@@ -161,12 +161,22 @@ def _build_genai_from_source(venv_path, genai_src):
     genai_out = os.path.join(build_dir, "openvino_genai")
     target = os.path.join(site_packages, "openvino_genai")
     ext = sysconfig.get_config_var("EXT_SUFFIX") or ".so"
-    for f in ["libopenvino_genai.so", f"py_openvino_genai{ext}"]:
-        src = os.path.join(genai_out, f)
-        dst = os.path.join(target, f)
-        if os.path.isfile(src):
-            shutil.copy2(src, dst)
-            print(f"  ✓ {TR('已安装', 'Installed')}: {f}")
+    libsrc = os.path.join(genai_out, "libopenvino_genai.so")
+    if os.path.isfile(libsrc):
+        # SONAME 为 .so.2620，需要同时提供两个文件名
+        for fname in ["libopenvino_genai.so", "libopenvino_genai.so.2620"]:
+            shutil.copy2(libsrc, os.path.join(target, fname))
+        print(f"  ✓ {TR('已安装', 'Installed')}: libopenvino_genai.so")
+    pysrc = os.path.join(genai_out, f"py_openvino_genai{ext}")
+    if os.path.isfile(pysrc):
+        shutil.copy2(pysrc, target)
+        print(f"  ✓ {TR('已安装', 'Installed')}: py_openvino_genai{ext}")
+
+    # 清理 ld 缓存
+    try:
+        subprocess.check_call(["ldconfig"], env=env)
+    except Exception:
+        pass
 
     print(f"  ✓ {TR('GenAI 编译安装完成', 'GenAI build & install complete')}")
     return True
