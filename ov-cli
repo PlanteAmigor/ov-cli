@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+DIR="$(cd "$(dirname "$0")" && pwd)"
+VENV="$DIR/.venv"
+if [ ! -d "$VENV" ]; then
+    VENV="$DIR/Hy-MT2/.venv"
+fi
+if [ ! -d "$VENV" ]; then
+    VENV="$DIR/../.venv"
+fi
+
+if [ -d "$VENV" ]; then
+    exec "$VENV/bin/python" -m ov_cli "$@"
+else
+    exec python -m ov_cli "$@"
+fi
