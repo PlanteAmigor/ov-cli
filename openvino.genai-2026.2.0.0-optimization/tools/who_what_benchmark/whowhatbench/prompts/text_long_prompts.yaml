@@ -1,0 +1,1117 @@
+# The source of prompts - zai-org/LongBench
+en:
+    prompts:
+        -  |
+            You are given a scientific article and a question. Answer the question as concisely as you can, using a single phrase or sentence if possible. If the question cannot be answered based on the information in the article, write "unanswerable". If the question is a yes/no question, answer "yes", "no", or "unanswerable".
+
+            Title: Establishing Ground Truth in Fake News Detection: Methods and Challenges
+
+            Abstract:
+            The proliferation of misinformation on digital platforms has amplified the need for robust fake news detection systems. Central to developing and evaluating such systems is the establishment of a reliable ground truth. This paper reviews methodologies used to determine the veracity of news content, focusing on expert annotation, fact-checking services, and crowdsourcing. It also discusses challenges such as bias, subjectivity, and the evolving nature of truth in socio-political contexts.
+
+            1. Introduction
+            Fake news—deliberately false or misleading information presented as news—has become a global concern, impacting elections, public health, and societal trust. Machine learning and natural language processing (NLP) techniques have emerged to detect fake news, but these systems require labeled datasets with a ground truth indicating whether content is true or false. Defining and verifying this ground truth is complex due to subjective interpretation, ideological bias, and temporal shifts in facts.
+
+            2. Ground Truth Establishment Methods
+            2.1 Expert Annotation
+            Many datasets rely on professional journalists, domain experts, or researchers to manually annotate articles. Annotators verify claims against authoritative sources and follow defined guidelines to classify news as true, partially true, or false. This method ensures high-quality labels but is costly and time-consuming.
+            2.2 Fact-Checking Organizations
+            Ground truth is often derived from fact-checking platforms such as PolitiFact, Snopes, and FactCheck.org. These organizations apply rigorous verification processes and publish verdicts on individual claims. Datasets like LIAR and FakeNewsNet incorporate these verdicts as labels. While credible, such sources may still exhibit systemic biases based on their editorial standards.
+            2.3 Crowdsourcing
+            Some studies use non-expert crowdsourced workers to annotate news, leveraging redundancy and aggregation to improve label reliability. However, crowd workers may lack the domain knowledge or context needed to accurately judge factual correctness, leading to inconsistent labels.
+            2.4 Source Credibility and Heuristics
+            In some automated settings, the credibility of the news source is used as a proxy for truth. For example, mainstream media might be labeled as reliable, while fringe websites are flagged as less trustworthy. This approach is scalable but oversimplifies the nuanced nature of fake news.
+
+            3. Challenges and Limitations
+            Bias and Subjectivity: Annotator beliefs and the framing of news can influence labeling decisions.
+            Temporal Dynamics: What is false today might become true tomorrow, and vice versa, particularly in fast-evolving domains like science or politics.
+            Lack of Consensus: Multiple fact-checkers may disagree on the same piece of content.
+            Granularity of Labels: Truth is often not binary; claims can be partially true or require additional context.
+
+            4. Conclusion
+            Establishing ground truth for fake news remains a critical and non-trivial task. Despite the availability of expert fact-checking and annotation methodologies, challenges such as bias, subjectivity, and the dynamic nature of truth persist. Future work should focus on consensus-building, context-aware labeling, and hybrid annotation pipelines combining expert and crowd-based approaches.
+
+            Question: How is the ground truth for fake news established?
+        -  |
+            Please read the following text and answer the question below:
+
+            For much of the twentieth century, the coastal town of Brinford thrived on maritime labor.
+            Its deep harbor and natural breakwater made it an ideal location for ship repair and refitting,
+            and by the 1970s nearly every household had at least one family member employed at the docks.
+            Local schools tailored their curricula toward mechanical skills, welding, and navigation,
+            while small businesses—from diners to hardware stores—depended on the steady wages brought
+            in by shipyard workers.
+
+            This stability began to erode toward the end of the century. Advances in automation reduced
+            the need for manual labor, and international shipyards offered lower costs and faster turnaround
+            times. Contracts that once sustained the town for years were lost in a matter of months.
+            Gradually, layoffs became common, younger residents moved away in search of work, and vacant
+            storefronts appeared along Main Street.
+
+            Municipal leaders faced increasing pressure as unemployment climbed and tax revenues declined.
+            Several proposals were debated at town hall meetings, including subsidies to the shipyards,
+            efforts to rebrand Brinford as a tourist destination, and initiatives aimed at attracting new
+            industries altogether. Ultimately, officials concluded that reviving the ship repair sector
+            was unlikely in the long term.
+
+            Instead, the town council approved a multi-year plan focused on economic transition. Funding
+            was allocated to modernize roads, expand high-speed internet access, and repurpose abandoned
+            industrial buildings. A former warehouse complex near the harbor was transformed into a campus
+            for a newly founded technical college offering programs in software development, applied
+            engineering, and renewable energy systems.
+
+            These changes were not without difficulty. Many long-time dockworkers found retraining
+            challenging, and the cultural shift created tension between generations. However, as technology
+            firms and research startups began to occupy the renovated spaces, employment patterns slowly
+            changed. By the end of the following decade, Brinford’s economy had diversified, and while the
+            shipyards no longer dominated the town’s identity, the new investments had stabilized its future.
+
+            What was the primary reason Brinford began investing in education and infrastructure?
+
+            Choices:
+            (A) To protect the town’s maritime heritage
+            (B) To encourage tourism and hospitality businesses
+            (C) To respond to the long-term decline of ship repair employment
+            (D) To reduce population growth in coastal areas
+
+            Format your response as follows: “The correct answer is (A or B or C or D)”
+        -  |
+            Throughout human history, societies have grappled with the tension between individual well-being and collective advancement. On one hand, humans are social creatures who need rest, leisure, and personal fulfillment to thrive. Work, in its many forms—agriculture, craftsmanship, science, and commerce—has always demanded effort, dedication, and sacrifice. On the other hand, human civilization progresses through innovation, exploration, and relentless pursuit of knowledge, which often requires long hours, discipline, and prioritization of goals beyond immediate comfort. These two forces—personal satisfaction and societal progress—are constantly in tension, shaping both cultural norms and individual lives.
+
+            In modern times, this tension has become even more pronounced. The digital era has created a world where work is never truly distant; emails, notifications, and global markets ensure that responsibilities follow people home. Many individuals feel pressure to always be “on,” sacrificing sleep, family time, hobbies, and personal care in the name of productivity or ambition. At the same time, some of the most extraordinary advancements in technology, medicine, and environmental science have come from people willing to devote long hours and intense focus to a goal greater than themselves. These efforts—whether developing life-saving vaccines, exploring space, or creating sustainable energy solutions—often require prioritizing collective progress over personal comfort.
+
+            Philosophers, ethicists, and sociologists debate this trade-off constantly. Some argue that a life spent in relentless pursuit of societal progress, without regard for personal health or relationships, risks dehumanizing individuals and undermining the very society it seeks to improve. Happiness, mental health, and family cohesion are not luxuries but essential elements of a thriving civilization; without them, even the greatest achievements may feel hollow. Others counter that extraordinary challenges demand extraordinary dedication. Without sacrifices, humanity risks stagnation, unable to overcome diseases, poverty, climate change, or other existential threats. They argue that in certain periods of history—during scientific revolutions, industrial expansions, or wartime innovation—the collective benefit of pushing human capability outweighed individual comfort.
+
+            Moreover, the question is not simply a personal choice but a societal one. Policies, cultural values, and economic structures shape how people balance these priorities. Some societies emphasize shorter workweeks, generous vacations, and well-being programs, while others valorize achievement, competition, and relentless labor. Even within a single society, individuals face difficult decisions: should one spend evenings at home with family or late at the lab trying to cure a disease? Should one decline a high-pressure opportunity to preserve mental health, or accept it in service of a broader mission?
+
+            This ongoing tension raises profound questions about meaning and purpose. Is the ultimate goal of life personal fulfillment, or contributing to something larger than oneself? Can there be a balance where personal well-being and societal progress coexist, or are trade-offs inevitable? In a world facing unprecedented global challenges—climate crises, pandemics, and technological revolutions—the stakes of these choices are higher than ever.
+
+            Question: Considering both individual well-being and the collective advancement of humanity, should we prioritize work-life balance or the progress of humanity?
+        -  |
+            My name’s Tom, and I’m getting started with Game Design; specifically, I’m carving a niche as a technical game designer. About Me I’m a geek of all trades, and a master of some. I obviously love playing video games, but I also enjoy traditional games, comics, anime, science, and anything in the sci-fi or fantasy genres. I’ve played my fair share of Magic. I’ve DMed a few campaigns of D&D. My Story I grew up playing Skate or Die on my brother’s Commodore 64 and Pitfall on his Atari. His hand-me-downs were an electronic legacy that got me thinking of games as early as four years old. The first time I even considered that I might be able to have a computer of my own, the first thought that entered my mind was that I would be able to make video games. My 10-year-old brain didn’t have the slightest clue what that would require, but the seed was planted. Later on in my early teens, I got into playing Jedi Knight: Dark Forces II on the MSN Gaming Zone. I quickly got wrapped up in the world of “cogs,” hacking game files to bend the game to your will. There was the additional challenge of keeping the hack from tripping a checksum error, so you could take your hacks into multiplayer games. In high school, I was a member of the school website team starting in my freshman year. That’s where my interest in web development grew. I pursued that interest in college, and enjoyed it for the most part. However, my passion for creation and game design wouldn’t go without a fight. I made great plans for using my programming skills with my friends help to make games. Those plans never came to fruition. A few years later, I decided I needed a game development booster shot. I went back to school for a dose of knowledge and networking, and now I’m ready to make waves in the industry.
+            A few years later, I decided I needed a game development booster shot. I went back to school for a dose of knowledge and networking, and now I’m ready to make waves in the industry.
+
+            Today, I focus on developing skills at the intersection of design and engineering, aiming to become a technical game designer who understands both systems and player experience. My background in programming, combined with years of gaming, modding, and web development, has shaped my approach to game creation as both a technical and creative discipline.
+
+            Question: Based on the passage, which experiences most influenced Tom’s decision to pursue game design as a career?
+        -  |
+            The city rises from the water like a carefully composed painting, its skyline shaped as much by history as by necessity. Canals carve their way through neighborhoods the way streets do elsewhere, reflecting centuries-old facades in slow-moving water. Stone bridges arch gracefully from one bank to another, some narrow and steep, others wide enough to gather crowds pausing to watch boats drift beneath them. There is no constant hum of engines here; instead, the dominant sounds are footsteps on worn paving stones, the splash of oars, and voices echoing softly across the water.
+
+            The buildings are tightly packed, rising several stories high, their colors faded into warm shades of ochre, terracotta, and cream. Many bear subtle signs of age: crumbling plaster, iron balconies softened by rust, shuttered windows bleached by sun and salt air. At ground level, doors often open directly onto the water, where boats are moored like cars along a curb. The city seems to float, yet it feels solid—anchored by centuries of trade, art, and survival against the elements.
+
+            Commerce here has always depended on movement. Once, it was spices, silk, and glass that defined the city’s wealth; now it is people. Visitors arrive in steady waves, drawn by the promise of romance, beauty, and a sense of stepping outside modern time. Narrow alleys twist unpredictably, sometimes opening suddenly onto expansive squares dominated by ornate churches or civic buildings adorned with domes and columns. Pigeons gather where tourists linger, and cafés spill onto plazas where espresso is sipped standing at small counters.
+
+            Water shapes daily life in subtle ways. Seasonal flooding is an accepted inconvenience rather than a catastrophe, addressed with raised walkways and rubber boots stored near doorways. The rhythm of tides is understood intuitively by residents, just as weather is elsewhere. Light behaves differently here, bouncing off water and stone, creating a shimmering glow that shifts constantly throughout the day.
+
+            Art is not confined to museums; it lives in the city’s structure. Frescoes, sculptures, and mosaics appear in unexpected corners, reminders that beauty was once considered a civic duty. Even decay feels aesthetic, as if time itself has been incorporated into the design. At night, the city grows quieter, almost intimate. Lantern light reflects off canals, footsteps fade, and the city feels like it belongs once more to those who call it home.
+
+            This is a place shaped by water, history, and human ingenuity—a city that feels fragile yet enduring, suspended between preservation and disappearance.
+
+            Question: What city is being described?
+        -  |
+            At first glance, it appears deceptively simple: a small rectangular object designed to fit comfortably in one hand. Its surface is smooth and cool, interrupted only by a flat glass face that responds instantly to the lightest touch. There are few visible moving parts, yet within it exists an intricate network of components working together at remarkable speed. Though it occupies very little physical space, it serves as a gateway to vast amounts of information, communication, and entertainment.
+
+            This invention has fundamentally altered how people experience time and distance. Messages that once took days or weeks to arrive now appear in seconds, regardless of geography. Conversations no longer require physical presence or even simultaneous attention; they can unfold across time zones and schedules. The device has become an extension of memory itself, storing photographs, appointments, documents, and fragments of daily life that might otherwise be forgotten.
+
+            Its influence extends beyond communication. It has transformed commerce, allowing goods and services to be ordered with a few gestures. Navigation has become largely intuitive, with detailed maps and real-time guidance replacing folded paper charts and uncertain directions. Music, books, films, and news are no longer tied to physical formats but exist in a constantly updating digital stream accessible at any moment.
+
+            Social behavior has shifted alongside its adoption. Public spaces are now filled with individuals simultaneously present and elsewhere, eyes fixed on glowing screens. Moments once marked by idle waiting are now filled with scrolling, reading, or responding. The boundary between work and personal life has blurred, as this invention makes constant availability not only possible but often expected.
+
+            Despite its convenience, the invention raises questions about dependence and attention. Notifications compete for focus, shaping habits and even emotions. The sheer volume of information it delivers can overwhelm as easily as it can empower. Yet for many, life without it feels unimaginable; it has woven itself into daily routines so thoroughly that its absence is immediately felt.
+
+            This invention is both tool and companion, praised for its efficiency and criticized for its intrusiveness. It reflects human ingenuity and desire for connection, while also exposing vulnerabilities in how that connection is managed.
+
+            Question:
+            What invention is being described?
+        -  |
+            Write a Python function named convert_temperature that performs temperature conversions between Celsius and Fahrenheit. This function should be designed to be user-friendly, readable, and well-documented, so that other programmers or beginners could understand and use it easily. Imagine that this function will be part of a small utility library for students learning Python and temperature conversions, so clarity and correctness are especially important.
+
+            Your function must meet the following requirements:
+
+            1. Input arguments:
+
+            - value: a number representing the temperature (can be integer or float).
+            - scale: a string that is either "C" for Celsius or "F" for Fahrenheit, indicating the scale of the input temperature.
+
+            2. Core functionality:
+
+            - If scale is "C", convert the temperature to Fahrenheit using the correct formula.
+            - If scale is "F", convert the temperature to Celsius.
+
+            3. Function output:
+
+            - Return a formatted string showing the conversion in a readable way, for example: "25°C is 77°F" or "77°F is 25°C".
+            - Round the converted temperature to two decimal places for clarity.
+
+            4. Input Validation:
+
+            - If scale is not "C" or "F", raise a ValueError with a clear, descriptive error message.
+            - Optionally, ensure that value is a numeric type and raise a TypeError if it is not.
+
+            5. Documentation:
+
+            Include a proper docstring at the start of the function that explains:
+
+            - What the function does
+            - The input parameters and expected types
+            - The output format
+            - Possible exceptions
+
+            6. Coding Style:
+
+            - Use meaningful variable names.
+            - Keep the code readable and follow standard Python conventions (PEP8).
+            - Add inline comments if needed to explain key steps.
+
+            7. Example Usage:
+
+            - Include at least two examples showing the function being called: one converting from Celsius to Fahrenheit, and one converting from Fahrenheit to Celsius.
+            - Print the results of the example calls so that someone running the code can see the output immediately.
+
+            Extra Notes:
+
+            - Think of this function as something that could be used in a beginner-friendly Python tutorial.
+            - Make sure the code is robust, clear, and easy to understand, while also meeting all the requirements above.
+
+            Your code:
+        -  |
+            Artificial intelligence (AI) is advancing at a staggering pace, transforming industries, economies, and workplaces. Machines and algorithms can now perform tasks that once required human judgment: analyzing medical scans, driving vehicles, writing reports, and even creating art or music. The potential benefits are enormous: higher efficiency, lower costs, and the ability to tackle complex problems faster than humans could ever achieve. AI could help solve major societal challenges, from climate modeling to disease diagnosis.
+
+            Yet this progress comes with difficult ethical and social dilemmas. As AI automates more tasks, millions of jobs that people rely on for income, identity, and social participation may disappear. Workers in transportation, manufacturing, customer service, and even creative fields face the prospect of being replaced by machines. Economies may grow, and productivity may rise, but the distribution of wealth and opportunity could become increasingly unequal. Human labor has value not just economically but psychologically and socially, offering purpose, routine, and community.
+
+            Philosophers, economists, and policymakers debate how society should balance these competing interests. Should AI development continue unabated for the sake of progress, even if it creates disruption and unemployment? Or should regulation slow its adoption to protect livelihoods, even if it limits potential benefits? Some suggest retraining programs or universal basic income as potential mitigations, but these solutions raise further questions about sustainability, fairness, and human dignity.
+
+            The AI dilemma also raises deeper questions about identity and purpose. If machines do much of the work humans once did, how will people find meaning in their lives? How do we balance the drive for innovation with the responsibility to protect individuals from harm? As the pace of technological change accelerates, societies must confront the tension between progress and human welfare with urgent clarity.
+
+            The rise of automation and AI is transforming the workplace, impacting job roles across various industries, including high-tech manufacturing. Thanks to advanced technologies, many manual and repetitive tasks can now be automated, leading to increased efficiency and productivity.
+
+            But this shift is also causing job roles to evolve, with some becoming obsolete while new ones emerge. For example, manufacturing workers need to acquire new skills to operate and maintain machines and robots that are taking over manual tasks. Additionally, AI integration into high-tech manufacturing processes is creating new job roles like data analysts, AI programmers, and machine learning specialists.
+
+            These emerging job roles require a combination of technical skills and a deep understanding of business processes. The jobs of the future will require a mix of technical skills, creativity, and adaptability to leverage the power of automation and AI effectively.
+
+            As AI continues to transform the job market and employment landscape, individuals need to adapt to stay relevant and competitive in their careers. One way to adapt is to focus on developing skills that are in high demand, such as data analytics, machine learning, and programming. This can involve taking courses, like our micro-cred Certificate in Data Visualisation and Analysis, attending workshops, or earning certifications in these fields.
+
+            Another way to adapt is to embrace the opportunities presented by AI, such as using it to augment human capabilities and work more efficiently. This may involve learning how to work with AI tools and technologies and collaborating with AI systems to achieve better results.
+
+            Additionally, individuals should stay informed about the latest developments in AI and its impact on their industries. This can involve following industry publications, attending conferences, and networking with peers and experts.
+
+            Finally, individuals should remain flexible and adaptable, as the job market and employment landscape continues to evolve rapidly in response to AI and other technological advances. By embracing change and continually developing their skills and knowledge, individuals can thrive in a world where AI is transforming the way we work.
+
+            Question: Should we prioritize AI development and technological progress, or the protection of human jobs and livelihoods?
+        -  |
+            Over the last year, Ireland has begun rolling out a nationwide Deposit Return Scheme (DRS) aimed at reducing plastic waste, litter, and improving recycling rates for drink bottles and cans. Under the scheme, introduced on 1 February 2024, consumers pay a small refundable deposit (typically €0.15–€0.25) when they buy a drink in a plastic bottle or aluminium can with the special “Re‑turn” logo. When they return the empty container to a participating shop or supermarket—usually via a reverse vending machine (RVM) or manually at the counter—they get their deposit back as cash or a store voucher. The scheme is part of Ireland’s strategy to reach ambitious EU recycling targets (e.g., 77% of bottles by 2025 and 90% by 2029) and to support a “circular economy” where materials are reused and recycled rather than sent to landfill or littered.
+
+            Supporters of the scheme argue that it is a necessary environmental policy that directly incentivises recycling instead of disposal. Since its introduction, millions of plastic bottles and cans have been returned, and surveys show that street litter counts have fallen significantly in some areas—suggesting a positive impact on urban cleanliness and environmental behaviour. Encouraging people to bring containers back to shops helps ensure higher quality recycling streams, reduces waste in mixed bins, and lowers the overall environmental burden of packaging production and disposal. Advocates also point out that participating in the DRS makes individuals feel more engaged in sustainability efforts and contributes to broader goals like reducing pollution and conserving resources.
+
+            However, public forums and consumer feedback reflect a range of frustrations and concerns. Many participants report that machines are frequently out of order, full, or rejecting valid containers, forcing people to make multiple attempts or give up. Others complain that returning bottles can be time‑consuming, especially when queues form or when users must visit several shops to find a working machine. Some say that the requirement to return bottles to the same shop where people plan to redeem their vouchers adds inconvenience, especially for those without a car or with limited time. Additional workshop complaints include lack of storage space at home, confusion about eligible containers, and the sense that the extra task adds stress rather than simplifying recycling habits. Critics in online communities even question whether the time and effort spent returning bottles outweigh the environmental benefit or feel that the scheme hasn’t been communicated or implemented smoothly.
+
+            Both sides have real points: proponents argue that the scheme aligns with climate goals and reduces plastic pollution, while detractors emphasise everyday practical problems experienced by consumers.
+
+            Question: Should Ireland maintain and even expand its deposit return scheme despite the inconvenience it can cause, or should priority be given to simpler recycling systems that require less effort from individuals?
+        -  |
+            Anne Boleyn (c. 1501–1536), scion of the English nobility and daughter of Thomas Boleyn, Earl of Wiltshire and Ormond, and Lady Elizabeth Howard, spent her formative years partially abroad in the Netherlands court, an experience that shaped her cultural sophistication and political acumen. Her eventual marriage to King Henry VIII was fraught with religious and political upheaval, catalyzing the English Reformation and the severance from papal authority. Anne's tragic downfall, culminating in charges of treason, adultery, and incest—charges historians continue to scrutinize—sealed her fate and profoundly altered the course of English history.
+
+            Beyond her role as queen consort, Anne emerged as a formidable political and intellectual influence within the Tudor court, advocating reformist religious ideas and patronizing scholars aligned with humanist and evangelical thought. Her presence challenged traditional expectations of queenship, as she actively participated in matters of policy, diplomacy, and royal patronage. Yet these very qualities, which once secured her favor, also rendered her vulnerable within the volatile dynamics of court politics. Isolated by shifting alliances and the king’s waning affection, Anne ultimately became a casualty of the same absolutist power she had helped to consolidate.
+
+            Question: From which region or court did the wife of King Henry VIII originate during her youth?
+        -  |
+            Ugandan authorities have increased actions against the country’s main opposition party since the presidential elections held on January 15, 2026, according to Human Rights Watch.
+
+            After the elections, security forces carried out mass arrests of supporters of the National Unity Platform (NUP). Two senior opposition leaders were also forcibly disappeared and are still missing. Soldiers surrounded the home of NUP leader Robert Kyagulanyi, known as Bobi Wine, blocking entry and exit, attacking his wife and staff, and damaging property. Kyagulanyi was the main opponent of President Yoweri Museveni, who was declared the winner of a seventh term in office.
+
+            Human Rights Watch said these actions show a serious increase in abuse against political opposition. The organization called on the Ugandan government to stop targeting critics and to protect people who express opposing views.
+
+            On January 16, Kyagulanyi said online that he escaped his home after soldiers raided his compound and shut off electricity and security cameras. He has been in hiding since then. On January 23, armed men reportedly raided his home again while he was away. His wife, Barbara Kyagulanyi, filmed the incident, showing armed soldiers entering the property. She later said the men pulled her hair, tore her clothes, pushed her to the ground, and demanded access to her phone, which she refused.
+
+            President Museveni’s son, Muhoozi Kainerugaba, who leads the Ugandan military, had publicly threatened Kyagulanyi. He claimed online that the government had killed 22 NUP members and expressed hope that Kyagulanyi would be next. He later denied that soldiers attacked Kyagulanyi’s wife.
+
+            On the night of January 14, soldiers arrested Jolly Jackline Tukamushaba, NUP deputy president for Western Uganda, at a hotel in Muhanga. She was preparing election documents with her daughter and supporters when armed soldiers entered the room, pointed guns at them, took documents and money, and forced Tukamushaba into an unmarked van. She has not been seen since and was unable to take part in the election.
+
+            Another opposition leader, Lina Zedriga Waru, NUP deputy president for Northern Uganda, was taken from her home by soldiers on January 15. Her son said eight soldiers abducted her. The military later denied holding her during a court hearing, and the case was delayed for further review.
+
+            Enforced disappearances are illegal under international law. Uganda has a history of using this tactic against political opponents, and Human Rights Watch urged authorities to investigate these recent cases.
+
+            The 2026 elections were also marked by other serious abuses. Security forces beat and arrested hundreds of opposition supporters, including journalists. A well-known human rights activist was detained, and at least 10 NGOs were suspended without clear reasons. The government also shut down the internet two days before the election, limiting access to important information.
+
+            Task: Write a clear and detailed summary of the situation described in the passage.
+        -  |
+            On one street, the yellow and black logo on Rawbank stands above a bolted door and a shut ATM machine; nearby, the blue and white Ecobank sign stands above doors sealed by big blue shutters; and on another street, the blue and orange Access Bank logo and flags frame more locked doors.
+            It was early on Friday, November 3, 2011, when M23 rebels made good on their threat from a few days prior and seized Goma, before advancing in DRC’s east and taking other key cities in the weeks and months that followed.
+            With the deteriorating security situation, all banks in Goma shut, and ATMs stopped operating. The effects on the local population were harsh – and immediate.
+            Sitting at the door of a pharmacy she runs in central Goma, Sheilla Zawadi watches the traffic on the road go by, recounting the way her business and livelihood have changed in the last year.
+            She has an account with Access Bank, but lost her bank card just before the city fell to the rebels – and she does not have a mobile banking app to conduct transactions electronically.
+            Fortunately, she has a Visa card, which allows her to withdraw money – as long as she finds a bank or ATM. So, like many others in Goma, the 37-year-old mother of three decided to make a plan – crossing from Goma into neighbouring Rwanda to find a bank.
+            After that, she’d cross over from Rwanda, meeting informal money dealers along the border between Gisenyi and Goma, who would help change the Rwandan francs into dollars and then into Congolese francs. But she loses money with every exchange.
+            “It’s more expensive to withdraw money in another country. If only the banks would reopen,” she complains. A year after banks shut, they have not resumed operations even as the security situation has normalised.
+            The government in Kinshasa and M23 officials who now run the city trade blame about who is responsible, while the banks themselves have not said much or referred on occasion to “temporary closure” due to the “security situation”.
+            The border between Gisenyi and Goma is always busy. People line up in a single file to cross from one side to the other. Every day, dozens flock to ATMs and banks in downtown Gisenyi to withdraw their money the same way Zawadi does.
+            Others also use ATMs installed at the customs office between the DRC and Rwanda. Meanwhile, in Goma, the economy is cash-based, or, for those who can, run through electronic transfers.
+            In the city’s main market, traders and buyers say commodity prices have surged, while everyone is struggling to make a decent living.
+
+            Question: Why did residents of Goma have to go to Rwanda to access their money after the banks closed?
+        -  |
+            You are given a collection of documents from news reports, interviews, and public records.
+            Each document may mention people, organizations, or events.
+            Some relationships can only be determined by combining information across multiple documents.
+
+            Document 1
+            TechNova Inc. announced in 2018 that it had appointed Laura Chen as its new Chief Technology Officer.
+            At the time, Chen was praised for her previous work in artificial intelligence and cloud systems.
+            TechNova is headquartered in San Jose, California.
+
+            Document 2
+            In a 2020 interview, Laura Chen stated that before joining TechNova, she spent six years at Apex Systems, where she led a research group focused on distributed computing.
+            She left Apex Systems shortly before TechNova’s acquisition of several smaller startups.
+
+            Document 3
+            Apex Systems, founded in 2005, is a multinational technology company specializing in enterprise software solutions.
+            Between 2014 and 2021, the company expanded aggressively into cloud infrastructure and machine learning platforms.
+
+            Document 4
+            A press release from 2021 reported that TechNova Inc. acquired CloudBridge, a startup founded by Michael O’Reilly.
+            The acquisition was part of TechNova’s strategy to strengthen its cloud services division.
+
+            Document 5
+            In a business profile published in 2019, Michael O’Reilly was described as a former senior engineer at Apex Systems, where he worked on internal cloud deployment tools.
+            He left Apex Systems in 2016 to start CloudBridge.
+
+            Document 6
+            A corporate filing shows that CloudBridge partnered with Apex Systems on a joint research initiative in early 2017, focusing on scalable cloud architectures.
+
+            Document 7
+            In a later interview, Laura Chen mentioned that several of TechNova’s post-acquisition cloud initiatives benefited from “prior collaborations and shared institutional knowledge” between acquired startups and established firms.
+
+            Question: Based on the documents above, what is the professional relationship between Laura Chen and Michael O’Reilly prior to TechNova’s acquisition of CloudBridge?
+        -  |
+            Answer the question based on the given passage:
+            Veil of Shadows is a 2018 neo-noir thriller directed by Lucas Renaud, featuring a chilling score composed by Jóhann Jóhannsson. The soundtrack combines minimalist orchestral arrangements with electronic soundscapes to heighten the film’s tense and brooding atmosphere.
+
+            Plot
+            Set in a rain-soaked metropolis, the story follows detective Marcus Hale (played by Oscar Isaac) as he investigates a series of mysterious disappearances linked to a secretive underground society. As Marcus delves deeper, he forms an uneasy alliance with Evelyn Drake (Tessa Thompson), a journalist whose own past is entwined with the case. Together, they unravel a web of corruption and betrayal that threatens to consume them both.
+
+            Cast
+            Oscar Isaac as Detective Marcus Hale
+            Tessa Thompson as Evelyn Drake
+            Mark Strong as Chief Inspector Graves
+            Ruth Negga as Lydia Cross
+            Ben Mendelsohn as Victor Kane
+
+            Reception
+            The film received generally positive reviews, with critics lauding its atmospheric direction and compelling performances. The Guardian praised Jóhannsson’s score as “a haunting masterpiece that perfectly complements the film’s dark tone.” However, some reviewers found the plot overly intricate, noting that it occasionally sacrificed clarity for mood. Despite this, Veil of Shadows was nominated for several awards, including Best Cinematography and Best Original Score.
+
+            Question: Who composed the score for Veil of Shadows?
+        -  |
+            You are given a report by a government agency. Write a one-page summary of the report.
+
+            Report:
+            This report provides a comprehensive analysis of the current state and effectiveness of the nation’s public transportation infrastructure. It evaluates various modes of transport, including buses, trains, subways, and light rail systems, across urban and rural regions. The report highlights key challenges such as aging infrastructure, funding shortfalls, and service gaps that hinder accessibility and efficiency.
+
+            Data collected over the past five years reveal a steady increase in ridership in metropolitan areas, reflecting growing demand for sustainable and affordable transit options. However, rural areas continue to experience limited service, leading to transportation inequities that affect economic opportunities and quality of life for residents.
+
+            The report examines the impact of recent federal and state investments aimed at modernizing transit fleets, improving safety standards, and integrating emerging technologies such as real-time tracking and contactless payment systems. These initiatives have shown promise in enhancing rider experience and operational efficiency, though they require ongoing funding and coordinated planning.
+
+            Environmental considerations are a significant focus, with recommendations to expand electric and hybrid vehicle adoption to reduce greenhouse gas emissions and improve air quality. Additionally, the report emphasizes the importance of inclusive planning that addresses the needs of elderly, disabled, and low-income populations.
+
+            In conclusion, the report calls for increased multi-level government collaboration, innovative financing mechanisms, and community engagement to ensure that public transportation systems are resilient, equitable, and capable of meeting future demands. It stresses that investment in public transit is critical not only for mobility but also for economic growth, environmental sustainability, and social inclusion.
+            Now, write a one-page summary of the report.
+
+            Summary:
+        -  |
+            Answer the question based on the story as concisely as you can, using a single phrase if possible.
+            Liam had never known the bustling comfort of a large household. From the earliest days he could recall, the modest cottage at the edge of Ashwood village had been his only home. The worn wooden door, its paint peeling from years of rain and sun, opened to a small sitting room where the scent of old books mingled with the faint aroma of lavender and fresh bread. This humble abode belonged to his grandmother, a stern yet kind woman whose hands told stories of decades spent in toil and tender care.
+
+            Though the cottage was simple—furnished with a creaking oak table, a patchwork quilt upon the narrow bed, and shelves lined with knickknacks collected through the years—it held a quiet warmth that comforted Liam against the chill of the outside world. His parents, long gone, had entrusted him to her care when he was but a child, and since then, the two had forged a life marked by routine and resilience.
+
+            Each morning, Liam awoke to the soft creak of his grandmother’s footsteps in the kitchen, where a pot of tea simmered and fresh bread awaited. Though the village was small and the neighbors few, Liam found solace in the steady rhythm of his days and the steadfast presence of the woman who had become both guardian and guide. It was a life shaped less by abundance and more by the quiet strength of kinship and simple comforts.
+            Question: Who does Liam live with?
+        -  |
+            Answer the question based on the given passages. Only give me the answer and do not output any other words.
+            Passage 1:
+            Brown v. Board of Education
+            Brown v. Board of Education, 347 U.S. 483 (1954), was a landmark United States Supreme Court case in which the Court declared state laws establishing separate public schools for black and white students to be unconstitutional. The decision overturned the "separate but equal" doctrine established by Plessy v. Ferguson in 1896 and helped dismantle racial segregation across the United States.
+
+            Background
+            The case was a consolidation of five different cases all challenging the constitutionality of racial segregation in public schools. African American students had been denied admission to certain public schools based on laws allowing segregation by race. The lead plaintiff, Oliver Brown, filed suit against the Board of Education of Topeka, Kansas, after his daughter was denied entry to an all-white school near their home.
+
+            Decision
+            The Supreme Court, led by Chief Justice Earl Warren, unanimously ruled that "separate educational facilities are inherently unequal," violating the Equal Protection Clause of the Fourteenth Amendment. The ruling mandated the desegregation of schools across America, though implementation met with resistance and took many years.
+
+            Passage 2:
+            Roe v. Wade
+            Roe v. Wade, 410 U.S. 113 (1973), was a landmark decision of the United States Supreme Court in which the Court ruled that a state law that banned abortions except to save the life of the mother was unconstitutional under the Due Process Clause of the Fourteenth Amendment. The ruling effectively legalized abortion nationwide and ignited decades of political and legal debate.
+
+            Background
+            The case was brought by "Jane Roe" (a pseudonym for Norma McCorvey), who challenged the Texas law criminalizing most abortions. Roe argued that the law violated her constitutional rights. The case was heard during the 1971-1972 term and decided in 1973.
+
+            Decision
+            The Court held that a woman's right to privacy included the decision to have an abortion but balanced this against the state's interests in regulating abortions and protecting prenatal life. The ruling created a trimester framework limiting state intervention early in pregnancy.
+
+            Question: Which case was decided first, Brown v. Board of Education or Roe v. Wade?
+        -  |
+            NNCF allows to quantize models for best results on a given Intel hardware type when executed using OpenVINO runtime. To achieve this, the quantizer setup should be performed with following considerations in mind:
+
+            1. every operation that can accept quantized inputs on a given HW (i.e. can be executed using quantized input values) should have its inputs quantized in NNCF
+            2. the quantized inputs should be quantized with a configuration that is supported on a given HW for a given operation (e.g. per-tensor vs per-channel quantization, or 8 bits vs. 4 bits)
+            3. for operations that are agnostic to quantization, the execution should handle quantized tensors rather than full-precision tensors.
+            4. certain operation sequences will be runtime-optimized to execute in a single kernel call ("fused"), and additional quantizer insertion/quantization simulation within such operation sequences will be detrimental to overall performance
+
+            These requirements are fulfilled by the quantizer propagation algorithm. The algorithm first searches the internal NNCF representation of the model's control flow graph for predefined patterns that are "fusible", and apply the fusing to the internal graph representation as well. Next, the operations in the graph that can be associated to input-quantizable operations on a given target hardware are assigned a single quantizer for each its quantizable activation input, with a number of possible quantizer configurations attached to it (that are feasible on target HW). The quantizers are then "propagated" against the data flow in the model's control flow graph as far as possible, potentially merging with other quantizers. Once all quantizers have reached a standstill in their propagation process, each will have a final (possibly reduced) set of possible quantizer configurations, from which a single one is either chosen manually, or using a precision initialization algorithm (which accepts the potential quantizer locations and associated potential quantizer configuration sets). The resulting configuration is then applied as a final quantizer setup configuration.
+
+            Note that this algorithm applies to activation quantization only - the weight quantizers do not require propagation. However, the possible configurations of weight quantizers themselves are also sourced from the HW config file definitions.
+
+            The HW to target for a given quantization algorithm run can be specified in NNCF config using the global "target_device" option. The default corresponds to CPU-friendly quantization. "TRIAL" corresponds to a configuration that uses the general quantizer propagation algorithm, but does not use any HW-specific information about quantizability of given operation types or possible quantizer configs for associated inputs or operation weights. Instead it uses a default, basic 8-bit symmetric per-tensor quantization configuration for each quantizer, and quantizes inputs of a certain default operation set, which at the moment is defined internally in NNCF. The quantization configuration in the "target_device": "TRIAL" case may be overridden using the regular "activations" and "weights" sections in the quantization compression algorithm sub-config, see below.
+
+            For all target HW types, parts of the model graph can be marked as non-quantizable by using the "ignored_scopes" field - inputs and weights of matching nodes in the NNCF internal graph representation will not be quantized, and the downstream quantizers will not propagate upwards through such nodes.
+
+            Question: What is the purpose of the target_device option in NNCF?
+        -  |
+            KVCache Token Eviction Algorithm
+            Overview
+            The cache eviction algorithm is designed to manage KV (Key-Value) cache memory for large language models (LLMs) during text generation. It determines which blocks of tokens should be evicted from the KV cache based on importance scores calculated from attention scores across different attention layers.
+
+            The cache eviction algorithm allows for average and maximum KV cache consumption savings since it effectively imposes a configurable hard limit on the amount of KV cache blocks that each sequence can occupy. A fixed, relatively small value of KV cache block limit means that there is less compute spent on generating next token, when compared to the no-eviction case where the entire KV cache history of the sequence, including prompt tokens, would have to be processed; token latency would also remain stable. This effect only comes into play during the generation stage and is most noticeable for longer generation lengths.
+
+            No eviction is done during prefill stage, therefore no speedups would be achieved during the prefill using cache eviction alone and the reduction in maximum KV cache consumption over the entire generation process is limited from below by the amount of KV cache blocks occupied by the full prompt. To achieve prefill stage speedup, the sparse attention prefill algorithms can be used, either separately or along with cache eviction.
+
+            Conceptual Model
+            The KV cache for each sequence is divided into three logical areas:
+
+            KV cache layout with cache eviction
+
+            Start Area: Initial tokens that are never evicted
+            Evictable Area: Tokens that can be evicted based on importance scores
+            Recent Area: Most recent tokens that are preserved (not evicted while in this area, but naturally migrating toward the evictable area as the text generation goes on)
+            The sizes of all three areas can be configured by modifying corresponding fields in a CacheEvictionConfig struct, which itself is a part of the pipeline-wide SchedulerConfig. As the generation starts, the blocks in respective logical areas are filled token-by-token, and once at least one block past the "recent" area is filled, eviction may take place. The tokens are evicted based on accumulated importance scores following the H2O approach. The scores are accumulated throughout the entire generation process and their weighting may be changed by adjusting the CacheEvictionConfig.aggregation_mode parameter. Eviction occurs with a block-wise granularity, and only the completely filled blocks from the "evictable" area are evicted. By default the start area is 32 tokens, evictable area is 512 tokens and recent area is 128 tokens, which amounts to a total maximum cache usage by sequence during the generation phase of 672 tokens.
+
+            This approach allows LLMs to handle long sequences efficiently by keeping the most contextually important tokens in the cache while evicting those of lesser importance. The downside of the eviction procedure is potential loss of generation accuracy, since the cache no longer contains the entire context for the generation, but only the most "important" token blocks. The user can adjust the individual sizes of the eviction sub-areas to hit the optimal point of accuracy/memory usage tradeoff in their particular case.
+
+            Note that currently the eviction only starts after the full prompt has been processed, i.e. no eviction takes place during the prefill phase. This means that for longer prompt sizes the maximum cache usage may exceed the limit defined by the CacheEvictionConfig parameters.
+
+            After the prefill phase, however, the maximum cache occupancy for each sequence currently being processed is strictly limited by the combined sizes of the 3 areas described above. CacheEvictionConfig.get_max_cache_size_after_eviction() can be queried to get this cache size limit in tokens.
+
+            Adaptive R-KV score aggregation
+
+            Along with the more straightforward AggregationMode.SUM and AggregationMode.NORM_SUM, there is an option to set CacheEvictionConfig.aggregation_mode = AggregationMode.ADAPTIVE_RKV to enable the R-KV-based scoring for the blocks to be evicted.
+
+            Whenever the eviction should occur, the R-KV approach uses the same per-token, block-accumulated attention scores to determine the subset of KV cache blocks that comprises a configurable portion of the total attention scores across currently retained blocks (i.e. "attention mass", as controlled CacheEvictionConfig.adaptive_rkv_config.attention_mass). This block subset (up to the limits imposed by the higher-level config's start_size, recent_size and max_cache_size) will be retained after eviction. The rest of the blocks that would need to be retained during current eviction step will be taken from the most "diverse" remaining blocks in the evictable area. The "diversity" is calculated as the negative of the block-aggregated cross-token cosine similarity; the aim is to find the most dissimilar blocks among the non-attention-mass subset and keep only those as most representative ones.
+
+            In addition to the above, the attention scores are aggregated across generation step by a running average with a window size controlled by the CacheEvictionConfig.adaptive_rkv_config.window_size.
+
+            Question: What are the three logical areas of the KV cache in the token eviction algorithm?
+        -  |
+            This dog breed traces its origins to white-coated herding dogs that share ancestry with early German Shepherd lines. Although dogs of this coloration were later barred from registration in Germany due to changing breed standards, they continued to gain popularity in North America, particularly in the United States and Canada. Enthusiasts in these countries valued the dogs for their intelligence, working ability, and distinctive white coats, eventually forming dedicated breed clubs that promoted and preserved these dogs as a separate lineage.
+
+            In the early 1970s, several dogs of this type were imported from North America to Switzerland, marking a key moment in the breed’s development in Europe. One of the earliest and most influential foundation dogs was an American-born male named Lobo, born on 5 March 1966. Additional dogs were later imported from both the United States and Canada, helping to establish a stable breeding population. Swiss breeders focused on maintaining the breed’s balanced temperament, physical soundness, and working aptitude while distinguishing it from its German ancestors.
+
+            The breed gained official recognition in Switzerland in June 1991 and was entered into the national registry maintained by the Swiss Kennel Club. International recognition followed when the breed received provisional acceptance from the Fédération Cynologique Internationale in 2002, with full recognition granted in 2011. Recognition continued to expand, and in 2017 the breed was officially acknowledged by the British Kennel Club. Today, this breed is appreciated both as a loyal companion and as a versatile working dog, known for its calm demeanor, intelligence, and strong bond with its family.
+
+            Question: What breed is described above?
+        -  |
+            Logistic regression is a statistical modeling approach used to estimate the probability of a categorical outcome based on one or more independent variables. It models the log-odds of an event as a linear combination of input variables and uses the logistic (sigmoid) function to map these values to probabilities between 0 and 1. The model itself produces probabilities, which can later be converted into class predictions by applying a decision threshold.
+
+            In its most basic form, binary logistic regression is designed for problems where the outcome has exactly two possible classes. These classes are commonly encoded as 0 and 1, representing mutually exclusive states such as success or failure, yes or no, or positive or negative. The model estimates a single probability: the likelihood that an observation belongs to one specific class relative to the other.
+
+            However, many real-world problems involve more than two possible outcome categories. In such cases, multinomial logistic regression is used. Instead of modeling a single probability, this extension estimates probabilities for each class among three or more unordered categories, such as types of transportation, product choices, or document topics. It does this by learning separate parameter sets for each class and normalizing the results so that all class probabilities sum to one.
+
+            Logistic regression and its variants are widely applied in fields such as medicine, economics, social sciences, and machine learning. While binary logistic regression is simpler and easier to interpret, multinomial logistic regression allows the same core principles to be applied to more complex classification tasks involving multiple categories. Both models are typically trained using maximum-likelihood estimation and are valued for their interpretability and strong baseline performance.
+
+            Question: What is the difference between binary logistic regression and multinomial logistic regression?
+        -  |
+            In recent years, Automatic Speech Recognition (ASR) has transitioned from traditional end-to-end (E2E) paradigms—such as Transducer models (Graves, 2012) and Attention-based Encoder–Decoder (AED) models (Chan et al., 2016; Radford et al., 2023)—to the Large Audio-Language Model (LALM) paradigm. Compared with conventional ASR systems, this paradigm can better leverage the language modeling capabilities and world knowledge of large language models. Instead of relying solely on bottom-up acoustic pattern matching, the model first forms a high-level semantic understanding of the audio signal and then generates transcriptions conditioned on this understanding. Under this paradigm, challenges that are traditionally difficult for conventional ASR models—such as long-form transcription, robustness to noise, utilization of world knowledge and named-entity recognition, as well as multilingual and dialectal coverage—can be addressed more naturally.
+
+            In real-world deployments, ASR systems are often required to output timestamps alongside transcripts, for example in subtitle generation. Prior work typically performs timestamp prediction as a post-processing step using techniques such as Connectionist Temporal Classification (CTC) or Continuous Integrate-and-Fire (CIF) (Kürzinger et al., 2020; Rastorgueva et al., 2023; Shi et al., 2023). We highlight that an LALM-based approach can provide more accurate and faster timestamp prediction at arbitrary temporal granularities. Moreover, by leveraging the multilingual capabilities of LALMs, a single unified model can support timestamp alignment across diverse languages.
+
+            In this report, we present the Qwen3-ASR family, including Qwen3-ASR-1.7B and Qwen3-ASR-0.6B—two all-in-one ASR models with language identification (LID) capabilities covering 52 languages and dialects—as well as Qwen3-ForcedAligner-0.6B, the first lightweight LALM-based multilingual forced aligner supporting 11 languages and flexible timestamp granularities. These models are post-trained from the strong foundation model Qwen3-Omni (Xu et al., 2025a). To evaluate ASR performance beyond existing open-sourced benchmarks—where annotation noise has become a limiting factor—we construct a suite of internal benchmarks covering complex acoustic environments, dialectal variation, elderly and children’s speech, and multilingual scenarios. Qwen3-ASR-1.7B achieves state-of-the-art (SOTA) performance among open-sourced ASR models and is competitive with leading proprietary commercial APIs. Qwen3-ASR-0.6B offers the best accuracy-to-model-size trade-off, making it a strong candidate for on-device deployment. Qwen3-ForcedAligner-0.6B delivers highly accurate forced-alignment timestamps while inheriting key capabilities from Qwen3-ASR, including multilingual and long-form speech support, enabling scalable labeling of speech–transcript pairs.
+
+            The key features and contributions of the proposed Qwen3-ASR family are summarized as follows:
+
+            - State-of-the-art all-in-one ASR and LID performance. Qwen3-ASR-1.7B and Qwen3-ASR-0.6B support ASR for 30 languages, 22 Chinese dialects, and English from diverse countries and regions worldwide. Both models demonstrate robust recognition under complex conditions, including singing voice and song recognition, noisy environments, and complex textual patterns.
+
+            - Novel speech forced-alignment architecture. To the best of our knowledge, we introduce the first Large Language Model–based speech forced aligner capable of producing accurate timestamps at flexible granularities, including word-, sentence-, and paragraph-level alignment. Compared with existing forced-alignment tools such as Montreal Forced Aligner (MFA) and NeMo Forced Aligner (NFA), Qwen3-ForcedAligner-0.6B fills the gap for an all-in-one, multilingual forced-alignment solution and completes a critical component of the Qwen3-ASR family.
+
+            - Open-sourced weights and comprehensive inference and finetuning framework. In addition to releasing the weights of all three models, we open-source a complete and user-friendly codebase that supports inference with multiple features and provides a finetuning recipe. We hope this unified toolkit will facilitate further research and development within the ASR community.
+
+            Question: How many Chinese dialects are supported by the Qwen3-ASR-1.7B model?
+        -  |
+            The Emergency Response Payment (ERP), formerly known as the Humanitarian Assistance Scheme, provides financial support to households whose homes have been directly affected by severe weather events, such as flooding, storms, or other emergencies. The payment is designed to help meet essential needs and repair costs rather than provide full compensation for all losses. It is only open for applications when activated in response to a specific emergency.
+
+            The ERP is divided into three stages. Stage 1 provides immediate support for urgent needs, such as food, clothing, bedding, and essential personal items, and is not income-tested. Stage 2 covers the replacement of essential household items, including white goods, flooring, and basic furniture, when there is a valid reason these costs were not covered by insurance. Stage 3 provides support for structural damage to a home, such as plastering, electrical rewiring, or painting, to restore the property to a liveable condition. Stage 2 and Stage 3 payments are subject to income testing, meaning that household income is assessed to determine whether the household can contribute to the costs or if they qualify for full support.
+
+            Income assessment works by first establishing a base income limit. For a single applicant, this limit is €50,000. The limit is increased by €15,000 for each qualified child living in the household. Non-dependent adult members of the household also count toward the income calculation, with 20% of their income added to the household total. If the household income is at or below the adjusted income limit, applicants may receive 100% of the amount allowable. For income above the limit, applicants are expected to contribute 1% of the allowable amount for every €1,000 over the threshold.
+
+            The ERP does not cover losses that are already insured, losses to non-essential items, luxury goods, commercial or agricultural losses, damage to rented accommodation, or motor vehicles. Only uninsured and essential losses are considered in the calculation of the payment. For applicants who do not have insurance without a valid reason, an initial contribution of €2,000 is expected, and additional contributions are calculated based on household income above the applicable limit.
+            For example, if you are: Single, and Have a gross household income of €55,000 You get 95% of the amount allowable (€5,000 over the income limit of €50,000 = 5% personal contribution towards the loss). If you are in a couple If you are married, in a civil partnership or cohabiting and have a combined gross household income of €90,000 or less, you get 100% of the amount allowable. For each whole €1,000 of household income above €90,000, you are required to make a 1% contribution to the amount allowable. For example, if you are: Married, in a civil partnership or cohabiting, and Have a combined gross household income of €105,000 You get 85% of the amount allowable (€15,000 over the income limit of €90,000 = 15% personal contribution to the loss). Increases for qualified children The income limits are increased by €15,000 for each qualified child. One-parent household The income limit for one-parent households is €90,000 plus €15,000 for each qualified child.
+
+            Question: How much can the single mother and her five-year-old child claim under the Emergency Response Payment for her uninsured losses? Total loss: €20,000; covered by insurance: €12,000.
+        -  |
+            Answer the question based on the given passage.
+
+            Passage:
+            The Rise and Global Impact of Streaming Services on the Film Industry
+
+            In the early 21st century, streaming platforms such as Netflix, Amazon Prime Video, and later Disney+, fundamentally transformed the film and television industry. Initially starting as a DVD-by-mail service, Netflix pivoted to streaming in 2007, leading a digital revolution that disrupted the traditional distribution models of cinema and broadcast television.
+
+            One of the most significant shifts caused by streaming has been the collapse of the theatrical release window. Previously, films would debut exclusively in cinemas for months before becoming available for home viewing. Streaming services, however, began offering original films directly to subscribers, sometimes releasing them simultaneously in theaters and online—most notably during the COVID-19 pandemic, which accelerated this trend.
+
+            This shift has sparked debates across the industry. While some filmmakers argue that streaming democratizes access and offers greater creative freedom, others worry it diminishes the cultural experience of cinema and undermines box office revenue. Additionally, streaming platforms use complex algorithms to personalize recommendations, influencing viewer habits and even greenlighting content based on data-driven predictions rather than purely artistic vision.
+
+            Globally, the reach of streaming has enabled regional and independent films to gain international exposure. Korean dramas, Spanish thrillers, and Indian series now enjoy mainstream success beyond their borders, contributing to a diversification of storytelling and audience tastes worldwide.
+
+            Question: In what ways have streaming platforms altered both the distribution of films and the global cultural landscape of entertainment?
+        -  |
+            Task: Read the following description carefully and try to guess the story and its author based on the details provided.
+
+            In the foggy streets of Victorian London, a wealthy and anxious young woman seeks help after her father mysteriously disappears, leaving behind a series of strange clues that no one seems to understand. The case appears nearly impossible: cryptic notes, unusual behavior from several individuals, and subtle signs all point toward a hidden danger.
+
+            A highly observant detective, aided by his loyal friend who records the events, meticulously examines the evidence. He notices minute details overlooked by others—a small smudge on a letter, the unusual placement of objects in a room, and faint marks that hint at past events. Using these observations along with his deep understanding of human behavior and criminal patterns, he reconstructs the sequence of events leading to the father’s disappearance.
+
+            The investigation leads him through dimly lit streets, abandoned buildings, and the hidden corners of the city. Along the way, he uncovers secret passages, deciphers coded messages, and pieces together a network of seemingly unrelated incidents. Danger is ever-present, and the tension escalates as he races against time to prevent further harm.
+
+            In a dramatic climax, the detective cleverly exposes the mastermind behind the scheme, surprising both the authorities and the client. The resolution highlights his remarkable intellect and his ability to understand the criminal mind, while also showcasing his flair for presenting the truth in a compelling, almost theatrical manner. Themes of loyalty, justice, and the limits of perception run throughout the story, all set against the atmospheric backdrop of 19th-century London.
+
+            This tale has become a classic example of detective fiction, celebrated for its suspense, ingenious reasoning, and the unforgettable personality of its central character.
+
+            Question: Based on the description above, can you name the story and its author?
+        -  |
+            What does "run" and "step" correspond to in Tensorflow debugger (tfdbg)?
+
+            I am trying to understand how Tensorflow debugger tfdbg works:
+
+            with sv.managed_session(config=config_proto) as session:
+                session = tf_debug.LocalCLIDebugWrapperSession(session)
+                for i in range(config.max_epoch):
+                    session.run(model.lr)
+
+            After reading the docs and watching one small tutorial on youtube I could not understand what does "run" and "step" commands actually stand for and what's more important how do they compare with neural network training time steps and epochs?
+
+            From the docs:
+
+            The run command causes tfdbg to execute until the end of the next Session.run() call, which calculates the model's accuracy using a test data set.
+
+            But the Session.run it is just:
+
+            ... one "step" of TensorFlow computation, by running the necessary graph fragment to execute every Operation and evaluate every Tensor in fetches, substituting the values in feed_dict for the corresponding input values.
+
+            In TensorFlow 1.x, a Session.run() executes part of the computation graph. You provide fetches (tensors or operations you want to evaluate), and TensorFlow computes all operations required to produce those fetches, using any values in feed_dict.
+
+            When using the TensorFlow debugger (tfdbg), the CLI offers two main commands:
+
+            run: Executes a portion of the graph in a controlled way.
+
+            step: Allows the user to examine operations in the graph more granularly.
+
+            Neural network training is often organized into epochs (full passes over the training dataset) and steps/iterations (processing individual batches).
+
+            I am new to TF and I still do not understand how to interpret "run" in terms of neural network steps and epochs. This of course makes difficult to use tfdbg because after couple of "run"s I get a list of ~5000 lines of misc tensor and ops which I need to search through and I don't understand what am I looking at, the results of one time step or epoch.
+
+            Question: In TensorFlow debugger (tfdbg), what do the commands run and step correspond to in terms of neural network training steps and epochs?
+
+cn:
+    prompts:
+        -  |
+           您将获得一篇科学文章和一个问题。请尽可能简洁地回答该问题，最好使用一个短语或句子。如果文章中的信息无法回答该问题，请写“无法回答”。如果问题是是非题，请回答“是”、“否”或“无法回答”。
+
+            标题：建立虚假新闻检测中的真实性：方法与挑战
+
+            摘要：
+
+            数字平台上虚假信息的泛滥凸显了对可靠的虚假新闻检测系统的需求。开发和评估此类系统的关键在于建立可靠的真实性。本文回顾了用于确定新闻内容真实性的方法，重点关注专家标注、事实核查服务和众包。此外，本文还探讨了偏见、主观性以及在社会政治背景下真相不断演变等挑战。
+
+            1. 引言
+
+            虚假新闻——故意捏造或误导性信息并以新闻形式呈现——已成为全球关注的问题，影响着选举、公共卫生和社会信任。机器学习和自然语言处理 (NLP) 技术已被用于检测虚假新闻，但这些系统需要带有标签的数据集，其中包含指示内容真假的“真实标签”。由于主观解读、意识形态偏见以及事实随时间推移而变化等因素，定义和验证这种“真实标签”十分复杂。
+
+            2. 真实标签的建立方法
+
+            2.1 专家标注
+
+            许多数据集依赖于专业记者、领域专家或研究人员手动标注文章。标注人员会根据权威来源验证说法，并遵循既定准则将新闻分类为真、部分真或假。这种方法可以确保标签的高质量，但成本高昂且耗时。
+
+            2.2 事实核查机构
+
+            真实标签通常来源于 PolitiFact、Snopes 和 FactCheck.org 等事实核查平台。这些机构采用严格的验证流程，并发布对具体说法的结论。LIAR 和 FakeNewsNet 等数据集会将这些结论作为标签。尽管这些来源可信，但它们仍可能基于自身的编辑标准而表现出系统性偏见。
+
+            2.3 众包
+
+            一些研究利用非专业人士组成的众包团队来标注新闻，通过冗余和聚合来提高标签的可靠性。然而，众包人员可能缺乏准确判断事实正确性所需的领域知识或背景信息，从而导致标签不一致。
+
+            2.4 来源可信度和启发式方法
+
+            在一些自动化设置中，新闻来源的可信度被用作真实性的替代指标。例如，主流媒体可能被标记为可靠，而边缘网站则被标记为不太可信。这种方法虽然可扩展，但却过于简化了虚假新闻的复杂性。
+
+            3. 挑战与局限性
+
+            偏见与主观性：标注者的信念和新闻的框架会影响标签决策。
+
+            时间动态：今天被认为是错误的，明天可能就变成了正确的，反之亦然，尤其是在科学或政治等快速发展的领域。
+
+            缺乏共识：多位事实核查员可能对同一内容持有不同意见。
+
+            标签粒度：真相往往并非非黑即白；某些说法可能部分正确，或者需要更多背景信息。
+
+            4. 结论
+
+            为虚假新闻确立真相仍然是一项至关重要且极具挑战性的任务。尽管已有专家事实核查和标注方法，但偏见、主观性和真相的动态性等挑战依然存在。未来的工作应着重于共识构建、上下文感知标注以及结合专家和众包方法的混合标注流程。
+
+            问题：如何确立虚假新闻的真相？
+        -  |
+            请阅读以下文字并回答问题：
+
+            在二十世纪的大部分时间里，沿海小镇布林福德依靠海事劳动力而繁荣发展。
+
+            其深水港和天然防波堤使其成为船舶维修和改装的理想地点，
+
+            到了20世纪70年代，几乎每家每户都至少有一名家庭成员在码头工作。
+
+            当地学校的课程设置侧重于机械技能、焊接和航海，
+
+            而从餐馆到五金店等小型企业则依赖于
+
+            造船厂工人带来的稳定工资。
+
+            这种稳定性在世纪末开始瓦解。自动化技术的进步减少了
+
+            对体力劳动的需求，而国际造船厂则提供了更低的成本和更快的周转时间。
+
+            曾经支撑小镇数年的合同在短短几个月内就消失了。
+
+            渐渐地，裁员变得司空见惯，年轻居民为了寻找工作而搬走，
+
+            主街上出现了空置的店面。
+
+            随着失业率攀升和税收收入下降，市政领导人面临着越来越大的压力。
+
+            在市政厅会议上，就多项提案进行了辩论，包括对造船厂的补贴、
+
+            将布林福德重新打造为旅游目的地的努力，以及旨在吸引全新产业的举措。
+
+            最终，官员们得出结论，从长远来看，振兴船舶修理业不太可能。
+
+            取而代之的是，镇议会批准了一项以经济转型为重点的多年计划。资金被分配用于道路现代化、扩大高速互联网接入以及改造废弃的工业建筑。
+
+            港口附近的一个旧仓库群被改造成一个校园，供一所新成立的技术学院使用，该学院提供软件开发、应用工程和可再生能源系统等课程。
+
+            这些变革并非一帆风顺。许多老码头工人发现再培训充满挑战，
+
+            文化转变也造成了代际之间的紧张关系。然而，随着科技公司和研究型初创企业开始入驻改造后的空间，就业模式逐渐发生了变化。到下一个十年末，布林福德的经济已经多元化，虽然
+
+            造船厂不再是这座小镇的标志性产业，但新的投资稳定了它的未来。
+
+            布林福德开始投资教育和基础设施的主要原因是什么？
+
+            选项：
+
+            (A) 为了保护小镇的航海遗产
+
+            (B) 为了促进旅游和酒店业的发展
+
+            (C) 为了应对船舶维修就业岗位的长期下降
+
+            (D) 为了降低沿海地区的人口增长
+
+            请按以下格式作答：“正确答案是（A 或 B 或 C 或 D）”
+        -  |
+            纵观人类历史，各个社会都在努力平衡个人福祉与集体进步之间的关系。一方面，人类是社会性动物，需要休息、休闲和个人满足感才能茁壮成长。工作，无论其形式如何——农业、手工艺、科学和商业——始终需要付出努力、奉献和牺牲。另一方面，人类文明的进步依赖于创新、探索和对知识的不懈追求，这往往需要长时间的工作、自律以及超越眼前舒适的目标。这两种力量——个人满足感和社会进步——始终处于一种张力之中，塑造着文化规范和个人生活。
+
+            在现代社会，这种张力变得更加显著。数字时代创造了一个工作无处不在的世界；电子邮件、通知和全球市场确保了人们的责任如影随形。许多人感到必须时刻保持“在线”状态，为了生产力或抱负而牺牲睡眠、家庭时间、爱好和个人照护。与此同时，科技、医学和环境科学领域一些最卓越的进步，都源于那些愿意投入大量时间和精力，为了一个超越自身利益的伟大目标而奋斗的人们。这些努力——无论是研发救命疫苗、探索太空，还是创造可持续能源解决方案——往往都需要将集体进步置于个人舒适之上。
+
+            哲学家、伦理学家和社会学家一直在争论这种权衡取舍。一些人认为，如果一个人毕生致力于追求社会进步，却忽视个人健康或人际关系，那么他就有可能丧失人性，并最终破坏他试图改善的社会本身。幸福、心理健康和家庭和睦并非奢侈品，而是文明繁荣的必要组成部分；缺少了它们，即使是最伟大的成就也会显得空洞无物。另一些人则反驳说，非凡的挑战需要非凡的奉献。如果没有牺牲，人类将面临停滞不前的风险，无法战胜疾病、贫困、气候变化或其他生存威胁。他们认为，在某些历史时期——例如科学革命、工业扩张或战时创新时期——提升人类能力所带来的集体利益超过了个人舒适。
+
+            此外，这并非仅仅是个人选择，而是社会选择。政策、文化价值观和经济结构塑造了人们如何平衡这些优先事项。一些社会强调缩短工作周、提供充足的假期和完善的福利计划，而另一些社会则推崇成就、竞争和不懈努力。即使在同一社会内部，个人也面临着艰难的抉择：是应该晚上待在家中陪伴家人，还是应该在实验室熬夜攻克疾病？为了保持心理健康，应该放弃高压的工作机会，还是应该为了更宏大的使命而接受它？
+
+            这种持续存在的矛盾引发了关于意义和目的的深刻思考。人生的最终目标是实现个人价值，还是为超越自身的事物做出贡献？个人福祉和社会进步能否兼得，还是说两者之间必然存在权衡取舍？在当今世界面临前所未有的全球挑战——气候危机、流行病和科技革命——的背景下，这些选择的重要性比以往任何时候都更加重大。
+
+            问题：兼顾个人福祉和人类的集体进步，我们应该优先考虑工作与生活的平衡，还是优先考虑人类的进步？
+        -  |
+            我叫汤姆，我刚开始学习游戏设计；具体来说，我正在努力成为一名技术型游戏设计师。关于我：我涉猎广泛，精通某些领域。我当然喜欢玩电子游戏，但也喜欢传统游戏、漫画、动画、科学，以及任何科幻或奇幻题材的作品。我玩过不少《万智牌》，也主持过几次《龙与地下城》的战役。我的故事：我小时候经常玩哥哥的Commodore 64上的《滑板或死亡》（Skate or Die）和雅达利上的《陷阱》（Pitfall）。他留给我的这些二手电脑就像一份电子遗产，让我从四岁起就开始思考游戏。当我第一次想到自己或许能拥有一台电脑时，脑海中浮现的第一个念头就是我可以制作电子游戏。我当时只有十岁，完全不知道这需要付出什么，但这个想法的种子已经种下了。十几岁的时候，我开始在MSN游戏专区玩《星球大战绝地武士：黑暗力量2》。我很快就沉迷于“修改器”的世界，也就是修改游戏文件来操控游戏。更棘手的是，还要避免修改后的程序出现校验和错误，这样才能把修改后的文件应用到多人游戏中。高中一年级时，我加入了学校的网站团队。正是在那里，我对网页开发产生了浓厚的兴趣。大学期间，我继续深造，并且大部分时间都乐在其中。然而，我对创作和游戏设计的热情始终不减。我曾雄心勃勃地计划和朋友们一起，利用我的编程技能制作游戏。但这些计划最终未能实现。几年后，我意识到自己需要加强游戏开发方面的学习。我重返校园，汲取知识，拓展人脉，现在我已经准备好在这个行业大展拳脚了。
+
+            几年后，我意识到自己需要加强游戏开发方面的学习。我重返校园，汲取知识、拓展人脉，现在我已经准备好在游戏行业大展拳脚。
+
+            如今，我专注于提升设计与工程交叉领域的技能，目标是成为一名既精通系统又了解玩家体验的技术型游戏设计师。我的编程背景，加上多年的游戏、MOD制作和网页开发经验，塑造了我将游戏创作视为一门兼具技术和创意的学科的独特视角。
+
+            问题：根据文章内容，哪些经历对汤姆决定从事游戏设计这一职业影响最大？
+        -  |
+            这座城市从水中拔地而起，宛如一幅精心构筑的画作，其天际线既受历史的沉淀，也受生活所需所致。运河如同其他地方的街道一般，蜿蜒穿过各个街区，在缓缓流淌的水中倒映着百年老建筑的立面。石桥优雅地连接着两岸，有的狭窄陡峭，有的则宽阔宽敞，足以吸引人群驻足观赏桥下船只的往来。这里没有引擎的轰鸣，取而代之的是脚步踩在磨损的石板上的沙沙声、桨橹的拍打声，以及人们在水面上轻柔回荡的声音。
+
+            建筑鳞次栉比，层层叠叠，色彩褪成了温暖的赭色、赤陶色和奶油色。许多建筑都留有岁月的痕迹：斑驳的灰泥、锈迹斑斑的铁阳台、被阳光和海风漂白的百叶窗。在地面层，许多门直接通向水面，船只像汽车一样停泊在路边。这座城市仿佛漂浮在空中，却又稳如磐石——几个世纪以来，贸易、艺术和抵御自然侵蚀的生存经验将其牢牢锚定。
+
+            这里的商业活动始终依赖于人员流动。过去，香料、丝绸和玻璃是这座城市财富的象征；如今，则是人流。游客络绎不绝地涌入，被浪漫、美景和远离尘嚣的宁静所吸引。狭窄的巷道蜿蜒曲折，有时突然豁然开朗，通向宽阔的广场，广场上矗立着装饰华丽的教堂或圆顶柱廊的市政建筑。鸽子聚集在游客驻足的地方，咖啡馆的门廊延伸到广场上，人们站在小柜台前啜饮着浓缩咖啡。
+
+            水以微妙的方式影响着人们的日常生活。季节性洪水被视为一种可以接受的不便，而非灾难，人们会修建高架人行道，并在门口存放雨靴来应对。居民们对潮汐的节奏有着与生俱来的理解，就像他们对其他地方的天气一样。这里的光线表现得截然不同，它在水面和岩石间反射，营造出闪烁的光晕，随着时间推移不断变化。
+
+            艺术并不局限于博物馆；它存在于城市的肌理之中。壁画、雕塑和马赛克出现在意想不到的角落，提醒着人们，美曾被视为公民的责任。即使是衰败也别具美感，仿佛时间本身也融入了设计之中。夜幕降临，城市变得静谧，近乎私密。灯笼的光芒映照在运河上，脚步声渐渐远去，这座城市仿佛再次属于那些以它为家的人们。
+
+            这是一座由水、历史和人类智慧塑造的城市——一座既脆弱又坚韧的城市，徘徊在保存与消逝之间。
+
+            问题：这里描述的是哪座城市？
+        -  |
+            乍看之下，它似乎极其简单：一个设计小巧的长方形物体，可以舒适地握在手中。它的表面光滑冰凉，只有一块平坦的玻璃面板，对最轻微的触摸都能瞬间做出反应。虽然几乎没有可见的活动部件，但其内部却隐藏着一个精密的组件网络，以惊人的速度协同运作。尽管它占用的物理空间很小，却成为了通往海量信息、交流和娱乐的门户。
+
+            这项发明从根本上改变了人们对时间和距离的感知。过去需要数天甚至数周才能到达的信息，现在只需几秒钟就能送达，不受地理位置的限制。对话不再需要面对面，甚至无需同时关注；它们可以跨越时区和时间安排进行。该设备本身已成为记忆的延伸，存储着照片、约会、文档以及日常生活中那些容易被遗忘的片段。
+
+            它的影响远不止于通信。它改变了商业，人们只需几个手势即可订购商品和服务。导航也变得非常直观，详细的地图和实时导航取代了折叠的纸质地图和模糊的指示。音乐、书籍、电影和新闻不再局限于实体形式，而是存在于不断更新的数字流中，随时随地可访问。
+
+            随着数字技术的普及，人们的社交行为也发生了改变。公共空间里，人们常常同时身处其中又游离于其他地方，目光紧盯着闪烁的屏幕。曾经的闲暇等待，如今被滚动浏览、阅读或回复填满。工作与生活的界限变得模糊，因为这项发明不仅使随时随地在线成为可能，而且往往成为一种期待。
+
+            尽管这项发明带来了便利，但也引发了关于依赖性和注意力的思考。各种通知争夺着人们的注意力，塑造着人们的习惯，甚至影响着他们的情绪。它传递的海量信息既能让人感到不知所措，也能赋予人力量。然而，对许多人来说，没有它的生活难以想象；它已经如此深入地融入日常生活，以至于一旦失去它，人们会立刻感受到它的存在。
+
+            这项发明既是工具，也是伴侣，它因其高效而备受赞誉，也因其侵入性而饱受诟病。它体现了人类的创造力和对连接的渴望，同时也暴露了这种连接管理方式的脆弱性。
+
+            问：
+
+            这里描述的是哪项发明？
+        -  |
+            编写一个名为 `convert_temperature` 的 Python 函数，用于在摄氏度和华氏度之间进行温度转换。该函数应设计得用户友好、易于阅读且文档齐全，以便其他程序员或初学者能够轻松理解和使用它。假设该函数将作为学生学习 Python 和温度转换的小型实用工具库的一部分，因此清晰性和正确性尤为重要。
+
+            您的函数必须满足以下要求：
+
+            1. 输入参数：
+
+            - value：表示温度的数字（可以是整数或浮点数）。
+
+            - scale：字符串，表示输入温度的单位，可以是“C”（摄氏度）或“F”（华氏度）。
+
+            2. 核心功能：
+
+            - 如果 scale 为“C”，则使用正确的公式将温度转换为华氏度。
+
+            - 如果 scale 为“F”，则将温度转换为摄氏度。
+
+            3. 函数输出：
+
+            - 返回一个格式化的字符串，以易于阅读的方式显示转换结果，例如：“25°C 等于 77°F” 或 “77°F 等于 25°C”。
+
+            - 为了清晰起见，将转换后的温度值四舍五入到小数点后两位。
+
+            4. 输入验证：
+
+            - 如果单位不是“C”或“F”，则抛出一个 ValueError 异常，并附带清晰的描述性错误信息。
+
+            - （可选）确保输入值为数值类型，如果不是，则抛出一个 TypeError 异常。
+
+            5. 文档：
+
+            在函数开头添加一个完整的文档字符串，解释以下内容：
+
+            - 函数的功能
+
+            - 输入参数及其预期类型
+
+            - 输出格式
+
+            - 可能出现的异常
+
+            6. 编码风格：
+
+            - 使用有意义的变量名。
+
+            - 保持代码的可读性，并遵循标准的 Python 规范（PEP8）。
+
+            - 如有需要，添加内联注释来解释关键步骤。
+
+            7. 示例用法：
+
+            - 至少提供两个示例来展示函数的调用：一个示例演示如何将摄氏度转换为华氏度，另一个示例演示如何将华氏度转换为摄氏度。
+
+            - 打印示例调用的结果，以便运行代码的人能够立即看到输出。
+
+            补充说明：
+
+            - 请将此函数视为适合 Python 初学者教程的示例。
+
+            - 请确保代码健壮、清晰易懂，并满足上述所有要求。
+
+            您的代码：
+        -  |
+            人工智能（AI）正以惊人的速度发展，改变着各行各业、经济体系和工作场所。机器和算法如今可以执行过去需要人类判断的任务：分析医学扫描、驾驶车辆、撰写报告，甚至创作艺术或音乐。其潜在益处巨大：更高的效率、更低的成本，以及比人类更快地解决复杂问题的能力。人工智能可以帮助解决从气候建模到疾病诊断等重大社会挑战。
+
+            然而，这种进步也带来了棘手的伦理和社会困境。随着人工智能自动化任务的增加，数百万人们赖以维持收入、身份认同和社会参与的工作岗位可能会消失。交通运输、制造业、客户服务，甚至创意领域的从业者都面临着被机器取代的风险。经济可能会增长，生产力可能会提高，但财富和机会的分配可能会变得越来越不公平。人类劳动不仅具有经济价值，还具有心理和社会价值，它能带来目标感、规律性和社群归属感。
+
+            哲学家、经济学家和政策制定者正在就社会应如何平衡这些相互冲突的利益展开辩论。为了追求进步，人工智能的发展是否应该继续不受限制地进行，即使这会造成混乱和失业？或者，为了保护民生，监管是否应该减缓其应用，即使这会限制其潜在益处？有人建议通过再培训计划或全民基本收入来缓解这些问题，但这些方案又引发了关于可持续性、公平性和人类尊严的更多疑问。
+
+            人工智能的困境也引发了关于身份和意义的更深层次的问题。如果机器承担了人类曾经从事的大部分工作，人们将如何找到生活的意义？我们如何在追求创新和保护个人免受伤害的责任之间取得平衡？随着技术变革步伐的加快，社会必须以清晰的视角来应对进步与人类福祉之间的矛盾。
+
+            自动化和人工智能的兴起正在改变工作场所，影响着包括高科技制造业在内的各个行业的岗位。得益于先进技术，许多体力劳动和重复性工作现在可以实现自动化，从而提高了效率和生产力。
+
+            但这种转变也导致岗位不断演变，一些岗位被淘汰，而新的岗位则不断涌现。例如，制造业工人需要掌握新的技能来操作和维护正在取代人工工作的机器和机器人。此外，人工智能融入高科技制造流程也催生了新的职业角色，例如数据分析师、人工智能程序员和机器学习专家。
+
+            这些新兴职业需要兼具技术技能和对业务流程的深刻理解。未来的工作需要技术技能、创造力和适应能力的结合，才能有效地利用自动化和人工智能的力量。
+
+            随着人工智能不断改变就业市场和就业格局，个人需要不断适应才能在职业生涯中保持竞争力。一种适应方式是专注于发展高需求技能，例如数据分析、机器学习和编程。这可以通过参加课程（例如我们的数据可视化与分析微证书课程）、参加研讨会或获得相关领域的认证来实现。
+
+            另一种适应方式是拥抱人工智能带来的机遇，例如利用人工智能增强人类能力并提高工作效率。这可能包括学习如何使用人工智能工具和技术，以及如何与人工智能系统协作以取得更佳成果。
+
+            此外，个人应密切关注人工智能的最新发展及其对所在行业的影响。这包括阅读行业出版物、参加会议以及与同行和专家交流。
+
+            最后，个人应保持灵活和适应性，因为就业市场和就业格局会随着人工智能和其他技术进步而快速变化。通过拥抱变革并不断提升自身技能和知识，个人才能在人工智能正在改变我们工作方式的世界中蓬勃发展。
+
+            问题：我们应该优先考虑人工智能的发展和技术进步，还是优先考虑保护人类的就业和生计？
+        -  |
+            过去一年，爱尔兰开始在全国范围内推行押金返还计划（DRS），旨在减少塑料垃圾和废弃物，并提高饮料瓶罐的回收率。该计划于2024年2月1日正式实施。根据该计划，消费者在购买带有“Re-turn”特殊标识的塑料瓶或铝罐饮料时，需支付少量可退还押金（通常为0.15至0.25欧元）。当他们将空瓶退回参与活动的商店或超市时——通常是通过自动回收机（RVM）或在收银台手动操作——即可获得现金或购物券形式的押金返还。该计划是爱尔兰实现欧盟雄心勃勃的回收目标（例如，到2025年回收77%的瓶子，到2029年回收90%）战略的一部分，旨在支持“循环经济”，即材料得到再利用和回收，而不是被送往垃圾填埋场或随意丢弃。
+
+            该计划的支持者认为，这是一项必要的环保政策，能够直接激励人们进行回收利用，而不是随意丢弃。自推出以来，已有数百万个塑料瓶和易拉罐被回收，调查显示，部分地区的街道垃圾数量显著下降——这表明该计划对城市清洁和环保行为产生了积极影响。鼓励人们将容器带回商店有助于确保更高质量的回收流程，减少混合垃圾桶中的垃圾量，并降低包装生产和处置对环境造成的总体负担。倡导者还指出，参与可回收物返还计划（DRS）能增强个人对可持续发展的参与感，并有助于实现更广泛的目标，例如减少污染和节约资源。
+
+            然而，公共论坛和消费者反馈反映出一系列不满和担忧。许多参与者反映，机器经常出现故障、爆满或拒收有效容器的情况，迫使人们多次尝试或最终放弃。另一些人则抱怨，退还瓶子很费时间，尤其是在排队或用户必须跑好几家商店才能找到可用的机器时。还有人表示，必须将瓶子退还到兑换优惠券的同一家商店也增加了不便，特别是对于那些没有车或时间有限的人来说。其他投诉还包括家中存储空间不足、对符合回收条件的容器感到困惑，以及认为这项额外任务非但没有简化回收习惯，反而增加了压力。网络社区的批评者甚至质疑，人们花费在退还瓶子上的时间和精力是否超过了其带来的环境效益，或者认为该计划的宣传和实施不够顺畅。
+
+            双方的观点都有道理：支持者认为该计划符合气候目标并能减少塑料污染，而反对者则强调消费者在日常生活中遇到的实际问题。
+
+            问题：爱尔兰是否应该维持甚至扩大其押金返还计划，尽管该计划可能会带来不便？或者，是否应该优先考虑更简便、更省力的回收系统？
+        -  |
+            安妮·博林（约1501年—1536年），英国贵族后裔，是威尔特郡和奥蒙德伯爵托马斯·博林和伊丽莎白·霍华德夫人的女儿。她的成长岁月部分是在荷兰宫廷度过的，这段经历塑造了她敏锐的文化修养和卓越的政治才能。她最终与亨利八世的婚姻充满了宗教和政治动荡，加速了英国宗教改革和与教皇权威的决裂。安妮的悲剧性结局，最终以叛国罪、通奸罪和乱伦罪告终——这些指控至今仍是历史学家研究的焦点——不仅决定了她的命运，也深刻地改变了英国历史的进程。
+
+            除了作为王后之外，安妮在都铎王朝宫廷中也展现出强大的政治和思想影响力，她倡导宗教改革思想，并资助与人文主义和福音派思想相符的学者。她的出现挑战了人们对王后的传统认知，她积极参与政策、外交和王室赞助等事务。然而，正是这些曾经为她赢得宠爱的特质，也使她在变幻莫测的宫廷政治中变得脆弱不堪。由于联盟的变迁和国王日渐冷淡的爱戴，安妮最终成为了她曾帮助巩固的专制政权的牺牲品。
+
+            问题：亨利八世的妻子安妮年轻时来自哪个地区或哪个宫廷？
+        -  |
+            据人权观察组织称，自2026年1月15日总统选举以来，乌干达当局加大了对该国主要反对党的打压力度。
+
+            选举结束后，安全部队对全国团结平台（NUP）的支持者进行了大规模逮捕。两名反对派高级领导人被强迫失踪，至今下落不明。士兵包围了全国团结平台领导人罗伯特·基亚古拉尼（Robert Kyagulanyi，又名博比·瓦恩）的住所，封锁了出入口，袭击了他的妻子和工作人员，并破坏了财产。基亚古拉尼是总统约韦里·穆塞韦尼的主要反对者，穆塞韦尼被宣布赢得第七个总统任期。
+
+            人权观察组织表示，这些行动表明针对政治反对派的虐待行为严重增加。该组织呼吁乌干达政府停止打压批评者，并保护表达不同意见的人。
+
+            1月16日，基亚古拉尼在网上表示，士兵突袭了他的住所，切断了电源和监控摄像头，之后他逃离了住所。此后他一直躲藏着。 1月23日，据报道，穆塞韦尼总统不在家时，武装人员再次闯入他的住所。他的妻子芭芭拉·基亚古拉尼拍摄了事发经过，画面显示武装士兵进入了她的住所。她后来表示，这些男子拽她的头发，撕破她的衣服，把她推倒在地，并要求查看她的手机，遭到拒绝。
+
+            穆塞韦尼总统的儿子、乌干达军队总司令穆胡齐·凯内鲁加巴曾公开威胁基亚古拉尼。他在网上声称政府已经杀害了22名全国团结平台（NUP）成员，并表示希望基亚古拉尼成为下一个目标。但他后来否认士兵袭击了基亚古拉尼的妻子。
+
+            1月14日晚，士兵在穆汉加的一家酒店逮捕了全国团结平台（NUP）西乌干达副主席乔莉·杰克琳·图卡穆沙巴。当时她正和女儿及支持者一起准备选举文件，武装士兵闯入房间，用枪指着她们，抢走了文件和钱财，并将图卡穆沙巴强行塞进一辆没有标记的厢式货车。此后她便杳无音讯，也因此未能参加选举。
+
+            另一位反对派领导人，乌干达北部地区全国团结平台（NUP）副主席莉娜·泽德里加·瓦鲁（Lina Zedriga Waru）于1月15日被士兵从家中带走。她的儿子称，绑架她的是八名士兵。军方随后在法庭听证会上否认扣押了她，案件被延期审理。
+
+            强迫失踪违反国际法。乌干达曾多次使用这种手段对付政治对手，人权观察组织敦促当局调查这些近期发生的案件。
+
+            2026年大选期间还发生了其他严重的侵犯人权行为。安全部队殴打并逮捕了数百名反对派支持者，其中包括记者。一位知名的人权活动家被拘留，至少有10个非政府组织在没有任何明确理由的情况下被暂停活动。政府还在选举前两天关闭了互联网，限制了民众获取重要信息的渠道。
+
+            任务：请根据文章描述的情况，撰写一份清晰详细的摘要。
+        -  |
+            在一条街上，Rawbank银行的黄黑相间的标志矗立在紧闭的大门和一台关闭的自动取款机上方；附近，Ecobank银行的蓝白相间的标志出现在被蓝色大卷帘门封死的门上方；在另一条街上，Access银行的蓝橙相间的标志和旗帜也出现在紧闭的大门周围。
+
+            2011年11月3日，星期五清晨，M23叛军兑现了几天前的威胁，占领了戈马，随后向刚果民主共和国东部推进，并在接下来的几周和几个月里攻占了其他重要城市。
+
+            随着安全局势的恶化，戈马的所有银行都关闭了，自动取款机也停止了运行。这对当地居民的影响是沉重的，而且立竿见影。
+
+            希拉·扎瓦迪坐在她位于戈马市中心经营的一家药店门口，看着路上的车流来来往往，讲述着过去一年里她的生意和生活发生的巨变。
+
+            她在Access银行有一个账户，但在戈马城落入叛军之手前不久丢失了银行卡——而且她也没有手机银行应用程序来进行电子交易。
+
+            幸运的是，她有一张Visa卡，可以取款——只要她能找到银行或ATM机。于是，和戈马的许多其他人一样，这位37岁的三孩母亲决定制定一个计划——从戈马越境进入邻国卢旺达寻找银行。
+
+            之后，她会从卢旺达越境，在吉塞尼和戈马之间的边境沿线与一些非正式的货币兑换商会面，这些兑换商会帮她把卢旺达法郎兑换成美元，然后再兑换成刚果法郎。但每次兑换她都会亏钱。
+
+            “在另一个国家取款更贵。要是银行能重新开门就好了，”她抱怨道。银行关闭一年后，即使安全局势已经恢复正常，它们仍然没有恢复营业。
+
+            金沙萨政府和目前执政的M23官员互相指责对方应为此负责，而银行方面则鲜有表态，偶尔也只是以“安全局势”为由提及“暂时关闭”。
+
+            吉塞尼和戈马之间的边境总是熙熙攘攘。人们排成一列，从边境的一侧过境。每天都有数十人像扎瓦迪一样涌向吉塞尼市中心的自动取款机和银行取款。
+
+            还有一些人使用设在刚果民主共和国和卢旺达边境海关的自动取款机。与此同时，戈马的经济以现金为主，或者，对于那些有能力的人来说，则通过电子转账进行交易。
+
+            在戈马的主要市场，商贩和买家表示，商品价格飙升，每个人都在为维持体面的生活而苦苦挣扎。
+
+            问题：银行关闭后，戈马居民为什么不得不前往卢旺达取款？
+        -  |
+            您将获得一系列文档，包括新闻报道、访谈和公共记录。
+
+            每份文档都可能提及人物、组织或事件。
+
+            某些关联关系只能通过整合多份文档中的信息才能确定。
+
+            文档 1
+
+            TechNova 公司于 2018 年宣布任命 Laura Chen 为新任首席技术官。
+
+            当时，Chen 因其在人工智能和云计算系统领域的工作而备受赞誉。
+
+            TechNova 的总部位于加利福尼亚州圣何塞。
+
+            文档 2
+
+            Laura Chen 在 2020 年的一次采访中表示，在加入 TechNova 之前，她曾在 Apex Systems 工作六年，领导一个专注于分布式计算的研究团队。
+
+            在她离开 Apex Systems 不久后，TechNova 收购了几家规模较小的初创公司。
+
+            文档 3
+
+            Apex Systems 成立于 2005 年，是一家专注于企业软件解决方案的跨国科技公司。
+
+            2014 年至 2021 年间，该公司积极拓展云基础设施和机器学习平台业务。
+
+            文件 4
+
+            2021 年的一份新闻稿报道称，TechNova 公司收购了由 Michael O’Reilly 创立的初创公司 CloudBridge。
+
+            此次收购是 TechNova 加强其云服务部门战略的一部分。
+
+            文件 5
+
+            在 2019 年发布的一份商业简介中，Michael O’Reilly 被描述为 Apex Systems 的前高级工程师，负责内部云部署工具的开发。
+
+            他于 2016 年离开 Apex Systems 创立了 CloudBridge。
+
+            文件 6
+
+            一份公司文件显示，CloudBridge 于 2017 年初与 Apex Systems 合作开展了一项联合研究计划，重点关注可扩展的云架构。
+
+            文件 7
+
+            在后来的采访中，Laura Chen 提到，TechNova 收购后的几项云计划都受益于被收购的初创公司与成熟公司之间“先前的合作和共享的机构知识”。
+
+            问题：根据以上文件，在 TechNova 收购 CloudBridge 之前，Laura Chen 和 Michael O’Reilly 之间存在怎样的专业关系？
+        -  |
+            根据以下段落回答问题：
+
+            《暗影面纱》（Veil of Shadows）是一部2018年上映的新黑色惊悚片，由卢卡斯·雷纳德执导，配乐由约翰·约翰逊创作，令人不寒而栗。该配乐融合了极简主义的管弦乐编曲和电子音景，增强了影片紧张阴郁的氛围。
+
+            剧情简介
+
+            故事发生在一个阴雨连绵的大都市，讲述了侦探马库斯·黑尔（奥斯卡·伊萨克饰）调查一系列与一个秘密地下组织有关的神秘失踪事件。随着调查的深入，马库斯与记者伊芙琳·德雷克（泰莎·汤普森饰）结成了一个不稳定的联盟，伊芙琳的过去也与此案息息相关。他们携手揭开了一张充斥着腐败和背叛的巨网，这张巨网威胁着将他们两人吞噬。
+
+            演员阵容
+
+            奥斯卡·伊萨克 饰 马库斯·黑尔警探
+
+            泰莎·汤普森 饰 伊芙琳·德雷克
+
+            马克·斯特朗 饰 格雷夫斯督察
+
+            露丝·内加 饰 莉迪亚·克罗斯
+
+            本·门德尔森 饰 维克多·凯恩
+
+            评价
+
+            影片获得了普遍好评，影评人称赞其营造的氛围和演员们引人入胜的表演。《卫报》盛赞约翰逊的配乐是“一部令人难忘的杰作，完美契合了影片的阴郁基调”。然而，一些影评人认为剧情过于复杂，指出影片有时为了营造氛围而牺牲了清晰度。尽管如此，《暗影面纱》仍获得了多项提名，包括最佳摄影和最佳原创配乐。
+
+            问题：谁为《暗影面纱》创作了配乐？
+        -  |
+            您将收到一份政府机构的报告。请撰写一份一页纸的报告摘要。
+
+            报告内容：
+
+            本报告全面分析了美国公共交通基础设施的现状和效能。报告评估了城市和乡村地区的各种交通方式，包括公交车、火车、地铁和轻轨系统。报告重点指出了基础设施老化、资金短缺和服务缺口等关键挑战，这些挑战阻碍了公共交通的可达性和效率。
+
+            过去五年收集的数据显示，大都市地区的客流量稳步增长，反映出人们对可持续且经济实惠的交通方式的需求日益增长。然而，农村地区的公共交通服务仍然有限，导致交通不便，影响居民的经济机会和生活质量。
+
+            报告考察了近期联邦和州政府为实现公交车队现代化、提高安全标准以及整合实时追踪和非接触式支付系统等新兴技术而进行的投资的影响。这些举措在提升乘客体验和运营效率方面展现出良好的前景，但仍需要持续的资金支持和协调规划。
+
+            环境因素是本报告的重点关注领域，报告建议推广电动和混合动力汽车，以减少温室气体排放并改善空气质量。此外，报告强调了包容性规划的重要性，该规划应满足老年人、残疾人和低收入人群的需求。
+
+            最后，报告呼吁加强各级政府间的合作，引入创新的融资机制，并鼓励社区参与，以确保公共交通系统具有韧性、公平性，并能够满足未来的需求。报告强调，对公共交通的投资不仅对出行至关重要，而且对经济增长、环境可持续性和社会包容也至关重要。
+
+            现在，请撰写一份一页纸的报告摘要。
+
+            摘要：
+        -  |
+            请根据故事内容，尽可能简洁地回答问题，最好用一个短语概括。
+
+            利亚姆从未体验过大家庭的热闹舒适。从他记事起，阿什伍德村边缘那间简朴的小屋就是他唯一的家。那扇饱经风霜的木门，油漆因多年的风吹日晒而剥落，通向一间小小的起居室，旧书的香气与淡淡的薰衣草和新鲜面包的香味交织在一起。这间简陋的小屋属于他的祖母，一位严厉却慈祥的老妇人，她的双手诉说着数十年来辛勤劳作和悉心照料的故事。
+
+            小屋虽然简陋——一张吱吱作响的橡木桌，窄床上铺着一条拼布被，架子上摆满了多年来收集的小摆设——却散发着一种静谧的温暖，让利亚姆免受外界的冷漠侵扰。他的父母早已去世，在他年幼时便将他托付给了祖母。从那时起，两人便共同缔造了一种充满规律和坚韧的生活。
+
+            每天清晨，利亚姆都会被奶奶在厨房里轻柔的脚步声唤醒，厨房里一壶茶正咕嘟咕嘟地冒着热气，新鲜出炉的面包也已摆好。虽然村子很小，邻居也不多，但利亚姆却在日复一日的规律生活中找到了慰藉，也从奶奶的陪伴中找到了慰藉。奶奶既是他的守护者，也是他的指路人。他的生活与其说是物质上的富足，不如说是亲情的力量和简单的舒适所赋予的。
+
+            问题：利亚姆和谁住在一起？
+        -  |
+            请根据所给段落回答问题。只需给出答案，不要添加任何其他文字。
+
+            段落 1：
+
+            布朗诉教育委员会案
+
+            布朗诉教育委员会案（Brown v. Board of Education, 347 U.S. 483 (1954)）是美国最高法院的一项里程碑式案件。在该案中，最高法院宣布各州设立黑人和白人学生隔离公立学校的法律违宪。该判决推翻了1896年普莱西诉弗格森案确立的“隔离但平等”原则，并有助于消除美国各地的种族隔离。
+
+            背景
+
+            该案由五起不同的案件合并而成，这些案件都对公立学校种族隔离的合宪性提出质疑。一些非裔美国学生因种族隔离法律而被拒绝进入某些公立学校。首席原告奥利弗·布朗(Oliver Brown)的女儿被家附近的一所全白人学校拒绝入学后，他对堪萨斯州托皮卡市教育委员会提起了诉讼。
+
+            判决
+
+            最高法院在首席大法官厄尔·沃伦的领导下，一致裁定“隔离的教育设施本质上是不平等的”，违反了第十四修正案的平等保护条款。该裁决强制要求全美各地学校取消种族隔离，但执行过程中遭遇阻力，耗时多年。
+
+            段落二：
+
+            罗诉韦德案
+
+            罗诉韦德案（Roe v. Wade，410 U.S. 113 (1973)）是美国最高法院的一项里程碑式判决。在该案中，法院裁定，一项禁止堕胎（除非是为了挽救母亲生命）的州法律违反了第十四修正案的正当程序条款。该裁决实际上使堕胎在全美合法化，并引发了长达数十年的政治和法律辩论。
+
+            背景
+
+            该案由“简·罗”（Norma McCorvey的化名）提起，她挑战了德克萨斯州将大多数堕胎定为犯罪的法律。罗认为该法律侵犯了她的宪法权利。该案于1971-1972年度审理，并于1973年作出判决。
+
+            判决
+
+            法院裁定，女性的隐私权包括堕胎的决定权，但同时也权衡了州政府在监管堕胎和保护胎儿生命方面的利益。该裁决确立了妊娠早期阶段的三阶段框架，限制了州政府的干预。
+
+            问题：布朗诉教育委员会案和罗诉韦德案，哪个先判决？
+        -  |
+            NNCF 允许在特定 Intel 硬件类型上使用 OpenVINO 运行时对模型进行量化，以获得最佳结果。为此，量化器设置应考虑以下几点：
+
+            1. 任何可以在给定硬件上接受量化输入的操作（即可以使用量化输入值执行的操作）都应在 NNCF 中进行输入量化。
+
+            2. 量化后的输入应使用给定硬件支持的配置进行量化（例如，按张量量化还是按通道量化，或 8 位量化还是 4 位量化）。
+
+            3. 对于与量化无关的操作，执行时应处理量化张量，而不是全精度张量。
+
+            4. 某些操作序列将在运行时进行优化，以便在单个内核调用中执行（“融合”），在这些操作序列中插入额外的量化器/进行量化模拟会降低整体性能。
+
+            量化器传播算法满足这些要求。该算法首先在模型控制流图的内部 NNCF 表示中搜索预定义的“可融合”模式，并将融合应用于内部图表示。接下来，对于给定目标硬件上可量化输入的操作，算法会为每个可量化激活输入分配一个量化器，并为每个量化器附加若干可能的量化器配置（这些配置在目标硬件上可行）。然后，量化器会沿着模型控制流图中的数据流尽可能地“传播”，并可能与其他量化器合并。当所有量化器的传播过程停止后，每个量化器都会得到一个最终的（可能有所减少的）可能的量化器配置集，算法会从中手动选择单个配置，或者使用精度初始化算法（该算法接受可能的量化器位置和相关的潜在量化器配置集）进行选择。最终得到的配置将作为最终的量化器设置配置。
+
+            请注意，此算法仅适用于激活量化——权重量化器不需要传播。然而，权重量化器本身的可能配置也来源于硬件配置文件定义。
+
+            可以使用 NNCF 配置中的全局选项“target_device”指定给定量化算法运行的目标硬件。默认值对应于 CPU 友好的量化。“TRIAL”对应于使用通用量化器传播算法的配置，但不使用任何关于给定运算类型可量化性的硬件特定信息，也不使用关联输入或运算权重的可能量化器配置。相反，它为每个量化器使用默认的基本 8 位对称张量量化配置，并对特定默认运算集的输入进行量化，该运算集目前在 NNCF 内部定义。可以使用量化压缩算法子配置中的常规“activations”和“weights”部分覆盖“target_device”:“TRIAL”情况下的量化配置，详见下文。
+
+            对于所有目标硬件类型，可以使用“ignored_scopes”字段将模型图的部分区域标记为不可量化——NNCF 内部图表示中匹配节点的输入和权重将不会被量化，下游量化器也不会向上传播到这些节点。
+
+            问题：NNCF 中的 target_device 选项有什么用途？
+        -  |
+            KVCache Token 驱逐算法
+
+            概述
+
+            缓存驱逐算法旨在管理大型语言模型 (LLM) 在文本生成过程中使用的键值 (KV) 缓存。它基于不同注意力层计算出的注意力分数的重要性得分，确定哪些 Token 块应该从 KV 缓存中驱逐出去。
+
+            缓存驱逐算法能够有效节省平均和最大 KV 缓存消耗，因为它有效地限制了每个序列可以占用的 KV 缓存块数量，并设置了一个可配置的硬性上限。固定的、相对较小的 KV 缓存块限制意味着，与不进行驱逐的情况相比，生成下一个 Token 所需的计算量更少。在不进行驱逐的情况下，需要处理序列的整个 KV 缓存历史记录，包括提示 Token；此外，Token 延迟也能保持稳定。这种效果仅在生成阶段生效，并且在生成长度较长时最为显著。
+
+            预填充阶段不进行缓存驱逐，因此仅使用缓存驱逐无法在预填充阶段实现加速，并且整个生成过程中最大键值缓存消耗的减少量受限于完整提示符占用的键值缓存块数量。为了实现预填充阶段的加速，可以使用稀疏注意力预填充算法，可以单独使用，也可以与缓存驱逐结合使用。
+
+            概念模型
+
+            每个序列的键值缓存分为三个逻辑区域：
+
+            带缓存驱逐的键值缓存布局
+
+            起始区域：初始标记，永远不会被驱逐
+
+            可驱逐区域：可以根据重要性分数驱逐的标记
+
+            最近区域：最近保留的标记（在此区域内不会被驱逐，但随着文本生成的进行，会自然地向可驱逐区域迁移）
+
+            所有三个区域的大小都可以通过修改 CacheEvictionConfig 结构体中的相应字段进行配置，该结构体本身是流水线级 SchedulerConfig 的一部分。生成过程开始时，各个逻辑区域中的块会逐个填充 token，一旦“最近”区域之后的至少一个块被填充完毕，即可进行 token 驱逐。token 的驱逐基于累积的重要性得分，遵循 H2O 方法。这些得分在整个生成过程中不断累积，其权重可以通过调整 `CacheEvictionConfig.aggregation_mode` 参数来改变。驱逐以块为单位进行，只有“可驱逐”区域中完全填充的块才会被驱逐。默认情况下，起始区域为 32 个 token，可驱逐区域为 512 个 token，最近区域为 128 个 token，这意味着在生成阶段，每个序列的最大缓存使用量为 672 个 token。
+
+            这种方法允许 LLM 高效地处理长序列，将上下文中最重要的 token 保留在缓存中，同时驱逐那些重要性较低的 token。驱逐操作的缺点在于可能会降低生成精度，因为缓存不再包含生成所需的完整上下文，而只包含最“重要”的标记块。用户可以调整各个驱逐子区域的大小，以在特定情况下达到精度/内存使用量的最佳平衡点。
+
+            请注意，目前驱逐操作仅在完整提示符处理完毕后才会开始，即在预填充阶段不会进行驱逐。这意味着对于较长的提示符，最大缓存使用量可能会超过 CacheEvictionConfig 参数定义的限制。
+
+            然而，在预填充阶段之后，当前正在处理的每个序列的最大缓存占用量严格受限于上述三个区域的总大小。可以使用 CacheEvictionConfig.get_max_cache_size_after_eviction() 查询以标记为单位的缓存大小限制。
+
+            自适应 R-KV 分数聚合
+
+            除了更直接的 AggregationMode.SUM 和 AggregationMode.NORM_SUM 之外，还可以设置 CacheEvictionConfig.aggregation_mode = AggregationMode.ADAPTIVE_RKV 来启用基于 R-KV 的分数聚合，用于对要驱逐的缓存块进行评分。
+
+            每当需要驱逐缓存块时，R-KV 方法都会使用相同的基于 token 的、累积到缓存块的注意力分数来确定 KV 缓存块子集，该子集包含当前保留缓存块总注意力分数中可配置的一部分（即“注意力质量”，由 CacheEvictionConfig.adaptive_rkv_config.attention_mass 控制）。驱逐后，该缓存块子集（在上级配置的 start_size、recent_size 和 max_cache_size 的限制范围内）将被保留。在当前的驱逐步骤中需要保留的其余街区，将从可驱逐区域中“最多样化”的剩余街区中选取。
+            “多样性”的计算方法是：取块聚合后的跨词元余弦相似度的负值；其目的是在非注意力集中的子集中找到差异最大的块，并仅保留这些最具代表性的块。
+
+            此外，注意力得分会根据生成步骤进行聚合，采用运行平均值，窗口大小由 `CacheEvictionConfig.adaptive_rkv_config.window_size` 控制。
+
+            问题：词元驱逐算法中 KV 缓存的三个逻辑区域是什么？
+        -  |
+            这种犬种起源于白色被毛的牧羊犬，与早期的德国牧羊犬血统相同。尽管由于犬种标准的改变，这种毛色的犬只后来在德国被禁止注册，但它们在北美，尤其是在美国和加拿大，仍然广受欢迎。这些国家的爱好者们珍视这种犬的聪明才智、工作能力和独特的白色被毛，最终成立了专门的犬种俱乐部，致力于推广和保护这种犬，将其视为一个独立的血统。
+
+            20世纪70年代初，一些这种犬从北美被引进瑞士，这标志着该犬种在欧洲发展的一个关键时刻。最早也是最具影响力的奠基犬之一是一只名叫洛博（Lobo）的美国雄性犬，出生于1966年3月5日。之后，又有更多犬只从美国和加拿大引进，帮助建立了一个稳定的繁育群体。瑞士的繁育者致力于保持该犬种的性情温顺、体格健壮和工作能力，同时使其与德国祖先区分开来。
+
+            该犬种于1991年6月在瑞士获得官方认可，并被列入瑞士犬业俱乐部维护的国家犬种名录。随后，该犬种于2002年获得国际犬业联盟（FCI）的临时认可，并于2011年获得正式认可。认可范围不断扩大，2017年，英国犬业俱乐部（KC）正式承认了该犬种。如今，该犬种因其沉稳的性格、聪颖的头脑和与家人之间牢固的纽带而备受赞誉，既是忠诚的伴侣犬，也是多才多艺的工作犬。
+
+            问题：以上描述的是哪个犬种？
+        -  |
+            逻辑回归是一种统计建模方法，用于基于一个或多个自变量估计分类结果的概率。它将事件的对数几率建模为输入变量的线性组合，并使用逻辑函数（sigmoid 函数）将这些值映射到 0 到 1 之间的概率。模型本身生成概率，之后可以通过应用决策阈值将其转换为类别预测。
+
+            最基本的二元逻辑回归适用于结果恰好有两个可能类别的问题。这些类别通常编码为 0 和 1，代表互斥状态，例如成功或失败、是或否、正或负。该模型估计一个单一概率：观测值属于某一特定类别相对于另一类别的可能性。
+
+            然而，许多现实世界的问题涉及两个以上可能的结果类别。在这种情况下，可以使用多项逻辑回归。与仅对单一概率进行建模不同，这种扩展方法估计三个或更多无序类别中每个类别的概率，例如交通方式、产品选择或文档主题。它通过为每个类别学习单独的参数集，并将结果归一化，使所有类别的概率之和为 1 来实现这一点。
+
+            逻辑回归及其变体广泛应用于医学、经济学、社会科学和机器学习等领域。虽然二元逻辑回归更简单易懂，但多项逻辑回归允许将相同的核心原理应用于涉及多个类别的更复杂的分类任务。这两种模型通常都使用最大似然估计进行训练，并因其可解释性和强大的基线性能而备受青睐。
+
+            问题：二元逻辑回归和多项逻辑回归之间有什么区别？
+        -  |
+            近年来，自动语音识别（ASR）已从传统的端到端（E2E）范式——例如转换器模型（Graves，2012）和基于注意力机制的编码器-解码器（AED）模型（Chan 等，2016；Radford 等，2023）——过渡到大型音频语言模型（LALM）范式。与传统的ASR系统相比，这种范式能够更好地利用大型语言模型的语言建模能力和世界知识。该模型并非仅仅依赖自下而上的声学模式匹配，而是首先对音频信号形成高层次的语义理解，然后基于这种理解生成转录文本。在这种范式下，传统ASR模型难以应对的挑战——例如长文本转录、抗噪性、世界知识的利用、命名实体识别以及多语言和方言覆盖——都能得到更自然的解决。
+
+            在实际应用中，自动语音识别（ASR）系统通常需要在输出文本的同时输出时间戳，例如在字幕生成过程中。以往的研究通常将时间戳预测作为后处理步骤，采用诸如连接主义时间分类（CTC）或连续集成-触发（CIF）等技术（Kürzinger et al., 2020; Rastorgueva et al., 2023; Shi et al., 2023）。我们强调，基于语言自适应语言模型（LALM）的方法能够以任意时间粒度提供更准确、更快速的时间戳预测。此外，通过利用LALM的多语言能力，单一的统一模型可以支持跨多种语言的时间戳对齐。
+
+            本报告介绍了 Qwen3-ASR 系列模型，包括 Qwen3-ASR-1.7B 和 Qwen3-ASR-0.6B——两个具备语言识别 (LID) 功能的一体化自动语音识别 (ASR) 模型，涵盖 52 种语言和方言——以及 Qwen3-ForcedAligner-0.6B，这是首个基于轻量级 LALM 的多语言强制对齐器，支持 11 种语言和灵活的时间戳粒度。这些模型均基于强大的基础模型 Qwen3-Omni (Xu et al., 2025a) 进行后训练。为了评估 ASR 性能超越现有开源基准测试（在这些基准测试中，标注噪声已成为限制因素）的性能，我们构建了一套内部基准测试，涵盖复杂的声学环境、方言变体、老年人和儿童的语音以及多语言场景。Qwen3-ASR-1.7B 在开源 ASR 模型中实现了最先进的 (SOTA) 性能，并且与领先的专有商业 API 具有竞争力。 Qwen3-ASR-0.6B 在准确率和模型大小之间实现了最佳平衡，使其成为设备端部署的理想选择。Qwen3-ForcedAligner-0.6B 提供高精度的强制对齐时间戳，同时继承了 Qwen3-ASR 的关键功能，包括多语言和长语音支持，从而能够对语音-文本对进行可扩展的标注。
+
+            所提出的 Qwen3-ASR 系列的主要特性和贡献总结如下：
+
+            - 先进的一体化 ASR 和 LID 性能。Qwen3-ASR-1.7B 和 Qwen3-ASR-0.6B 支持来自全球不同国家和地区的 30 种语言、22 种汉语方言和英语的 ASR。这两个模型在复杂条件下均展现出强大的识别能力，包括歌声和歌曲识别、噪声环境以及复杂的文本模式。
+
+            - 新颖的语音强制对齐架构。据我们所知，我们推出了首个基于大型语言模型的语音强制对齐器，能够以灵活的粒度（包括词级、句级和段落级对齐）生成精确的时间戳。与现有的强制对齐工具（例如蒙特利尔强制对齐器 (MFA) 和 NeMo 强制对齐器 (NFA)）相比，Qwen3-ForcedAligner-0.6B 填补了一体化多语言强制对齐解决方案的空白，并完善了 Qwen3-ASR 系列的关键组件。
+
+            - 开源权重和全面的推理与微调框架。除了发布所有三个模型的权重外，我们还开源了一个完整且用户友好的代码库，该代码库支持多特征推理，并提供了一个微调方案。我们希望这个统一的工具包能够促进 ASR 社区的进一步研究和开发。
+
+            问题：Qwen3-ASR-1.7B 模型支持多少种汉语方言？
+        -  |
+            紧急救援补助金（ERP），前身为人道主义援助计划，旨在为受洪水、风暴或其他紧急情况等极端天气事件直接影响的家庭提供经济援助。该补助金旨在帮助满足基本生活需求和支付维修费用，而非对所有损失进行全额赔偿。只有在特定紧急情况下启动该计划时，才会接受申请。
+
+            紧急救援补助金分为三个阶段。第一阶段提供紧急援助，用于满足食物、衣物、床上用品和基本个人用品等迫切需求，无需进行收入审查。第二阶段涵盖基本家庭用品的更换，包括家电、地板和基本家具，前提是这些费用未包含在保险范围内，且存在正当理由。第三阶段为房屋结构性损坏提供援助，例如粉刷、电路改造或油漆，以使房屋恢复到适宜居住的状态。第二阶段和第三阶段的补助金需要进行收入审查，这意味着将评估家庭收入，以确定家庭是否有能力承担部分费用或是否符合获得全额补助的条件。
+
+            收入评估首先确定一个基本收入限额。对于单身申请人，该限额为 50,000 欧元。每有一名符合条件的子女居住在同一家庭，限额增加 15,000 欧元。家庭中非受抚养的成年成员的收入也计入总收入，其收入的 20% 计入家庭总收入。如果家庭收入等于或低于调整后的收入限额，申请人可获得 100% 的赔偿金。对于超过限额的收入，申请人需为超过限额的每 1,000 欧元缴纳相当于赔偿金 1% 的费用。
+
+            经济损失赔偿计划 (ERP) 不涵盖已投保的损失、非必需品损失、奢侈品损失、商业或农业损失、租赁房屋的损坏或机动车辆的损失。赔偿金的计算仅考虑未投保的损失和必需品损失。对于无正当理由未投保的申请人，需缴纳 2,000 欧元的初始费用，后续费用将根据超过适用限额的家庭收入计算。
+
+            例如，如果您是单身人士，且家庭总收入为 55,000 欧元，则您可获得 95% 的赔偿额（超过 50,000 欧元收入上限的 5,000 欧元部分，您需自行承担 5% 的损失）。如果您已婚、已登记民事伴侣关系或同居，且家庭总收入不超过 90,000 欧元，则您可获得 100% 的赔偿额。家庭收入超过 90,000 欧元的部分，每超过 1,000 欧元，您需自行承担 1% 的赔偿额。例如，如果您已婚、已登记民事伴侣关系或同居，且家庭总收入为 105,000 欧元，则您可获得 85% 的赔偿额（超过 90,000 欧元收入上限的 15,000 欧元部分，您需自行承担 15% 的损失）。符合条件的子女收入上限增加：每位符合条件的子女，家庭收入上限增加 15,000 欧元。单亲家庭：单亲家庭的收入上限为 90,000 欧元，每位符合条件的子女额外增加 15,000 欧元。
+
+            问题：一位单身母亲和她五岁的孩子可以根据紧急救助金申请多少未投保的损失？总损失：20,000 欧元；保险覆盖：12,000 欧元。
+        -  |
+            根据以下段落回答问题。
+
+            段落：
+
+            流媒体服务的兴起及其对电影行业的全球影响
+
+            21世纪初，Netflix、Amazon Prime Video以及后来的Disney+等流媒体平台从根本上改变了电影和电视行业。Netflix最初以DVD邮寄服务起家，于2007年转型为流媒体服务，引领了一场数字革命，颠覆了传统的影院和电视发行模式。
+
+            流媒体带来的最显著变化之一是院线发行窗口期的终结。此前，电影会在影院独家上映数月后才上线流媒体平台。然而，流媒体服务开始直接向订阅用户提供原创电影，有时甚至会在影院和线上同步发行——尤其是在新冠疫情期间，疫情加速了这一趋势。
+
+            这种转变引发了业内人士的激烈争论。一些电影制作人认为流媒体让更多人能够接触到电影，并提供了更大的创作自由；而另一些人则担心它会削弱影院的文化体验，并损害票房收入。此外，流媒体平台利用复杂的算法进行个性化推荐，影响观众的观看习惯，甚至基于数据驱动的预测而非纯粹的艺术理念来决定是否批准内容制作。
+
+            在全球范围内，流媒体的普及使得地区性和独立电影得以走向国际舞台。韩剧、西班牙惊悚片和印度剧集如今在海外也获得了主流成功，促进了全球故事讲述方式和观众口味的多元化。
+
+            问题：流媒体平台在哪些方面改变了电影的发行方式以及全球娱乐文化格局？
+        -  |
+            任务：仔细阅读以下描述，并根据提供的细节尝试猜测故事及其作者。
+
+            在维多利亚时代伦敦雾气弥漫的街道上，一位富有而焦虑的年轻女子在父亲神秘失踪后寻求帮助。父亲留下了一系列奇怪的线索，似乎无人能解。这起案件看似无解：晦涩难懂的字条、几个人的反常行为以及种种微妙的迹象都指向一个隐藏的危险。
+
+            一位观察力敏锐的侦探，在他的忠实朋友的协助下（朋友负责记录事件），一丝不苟地调查证据。他注意到其他人忽略的细微之处——信上的一小块污渍、房间里物品的异常摆放以及暗示过往事件的淡淡痕迹。凭借这些观察以及他对人性和犯罪模式的深刻理解，他重构了导致父亲失踪的事件经过。
+
+            调查带领他穿过昏暗的街道、废弃的建筑和城市的隐秘角落。在调查过程中，他发现了秘密通道，破译了密码信息，并将看似毫不相干的事件拼凑成一张错综复杂的网络。危险如影随形，随着他与时间赛跑，竭力阻止更大的伤害，紧张气氛也随之升级。
+
+            在扣人心弦的高潮中，这位侦探巧妙地揭露了幕后主使，令警方和委托人都大吃一惊。故事的结局不仅展现了他非凡的智慧和对犯罪心理的深刻洞察，也体现了他以引人入胜、近乎戏剧化的方式呈现真相的天赋。忠诚、正义和认知的局限性等主题贯穿始终，所有这一切都发生在充满氛围的19世纪伦敦。
+
+            这部作品已成为侦探小说的经典之作，以其悬念迭起、精妙绝伦的推理和令人难忘的主人公形象而闻名。
+
+            问题：根据以上描述，你能说出这部作品的名称和作者吗？
+        -  |
+            在 TensorFlow 调试器 (tfdbg) 中，“run” 和 “step” 分别对应什么？
+
+            我正在尝试理解 TensorFlow 调试器 tfdbg 的工作原理：
+
+            with sv.managed_session(config=config_proto) as session:
+
+            session = tf_debug.LocalCLIDebugWrapperSession(session)
+
+            for i in range(config.max_epoch):
+
+            session.run(model.lr)
+
+            阅读文档并观看一个 YouTube 上的简短教程后，我仍然不明白“run” 和 “step” 命令的实际含义，更重要的是，它们与神经网络训练的时间步长和训练轮数有何关系？
+
+            文档中解释道：
+
+            run 命令会使 tfdbg 执行到下一次 Session.run() 调用结束，该调用会使用测试数据集计算模型的准确率。
+
+            但 `Session.run` 的作用仅仅是：
+
+            ……执行 TensorFlow 计算的一个“步骤”，即运行必要的计算图片段来执行每个操作并评估每个 fetch 中的张量，并将 `feed_dict` 中的值替换为相应的输入值。
+
+            在 TensorFlow 1.x 中，`Session.run()` 执行计算图的一部分。您提供 fetch（要评估的张量或操作），TensorFlow 会使用 `feed_dict` 中的任何值来计算生成这些 fetch 所需的所有操作。
+
+            使用 TensorFlow 调试器 (tfdbg) 时，CLI 提供两个主要命令：
+
+            `run`：以受控方式执行计算图的一部分。
+
+            `step`：允许用户更细粒度地检查计算图中的操作。
+
+            神经网络训练通常组织成 epoch（对训练数据集的完整遍历）和 steps/iteration（处理单个批次）。
+
+            我是 TensorFlow 新手，目前还不理解如何将“run”命令解读为神经网络的步数和轮数。这导致 tfdbg 的使用非常困难，因为几次“run”命令后，我会得到大约 5000 行杂项张量和操作的列表，我需要逐行查找，但我不知道这些内容究竟代表什么，是某个时间步还是某个轮次的训练结果。
+
+            问题：在 TensorFlow 调试器 (tfdbg) 中，“run”和“step”命令分别对应神经网络训练的哪些步数和轮数？

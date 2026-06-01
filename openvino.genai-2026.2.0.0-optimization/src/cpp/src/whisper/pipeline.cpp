@@ -1,0 +1,243 @@
+// Copyright (C) 2023-2026 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0
+
+#include <algorithm>
+#include <filesystem>
+#include <openvino/openvino.hpp>
+#include <utility>
+#include <variant>
+
+#include "openvino/genai/text_streamer.hpp"
+#include "openvino/genai/whisper_pipeline.hpp"
+#include "utils.hpp"
+#include "whisper/config.hpp"
+#include "whisper/context_tokens.hpp"
+#include "whisper/feature_extractor.hpp"
+#include "whisper/models.hpp"
+#include "whisper/models/decoder.hpp"
+#include "whisper/pipeline_base.hpp"
+#include "whisper/pipeline_static.hpp"
+#include "whisper/whisper.hpp"
+#include "whisper/word_level_timestamps.hpp"
+#include "whisper_utils.hpp"
+
+namespace {
+ov::genai::OptionalWhisperGenerationConfig get_config_from_map(const ov::AnyMap& config_map) {
+    if (config_map.count("generation_config")) {
+        return config_map.at("generation_config").as<ov::genai::WhisperGenerationConfig>();
+    } else {
+        return std::nullopt;
+    }
+}
+
+void erase_whisper_generation_config_keys(ov::AnyMap& config_map) {
+    config_map.erase("word_timestamps");
+}
+
+ov::InferRequest init_model(ov::CompiledModel& compiled) {
+    ov::InferRequest request = compiled.create_infer_request();
+
+    try {
+        ov::RemoteContext context = compiled.get_context();
+        ov::Shape output_shape = request.get_output_tensor().get_shape();
+        ov::RemoteTensor remote = context.create_tensor(ov::element::f32, output_shape);
+        request.set_tensor("last_hidden_state", remote);
+        return request;
+    } catch (const ov::Exception&) {
+        return request;
+    }
+}
+
+void reshape_to_static_encoder(std::shared_ptr<ov::Model> model, const size_t batch_size, const size_t feature_size) {
+    std::map<std::string, ov::PartialShape> new_shapes;
+    for (auto input : model->inputs()) {
+        const auto& input_name = input.get_any_name();
+        ov::PartialShape new_shape;
+        if (input_name.find("input_features") != std::string::npos) {
+            const auto& partial_shape = input.get_partial_shape();
+            OPENVINO_ASSERT(partial_shape.size() >= 3);
+            new_shape = partial_shape;
+            new_shape[0] = batch_size;  // batch_dim
+            new_shape[1] = feature_size;
+            new_shapes.emplace(input_name, new_shape);
+        }
+    }
+    model->reshape(new_shapes);
+}
+
+}  // namespace
+
+namespace ov {
+namespace genai {
+
+class WhisperPipeline::WhisperPipelineStatefulImpl : public WhisperPipeline::WhisperPipelineImplBase {
+public:
+    WhisperPipelineStatefulImpl(const std::filesystem::path& models_path,
+                                const std::string& device,
+                                const ov::AnyMap& properties)
+        : WhisperPipelineImplBase{models_path},
+          m_sampler(m_tokenizer) {
+        ov::AnyMap properties_copy = properties;
+        m_generation_config.update_generation_config(properties_copy);
+        erase_whisper_generation_config_keys(properties_copy);
+
+        ov::Core core = utils::singleton_core();
+        ov::CompiledModel compiled_model;
+        if (device == "NPU") {
+            auto encoder_model =
+                core.read_model(models_path / "openvino_encoder_model.xml", {}, std::as_const(properties_copy));
+            // NB: only batch_size == 1 is supported now for NPU
+            reshape_to_static_encoder(encoder_model, 1, m_feature_extractor.feature_size);
+            compiled_model = core.compile_model(encoder_model, "NPU", properties_copy);
+
+            // WA: Push eos_token to NPUW to stop infer() if KVcache is full
+            auto eos_token = m_generation_config.eos_token_id == -1 ? m_tokenizer.get_eos_token_id()
+                                                                    : m_generation_config.eos_token_id;
+            properties_copy.insert({"WHISPER_EOS_TOKEN", eos_token});
+
+            if (m_generation_config.word_timestamps) {
+                properties_copy.insert({"WHISPER_DECOMPOSE_SDPA", m_generation_config.word_timestamps});
+            }
+        } else {
+            compiled_model = core.compile_model(models_path / "openvino_encoder_model.xml", device, properties_copy);
+        }
+
+        ov::genai::utils::print_compiled_model_properties(compiled_model, "whisper encoder model");
+        m_encoder = init_model(compiled_model);
+
+        const bool decompose_cross_attention_spda_ops = m_generation_config.word_timestamps;
+        m_decoder =
+            WhisperDecoder::from_path(models_path,
+                                      device,
+                                      properties_copy,
+                                      m_encoder.get_compiled_model().output("last_hidden_state").get_partial_shape(),
+                                      decompose_cross_attention_spda_ops);
+
+        // If eos_token_id was not provided, take value
+        if (m_generation_config.eos_token_id == -1) {
+            m_generation_config.set_eos_token_id(m_tokenizer.get_eos_token_id());
+        }
+
+        m_sampler.set_seed(m_generation_config.rng_seed);
+    }
+
+    WhisperDecodedResults generate(const RawSpeechInput& raw_speech_input,
+                                   OptionalWhisperGenerationConfig generation_config,
+                                   const std::shared_ptr<StreamerBase> streamer) override {
+        auto start_time = std::chrono::steady_clock::now();
+        WhisperGenerationConfig config = utils::prepare_per_generate_config(m_generation_config, generation_config);
+
+        auto [context_tokens, tokenization_duration_microseconds] = prepare_context_tokens(config, m_tokenizer);
+
+        auto generate_result = ov::genai::whisper_generate(config,
+                                                           m_model_config,
+                                                           context_tokens,
+                                                           raw_speech_input,
+                                                           m_encoder,
+                                                           m_decoder,
+                                                           m_feature_extractor,
+                                                           streamer,
+                                                           m_sampler,
+                                                           m_tokenizer);
+        auto decode_start_time = std::chrono::steady_clock::now();
+        WhisperDecodedResults result{std::vector{m_tokenizer.decode(generate_result.output_tokens)}, std::vector{1.f}};
+        generate_result.perf_metrics.raw_metrics.detokenization_durations.emplace_back(
+            PerfMetrics::get_microsec(std::chrono::steady_clock::now() - decode_start_time));
+
+        result.language = generate_result.language;
+        result.words = generate_result.words;
+
+        result.perf_metrics = generate_result.perf_metrics;
+        result.perf_metrics.raw_metrics.tokenization_durations.emplace_back(tokenization_duration_microseconds);
+        auto& segments = generate_result.segments;
+
+        if (segments.has_value()) {
+            std::vector<WhisperDecodedResultChunk> chunks;
+            chunks.reserve((*segments).size());
+
+            for (auto& segment : *segments) {
+                decode_start_time = std::chrono::steady_clock::now();
+                chunks.push_back(
+                    WhisperDecodedResultChunk{segment.m_start, segment.m_end, m_tokenizer.decode(segment.m_tokens)});
+                result.perf_metrics.raw_metrics.detokenization_durations.emplace_back(
+                    PerfMetrics::get_microsec(std::chrono::steady_clock::now() - decode_start_time));
+            }
+
+            result.chunks = chunks;
+        }
+
+        auto& metrics = result.perf_metrics;
+        metrics.load_time = this->m_load_time_ms;
+        auto stop_time = std::chrono::steady_clock::now();
+        metrics.raw_metrics.generate_durations.emplace_back(PerfMetrics::get_microsec(stop_time - start_time));
+        metrics.evaluate_statistics(start_time);
+
+        return result;
+    }
+
+private:
+    ov::InferRequest m_encoder;
+    std::shared_ptr<ov::genai::WhisperDecoder> m_decoder;
+    Sampler m_sampler;
+};
+
+std::pair<std::string, Any> generation_config(const WhisperGenerationConfig& config) {
+    return {utils::CONFIG_ARG_NAME, Any::make<WhisperGenerationConfig>(config)};
+}
+
+}  // namespace genai
+}  // namespace ov
+
+ov::genai::WhisperPipeline::WhisperPipeline(const std::filesystem::path& models_path,
+                                            const std::string& device,
+                                            const ov::AnyMap& properties) {
+    auto start_time = std::chrono::steady_clock::now();
+    if (device == "NPU") {
+        auto properties_copy = properties;
+        const bool use_static_pipeline = utils::pop_or_default(properties_copy, "STATIC_PIPELINE", false);
+        if (!use_static_pipeline) {
+            m_impl = std::make_unique<WhisperPipelineStatefulImpl>(models_path, device, properties_copy);
+        } else {
+            m_impl = std::make_unique<StaticWhisperPipeline>(models_path, properties_copy);
+        }
+    } else {
+        m_impl = std::make_unique<WhisperPipelineStatefulImpl>(models_path, device, properties);
+    }
+    auto stop_time = std::chrono::steady_clock::now();
+    m_impl->m_load_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(stop_time - start_time).count();
+}
+
+ov::genai::WhisperDecodedResults ov::genai::WhisperPipeline::generate(const RawSpeechInput& raw_speech_input,
+                                                                      OptionalWhisperGenerationConfig generation_config,
+                                                                      StreamerVariant streamer) {
+    auto base_streamer = utils::create_streamer(streamer, m_impl->m_tokenizer);
+
+    return m_impl->generate(raw_speech_input, generation_config, base_streamer);
+}
+
+ov::genai::WhisperDecodedResults ov::genai::WhisperPipeline::generate(const RawSpeechInput& raw_speech_input,
+                                                                      const ov::AnyMap& config_map) {
+    auto config_arg = get_config_from_map(config_map);
+    WhisperGenerationConfig config = (config_arg.has_value()) ? *config_arg : get_generation_config();
+    config.update_generation_config(config_map);
+    StreamerVariant streamer_variant = utils::get_streamer_from_map(config_map);
+    const std::shared_ptr<StreamerBase> base_streamer = utils::create_streamer(streamer_variant, m_impl->m_tokenizer);
+
+    return m_impl->generate(raw_speech_input, config, base_streamer);
+}
+
+ov::genai::WhisperGenerationConfig ov::genai::WhisperPipeline::get_generation_config() const {
+    return m_impl->m_generation_config;
+}
+
+ov::genai::Tokenizer ov::genai::WhisperPipeline::get_tokenizer() {
+    return m_impl->m_tokenizer;
+}
+
+void ov::genai::WhisperPipeline::set_generation_config(const WhisperGenerationConfig& config) {
+    WhisperGenerationConfig _config = utils::prepare_per_generate_config(m_impl->m_generation_config, config);
+
+    m_impl->m_generation_config = _config;
+}
+
+ov::genai::WhisperPipeline::~WhisperPipeline() = default;

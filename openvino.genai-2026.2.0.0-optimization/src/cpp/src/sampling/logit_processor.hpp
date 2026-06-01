@@ -1,0 +1,172 @@
+// Copyright (C) 2023-2026 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0
+
+#pragma once
+
+#include <algorithm>
+#include <cmath>
+
+#include "openvino/genai/generation_config.hpp"
+#include "sampling/logit_transformers.hpp"
+#include "sampling/structured_output/structured_output_controller.hpp"
+
+namespace ov::genai {
+class LogitProcessor {
+protected:
+    std::vector<std::shared_ptr<LogitTransformers::ILogitTransformer>> m_logit_transformers;
+    std::vector<std::shared_ptr<LogitTransformers::IStatefulLogitTransformer>> m_stateful_logit_transformers;
+
+    std::shared_ptr<std::map<int64_t, size_t>> m_unique_generated_token_ids = std::shared_ptr<std::map<int64_t, size_t>>(new std::map<int64_t, size_t>);
+    std::shared_ptr<std::set<int64_t>> m_unique_prompt_token_ids = std::shared_ptr<std::set<int64_t>>(new std::set<int64_t>);
+    size_t m_generated_tokens = 0;
+
+    // reasoning budget
+    std::shared_ptr<LogitTransformers::ThinkingBudgetTransform> m_thinking_budget;
+
+    // speculative decoding parameters
+    float m_assistant_confidence_threshold = 0.f;
+
+
+public:
+    LogitProcessor(const ov::genai::GenerationConfig& sampling_params,
+                   const LogitTransformers::TokenIds& input_ids,
+                   std::shared_ptr<ov::genai::StructuredOutputController> structured_output_controller = nullptr
+    ) {
+        for (const auto& input_id : input_ids) {
+            m_unique_prompt_token_ids->insert(input_id);
+        }
+
+        // When logprobs > 0: snapshot the full-vocab log-partition function (LSE) and copy
+        // all logits to m_vector BEFORE any transform runs.  This keeps m_data pristine so
+        // returned log-probabilities are normalised over the raw model output:
+        //   log p_i = m_data[i] − m_full_vocab_log_sum_exp
+        // All subsequent transforms (EOSPenalty, grammar, penalties, TopK/Temp/TopP) operate
+        // on m_vector because is_vector_initialized() will be true from this point on.
+        if ((sampling_params.is_multinomial() || sampling_params.is_greedy_decoding()) && sampling_params.logprobs > 0) {
+            m_logit_transformers.push_back(std::make_shared<LogitTransformers::FullVocabLogSumExpTransform>());
+            m_logit_transformers.push_back(std::make_shared<LogitTransformers::CopyLogitsToVectorTransform>());
+        }
+
+        // Reasoning budget: force </think> when budget exhausted
+        if (sampling_params.reasoning_budget_tokens >= 0 &&
+            sampling_params.thinking_start_token_id >= 0 &&
+            sampling_params.thinking_end_token_id >= 0) {
+            m_thinking_budget = std::make_shared<LogitTransformers::ThinkingBudgetTransform>(
+                sampling_params.reasoning_budget_tokens,
+                sampling_params.thinking_start_token_id,
+                sampling_params.thinking_end_token_id);
+            m_logit_transformers.push_back(m_thinking_budget);
+        }
+
+        if (sampling_params.min_new_tokens > 0) {
+            m_logit_transformers.push_back(std::make_shared<LogitTransformers::EOSPenaltyTransform>(
+                sampling_params.stop_token_ids, sampling_params.min_new_tokens));
+        }
+
+        OPENVINO_ASSERT(structured_output_controller != nullptr || !sampling_params.is_structured_output_generation(), "Structured output controller is not set for structured output generation");
+        if (sampling_params.is_structured_output_generation() && structured_output_controller != nullptr) {
+            auto transformer = structured_output_controller->get_logits_transformer(sampling_params);
+            m_logit_transformers.push_back(transformer);
+            m_stateful_logit_transformers.emplace_back(std::dynamic_pointer_cast<LogitTransformers::IStatefulLogitTransformer>(transformer));
+        }
+
+        if (sampling_params.is_multinomial() || sampling_params.is_greedy_decoding()) {
+            if (sampling_params.repetition_penalty != 1.0f) {
+                auto transformer = std::make_shared<LogitTransformers::RepetitionPenaltyTransform>(sampling_params.repetition_penalty);
+                transformer->set_unique_prompt_token_ids(m_unique_prompt_token_ids);
+                transformer->set_unique_generated_token_ids(m_unique_generated_token_ids);
+                m_logit_transformers.push_back(transformer);
+            }
+            if (sampling_params.presence_penalty != 0.0f) {
+                auto transformer = std::make_shared<LogitTransformers::PresencePenaltyTransform>(sampling_params.presence_penalty);
+                transformer->set_unique_generated_token_ids(m_unique_generated_token_ids);
+                m_logit_transformers.push_back(transformer);
+            }
+            if (sampling_params.frequency_penalty != 0.0f) {
+                auto transformer = std::make_shared<LogitTransformers::FrequencyPenaltyTransform>(sampling_params.frequency_penalty);
+                transformer->set_unique_generated_token_ids(m_unique_generated_token_ids);
+                m_logit_transformers.push_back(transformer);
+            }
+
+            if (sampling_params.is_multinomial()) {
+                // Order: top_k → temperature → min_p → top_p
+                //
+                // top_k first: temperature scaling only changes magnitude, we would pick same K tokens
+                // regardless of temperature and if we filter top_k first, temperature scaling runs on smaller vector
+                //
+                // min_p / top_p: by the time they run, m_vector holds normalised probabilities from temperature transform
+
+                const bool top_k_active = (sampling_params.top_k > 0 &&
+                                           sampling_params.top_k < std::numeric_limits<size_t>::max());
+                if (top_k_active) {
+                    m_logit_transformers.push_back(std::make_shared<LogitTransformers::TopKFilter>(sampling_params.top_k));
+                }
+                // Defer expf to the draw step (fused CDF scan) only when ALL conditions hold:
+                //   1. top_k > 0: TopKFilter already populated m_vector with K candidates
+                //      in arbitrary order (not sorted).
+                //   2. top_p == 1.0: TopPFilter will NOT run (it requires normalised probs).
+                //   3. min_p == 0.0: MinPFilter will NOT run (it also requires normalised probs).
+                // When deferred, TemperatureLogitTransform only scales logits by 1/T;
+                // expf and CDF scan are fused in _multinomial_sample.
+                const bool min_p_active = (sampling_params.min_p > 0.0f);
+                const bool defer_expf = top_k_active && (sampling_params.top_p == 1.0f) && !min_p_active;
+                m_logit_transformers.push_back(std::make_shared<LogitTransformers::TemperatureLogitTransform>(
+                    sampling_params.temperature, defer_expf));
+                if (min_p_active) {
+                    m_logit_transformers.push_back(std::make_shared<LogitTransformers::MinPFilter>(sampling_params.min_p));
+                }
+                if (sampling_params.top_p != 1.0f) {
+                    m_logit_transformers.push_back(std::make_shared<LogitTransformers::TopPFilter>(sampling_params.top_p));
+                }
+            }
+            if (sampling_params.assistant_confidence_threshold > 0) {
+                m_assistant_confidence_threshold = sampling_params.assistant_confidence_threshold;
+            }
+        }
+    }
+
+    float get_assistant_confidence_threshold() {
+        return m_assistant_confidence_threshold;
+    }
+
+    void apply(Logits& logits) {
+        for (const auto& transformer : m_logit_transformers) {
+            if (transformer->is_applicable(m_generated_tokens)) {
+                transformer->apply(logits);
+            }
+        }
+    }
+
+    void update_generated_len(size_t updated_len) {
+        m_generated_tokens = updated_len;
+    }
+
+    size_t get_generated_len() {
+        return m_generated_tokens;
+    }
+
+    void register_new_generated_token(int64_t new_token_id) {
+        auto it = m_unique_generated_token_ids->find(new_token_id);
+        if (it == m_unique_generated_token_ids->end()) {
+            m_unique_generated_token_ids->insert({new_token_id, 1});
+        } else {
+            it->second++;
+        }
+        for (const auto& transformer : m_stateful_logit_transformers) {
+            if (transformer->is_applicable(m_generated_tokens)) {
+                transformer->accept_tokens({new_token_id});
+            }
+        }
+        if (m_thinking_budget) {
+            m_thinking_budget->accept_token(new_token_id);
+        }
+    }
+
+    void decrease_generated_token_occurance(int64_t token_id) {
+        OPENVINO_ASSERT(m_unique_generated_token_ids->count(token_id) > 0);
+        m_unique_generated_token_ids->at(token_id)--;
+    }
+
+};
+
+} // namespace ov::genai

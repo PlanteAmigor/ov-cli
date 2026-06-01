@@ -154,7 +154,7 @@ def load_model(ov_path):
 
 
 
-def _make_genai_config(temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024, presence_penalty=None):
+def _make_genai_config(temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024, presence_penalty=None, reasoning=True, tokenizer=None):
     """创建 GenAI GenerationConfig。"""
     cfg = ov_genai.GenerationConfig()
     cfg.max_new_tokens = max_tokens
@@ -164,6 +164,18 @@ def _make_genai_config(temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024, pr
     cfg.do_sample = temperature >= 0.01
     if presence_penalty is not None:
         cfg.presence_penalty = presence_penalty
+    # Reasoning budget: 不显示思考时用 budget=0 强制立即结束思考
+    if not reasoning and tokenizer is not None:
+        try:
+            think_enc = tokenizer.encode("<think>", add_special_tokens=False)
+            nothink_enc = tokenizer.encode("</think>", add_special_tokens=False)
+            think_id = int(list(think_enc.input_ids.data)[0][0])
+            nothink_id = int(list(nothink_enc.input_ids.data)[0][0])
+            cfg.reasoning_budget_tokens = 0
+            cfg.thinking_start_token_id = think_id
+            cfg.thinking_end_token_id = nothink_id
+        except Exception:
+            pass
     return cfg
 
 
@@ -815,7 +827,7 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
         messages.extend(conv)
 
         pp = 1.5 if not reasoning else None
-        gen_cfg = _make_genai_config(temperature, top_p, top_k, max_tokens, presence_penalty=pp)
+        gen_cfg = _make_genai_config(temperature, top_p, top_k, max_tokens, presence_penalty=pp, reasoning=reasoning, tokenizer=pipe.get_tokenizer())
         t0 = time.time()
         print(f"  {TR('回复', 'Reply')}:", end=" ", flush=True)
 
@@ -909,7 +921,7 @@ def _run_translate_genai(ctx, max_tokens):
             target = TR("中文", "Chinese")
 
         prompt = t_zh.format(target=target, text=text) if has_chinese(text) else t_en.format(target=target, text=text)
-        gen_cfg = _make_genai_config(temperature=0, max_tokens=max_tokens)
+        gen_cfg = _make_genai_config(temperature=0, max_tokens=max_tokens, reasoning=True, tokenizer=pipe.get_tokenizer())
 
         print(f"  → {target}", flush=True)
         t0 = time.time()
