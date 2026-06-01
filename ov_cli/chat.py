@@ -369,7 +369,7 @@ _in_readline = False
 _hist_buf = ""
 def run_chat(ctx, system="You are a helpful AI assistant.",
              temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024,
-             image_path=None):
+             image_path=None, reasoning=True):
     """通用聊天模式"""
     from . import TR
 
@@ -391,16 +391,13 @@ def run_chat(ctx, system="You are a helpful AI assistant.",
     if ctx.get("optimum"):
         _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_path)
     else:
-        _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_path)
+        _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_path, reasoning)
 
 
-def _build_prompt(messages, model_type=""):
-    """将消息列表转为纯文本 prompt（用于 VLMPipeline 等不支持 ChatHistory 的管道）。
-
-    根据模型类型选择合适的模板格式。
-    """
-    # ChatML 格式（Qwen、Qwen3.5 等）
-    if "qwen" in (model_type or "").lower():
+def _build_prompt(messages, model_type="", enable_thinking=True):
+    """将消息列表转为纯文本 prompt。"""
+    is_qwen = "qwen" in (model_type or "").lower()
+    if is_qwen:
         prompt = ""
         for m in messages:
             role = m["role"]
@@ -411,9 +408,11 @@ def _build_prompt(messages, model_type=""):
                 prompt += f"<|im_start|>user\n{content}\n<|im_end|>\n"
             elif role == "assistant":
                 prompt += f"<|im_start|>assistant\n{content}\n<|im_end|>\n"
-        prompt += "<|im_start|>assistant\n"
+        if enable_thinking:
+            prompt += "<|im_start|>assistant\n<think>\n"
+        else:
+            prompt += "<|im_start|>assistant\n<think>\n\n</think>\n\n"
         return prompt
-    # 通用模板（Gemma、Hunyuan 等）
     prompt = ""
     for m in messages:
         role = m["role"]
@@ -641,7 +640,7 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
         print()
 
 
-def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_path=None):
+def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_path=None, reasoning=True):
     """GenAI 格式聊天模式。"""
     pipe = ctx["pipe"]
     is_vlm = ctx.get("is_vlm", False)
@@ -723,6 +722,13 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
         def streamer_callback(t):
             if stop_flag[0]:
                 return True
+            # 非阻塞检查 stdin 是否有 Ctrl+C
+            import select as _sel
+            if _sel.select([sys.stdin], [], [], 0)[0]:
+                c = sys.stdin.read(1)
+                if c == '\x03':
+                    stop_flag[0] = True
+                    return True
             reply_parts.append(t)
             sys.stdout.write(t)
             sys.stdout.flush()
@@ -730,19 +736,24 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
 
         old_handler = signal.signal(signal.SIGINT, lambda s, f: stop_flag.__setitem__(0, True))
         try:
+            prompt = _build_prompt(messages, ctx.get("model_type", ""), reasoning)
+            kwargs = {"generation_config": gen_cfg, "streamer": streamer_callback}
             if is_vlm:
-                kwargs = {"generation_config": gen_cfg, "streamer": streamer_callback}
                 if current_image is not None:
                     kwargs["image"] = current_image
-                pipe.generate(_build_prompt(messages, ctx.get("model_type", "")), **kwargs)
+                pipe.generate(prompt, **kwargs)
             else:
-                pipe.generate(ov_genai.ChatHistory(messages), gen_cfg, streamer_callback)
+                pipe.generate(prompt, gen_cfg, streamer_callback)
         finally:
             signal.signal(signal.SIGINT, old_handler)
         reply_text = "".join(reply_parts)
 
         elapsed = time.time() - t0
-        conv.append({"role": "assistant", "content": reply_text})
+        if stop_flag[0]:
+            print(f"\n  ⚠ {TR('已中断', 'Interrupted')}")
+            conv.append({"role": "assistant", "content": reply_text + TR(" [已中断]", " [Interrupted]")})
+        else:
+            conv.append({"role": "assistant", "content": reply_text})
         # 图片用完即清
         if current_image is not None:
             current_image = None
@@ -821,6 +832,12 @@ def _run_translate_genai(ctx, max_tokens):
         def streamer_callback(t):
             if stop_flag[0]:
                 return True
+            import select as _sel
+            if _sel.select([sys.stdin], [], [], 0)[0]:
+                c = sys.stdin.read(1)
+                if c == '\x03':
+                    stop_flag[0] = True
+                    return True
             reply_parts.append(t)
             sys.stdout.write(t)
             sys.stdout.flush()
