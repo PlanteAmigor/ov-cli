@@ -188,6 +188,7 @@ def run_benchmark(model_path):
 
     # 预热 (3 轮, 确保 GPU 升频 + KV Cache 就绪)
     import openvino_genai as ov_genai
+    import time as _time
     print(f"  {'预热中 (3 轮)...':40s}")
     for _ in range(3):
         if ctx.get("optimum"):
@@ -199,6 +200,8 @@ def run_benchmark(model_path):
             ctx["pipe"].generate("你好", images=[], max_new_tokens=10)
         else:
             ctx["pipe"].generate("你好", max_new_tokens=10)
+    print(f"  {'休息 3s...':40s}", end=" ", flush=True)
+    _time.sleep(3)
     print()
 
     input_sizes = [32, 1024]

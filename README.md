@@ -182,12 +182,13 @@ ov-cli/
 | 模型 | 量化 | 32 1st | 32 2nd | 32 tok/s | 1024 1st | 1024 2nd | 1024 tok/s | RSS |
 |:-----|:----:|:------:|:------:|:--------:|:---------:|:---------:|:----------:|:---:|
 | **Qwen3.5/0.8B-ov** | int8 | 297ms | 19ms | **54.9** | 660ms | 20ms | **51.8** | 826MB |
-| **Hy-MT2/1.8B-ov** | int4 | 247ms | 25ms | 42.5 | 705ms | 29ms | 38.5 | 916MB |
-| **Hy-MT2/1.8B-ov** | int8 | 238ms | 30ms | 34.8 | 631ms | 32ms | 31.7 | 1033MB |
-| **Qwen3/2B-ov** | int8 | 263ms | 32ms | 30.6 | 781ms | 38ms | 27.4 | 1206MB |
-| **Qwen3/8B-ov** | int4 AWQ | 385ms | 70ms | 14.6 | 2120ms | 75ms | 13.4 | 2014MB |
-| **Gemma-4-E2B-ov-test** | int4 | 255ms | 76ms | 15.5 | 1704ms | 258ms | 11.0 | 8365MB |
-| **Qwen3.6/35B-A3B-ov** | int4/8 mix | 1040ms | 84ms | 12.1 | 4435ms | 87ms | 11.7 | 1013MB |
+| **Qwen3.5/0.8B-ov** | int8 | 308ms | 19ms | **56.0** | 630ms | 19ms | **51.7** | 812MB |
+| **Hy-MT2/1.8B-ov** | int4 | 267ms | 25ms | 40.6 | 710ms | 24ms | 38.2 | 916MB |
+| **Hy-MT2/INT8** | int8 | 232ms | 25ms | 34.4 | 646ms | 33ms | 32.2 | 1033MB |
+| **Qwen3/2B-ov** | int8 | 262ms | 33ms | 30.7 | 771ms | 35ms | 27.8 | 1207MB |
+| **Qwen3/8B-ov** | int4 AWQ | 402ms | 79ms | 12.9 | 2161ms | 82ms | 12.1 | 2010MB |
+| **Gemma-4-E2B-ov-test** | int4 | 342ms | 77ms | 14.2 | 1732ms | 196ms | 10.8 | 8278MB |
+| **Qwen3.6/35B-A3B-ov** | int4/8 mix | 1069ms | 88ms | 11.8 | 4518ms | 87ms | 11.6 | 1013MB |
 
 > tok/s 对应 BPE subword token，中文约 1.8 字符/subword。
 
