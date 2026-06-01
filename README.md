@@ -1,4 +1,6 @@
 # ov-cli
+**[中文](README.md) | [English](README_EN.md)**
+
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License">
