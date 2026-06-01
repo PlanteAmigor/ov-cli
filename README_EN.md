@@ -132,7 +132,7 @@ Loads an OpenVINO model and starts an interactive terminal. Auto-detects model f
 | `//zh text` | Force translate to Chinese |
 | Direct input | Auto-detect language direction |
 
-## Supported Models
+> **Note**: Translate mode accepts one line per input. Paste multi-line text in separate chunks.
 
 ### ✅ Two Inference Formats
 
