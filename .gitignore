@@ -3,7 +3,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 dist/
-build/
+/build/
 
 # 虚拟环境
 .venv/
@@ -12,8 +12,6 @@ venv/
 # 模型 & 大文件
 model/
 optimum-intel-main/
-openvino.genai-2026.2.0.0
-
 # 开发日志
 BENCHMARK.md
 GEMMA4-DEVLOG.md
@@ -28,3 +26,7 @@ Thumbs.db
 
 # 临时转换目录
 *-ov/
+
+# GenAI 编译产物
+openvino.genai-2026.2.0.0-optimization/build/
+openvino.genai-2026.2.0.0-optimization/CMakeCache.txt
