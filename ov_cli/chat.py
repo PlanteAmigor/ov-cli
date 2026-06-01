@@ -104,7 +104,13 @@ def has_chinese(text):
 
 
 def read_multiline(prompt=">>> "):
-    """读取用户输入，自动检测多行粘贴。空行不会中断，连续无输入 0.1s 后结束。"""
+    """读取用户输入，自动检测多行粘贴。Windows 退化为单行输入。"""
+    import sys as _sys
+    if _sys.platform == "win32":
+        try:
+            return input(prompt)
+        except EOFError:
+            return ""
     try:
         line = input(prompt)
     except EOFError:
