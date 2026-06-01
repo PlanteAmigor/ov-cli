@@ -162,21 +162,18 @@ def _build_genai_from_source(venv_path, genai_src):
     target = os.path.join(site_packages, "openvino_genai")
     ext = sysconfig.get_config_var("EXT_SUFFIX") or ".so"
     libsrc = os.path.join(genai_out, "libopenvino_genai.so")
-    if os.path.isfile(libsrc):
-        # SONAME 为 .so.2620，需要同时提供两个文件名
-        for fname in ["libopenvino_genai.so", "libopenvino_genai.so.2620"]:
-            shutil.copy2(libsrc, os.path.join(target, fname))
-        print(f"  ✓ {TR('已安装', 'Installed')}: libopenvino_genai.so")
     pysrc = os.path.join(genai_out, f"py_openvino_genai{ext}")
-    if os.path.isfile(pysrc):
+    if os.path.isfile(pysrc) and os.path.isfile(libsrc):
+        # Fix RUNPATH to $ORIGIN so .so files find each other regardless of install path
+        import subprocess as _sp
+        try:
+            _sp.check_call(["patchelf", "--set-rpath", f"$ORIGIN:{target}", pysrc])
+        except Exception:
+            pass  # patchelf not available, fallback to symlink
+        shutil.copy2(libsrc, os.path.join(target, "libopenvino_genai.so"))
+        shutil.copy2(libsrc, os.path.join(target, "libopenvino_genai.so.2620"))
         shutil.copy2(pysrc, target)
-        print(f"  ✓ {TR('已安装', 'Installed')}: py_openvino_genai{ext}")
-
-    # 清理 ld 缓存
-    try:
-        subprocess.check_call(["ldconfig"], env=env)
-    except Exception:
-        pass
+        print(f"  ✓ {TR('已安装', 'Installed')}: libopenvino_genai.so + py_openvino_genai{ext}")
 
     print(f"  ✓ {TR('GenAI 编译安装完成', 'GenAI build & install complete')}")
     return True
@@ -322,7 +319,7 @@ def cmd_benchmark(args):
     """ov-cli benchmark"""
     from .benchmark import run_benchmark
     ov_path = os.path.abspath(args.model)
-    run_benchmark(ov_path)
+    run_benchmark(ov_path, args.reasoning == "on")
 
 
 def cmd_chat(args):
@@ -621,6 +618,8 @@ def main():
     )
     p_bench.add_argument("--model", "-m", required=True,
                          help=TR("OpenVINO 模型目录", "OpenVINO model dir"))
+    p_bench.add_argument("--reasoning", choices=["on", "off"], default="on",
+                         help=TR("思考模式 (默认: on)", "reasoning mode (default: on)"))
 
     # ── venv ──
     p_venv = sub.add_parser(
