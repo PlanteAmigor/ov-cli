@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License">
   <img src="https://img.shields.io/badge/python-≥3.10-blue" alt="Python">
   <img src="https://img.shields.io/badge/OpenVINO-≥2026.2-purple" alt="OpenVINO">
-  <img src="https://img.shields.io/badge/platform-Linux-lightgrey" alt="Platform">
+  <img src="https://img.shields.io/badge/platform-Linux%20|%20Windows-lightgrey" alt="Platform">
   <img src="https://img.shields.io/github/stars/PlanteAmigor/ov-cli?style=flat&label=stars" alt="Stars">
 </p>
 
