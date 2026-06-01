@@ -45,7 +45,7 @@ then applies the Gemma-4 shared KV layer patch.
 ```
 
 **Mode selection** (interactive): `setup` prompts to choose:
-1. **Simple mode** — pip install only, for regular use
+1. **Simple mode** — pip install only, for regular use. `--reasoning off` has no effect.
 2. **Full mode** — compiles modified GenAI from source to enable `--reasoning off` for thinking models (Qwen3.6 etc.)
 
 ### `venv` — Enter Virtual Environment
@@ -100,8 +100,8 @@ Loads an OpenVINO model and starts an interactive terminal. Auto-detects model f
 
 # Reasoning control (GenAI format only)
 ./ov-cli chat --model ./Qwen3/2B-ov --reasoning on                 # thinking on (default)
-./ov-cli chat --model ./Qwen3.5/0.8B-ov --reasoning off            # thinking off
-./ov-cli chat --model ./Qwen3.6/35B-A3B-ov --reasoning off         # needs custom GenAI build
+./ov-cli chat --model ./Qwen3.5/0.8B-ov --reasoning off            # thinking off (simple mode: ignored, full mode: effective)
+./ov-cli chat --model ./Qwen3.6/35B-A3B-ov --reasoning off         # needs custom GenAI build (full mode only)
 
 # Translate mode (Hy-MT2 etc.)
 ./ov-cli chat --model ./Hy-MT2-1.8B-ov --mode translate
@@ -156,7 +156,7 @@ Loads an OpenVINO model and starts an interactive terminal. Auto-detects model f
 
 - **Gemma-4**: Export needs `model_patcher.py` patch (`kv_shared_layer_index` → `layer_type`), `setup` applies it automatically
 - **Ctrl+C latency**: Interrupt may take 20-200ms (one token time). `^C` may appear in output
-- **`--reasoning off` for thinking models**: Qwen3.6 etc. cannot truly disable reasoning via prompt. `ov-cli` patches OpenVINO GenAI (`ThinkingBudgetTransform`) for logit-level `</think>` forcing, similar to llama.cpp's reasoning budget. Use `setup` full mode (option 2) to auto-build. **Linux only.**
+- **`--reasoning off` for thinking models**: Qwen3.6 etc. cannot truly disable reasoning via prompt. `ov-cli` patches OpenVINO GenAI (`ThinkingBudgetTransform`) for logit-level `</think>` forcing, similar to llama.cpp's reasoning budget. Use `setup` full mode (option 2) to auto-build. **Linux only. Simple mode (default) ignores `--reasoning off` entirely.**
 - Pre-converted OpenVINO models: [ModelScope OpenVINO](https://www.modelscope.cn/organization/OpenVINO)
 
 ## Project Structure
