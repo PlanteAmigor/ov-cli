@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# 虚拟环境
+.venv/
+venv/
+
+# 模型 & 大文件
+model/
+optimum-intel-main/
+
+# 开发日志
+BENCHMARK.md
+GEMMA4-DEVLOG.md
+KV-CACHE-DEVLOG.md
+
+# IDE
+.vscode/
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 临时转换目录
+*-ov/
