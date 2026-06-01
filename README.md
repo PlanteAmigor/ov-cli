@@ -1,5 +1,13 @@
 # ov-cli
 
+<p align="center">
+  <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License">
+  <img src="https://img.shields.io/badge/python-≥3.10-blue" alt="Python">
+  <img src="https://img.shields.io/badge/OpenVINO-≥2026.2-purple" alt="OpenVINO">
+  <img src="https://img.shields.io/badge/platform-Linux%20|%20Windows-lightgrey" alt="Platform">
+  <img src="https://img.shields.io/github/stars/PlanteAmigor/ov-cli?style=flat&label=stars" alt="Stars">
+</p>
+
 **OpenVINO LLM 命令行工具** — 轻量、离线、CPU/GPU 皆可运行。
 
 基于 Optimum Intel + OpenVINO GenAI。支持模型转换（FP32/FP16/INT8/INT4）、交互式聊天（流式输出）、翻译。
