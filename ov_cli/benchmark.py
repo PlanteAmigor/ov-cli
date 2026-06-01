@@ -14,7 +14,10 @@ def _make_prompt(target_tokens):
 
 
 def _measure_rss():
-    """返回当前 RSS (MB)。"""
+    """返回当前 RSS (MB)。Windows 返回 0。"""
+    import sys as _sys
+    if _sys.platform == "win32":
+        return 0
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024
 
 
