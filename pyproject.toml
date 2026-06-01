@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ov-cli"
+version = "0.1.0"
+description = "OpenVINO LLM 命令行工具"
+requires-python = ">=3.10"
+dependencies = [
+    "openvino>=2026.2",
+    "openvino-tokenizers",
+    "openvino-genai",
+    "nncf>=3.0",
+    "torch",
+    "torchvision",
+    "transformers>=4.57",
+    "tokenizers",
+    "jinja2",
+    "optimum-intel[openvino]",
+    "pillow",
+    "numpy",
+    "huggingface-hub",
+    "safetensors",
+    "sentencepiece",
+]
+
+[project.scripts]
+ov-cli = "ov_cli.cli:main"
