@@ -93,6 +93,24 @@ def _apply_gemma4_patch():
             print(f"  - {TR('Gemma-4 补丁不需要或已不适用', 'Gemma-4 patch not needed or N/A')}")
 
 
+def _is_windows():
+    return sys.platform == "win32"
+
+
+def _activate_path(venv_path):
+    """返回虚拟环境的 activate 脚本路径。"""
+    if _is_windows():
+        return os.path.join(venv_path, "Scripts", "activate")
+    return os.path.join(venv_path, "bin", "activate")
+
+
+def _pip_path(venv_path):
+    """返回虚拟环境的 pip 路径。"""
+    if _is_windows():
+        return os.path.join(venv_path, "Scripts", "pip.exe")
+    return os.path.join(venv_path, "bin", "pip")
+
+
 def cmd_setup(args):
     """ov-cli setup: 创建虚拟环境并安装依赖"""
     workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -100,7 +118,7 @@ def cmd_setup(args):
     print(f"  {TR('创建虚拟环境', 'Creating venv')}: {venv_path}")
     import subprocess, sys as _sys
     subprocess.check_call([_sys.executable, "-m", "venv", venv_path, "--clear"])
-    pip = os.path.join(venv_path, "bin", "pip")
+    pip = _pip_path(venv_path)
     print(f"  {TR('安装依赖...', 'Installing dependencies...')}")
     pkgs = [
         "openvino>=2026.2",
@@ -146,7 +164,7 @@ def cmd_setup(args):
     print()
     print(f"  {TR('✅ 完成!', '✅ Done!')}")
     print(f"  {TR('💡 激活虚拟环境:', '💡 Activate venv:')}")
-    print(f"     source {venv_path}/bin/activate")
+    print(f"     source {_activate_path(venv_path)}")
     print(f"  {TR('💡 或在 VS Code 中重新打开终端即可自动激活', '💡 Or just reopen terminal in VS Code for auto-activation')}")
 
 
@@ -169,7 +187,7 @@ def cmd_venv(args):
     """ov-cli venv: 进入 setup 创建的虚拟环境"""
     workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     venv_path = args.venv or os.path.join(workspace, ".venv")
-    activate = os.path.join(venv_path, "bin", "activate")
+    activate = _activate_path(venv_path)
     if not os.path.isfile(activate):
         print(f"{TR('错误: 找不到虚拟环境', 'Error: venv not found')}: {activate}")
         print(f"  {TR('请先运行', 'Run first')}: ./ov-cli setup")
