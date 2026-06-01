@@ -6,7 +6,7 @@ ov-cli chat: LLM 聊天/翻译终端。
   Optimum 格式 (optimum-intel OVModelForVisualCausalLM): Gemma-4 等
 """
 
-import os, sys, time, select, json, signal
+import os, sys, time, json, signal
 import openvino as ov
 import openvino_genai as ov_genai
 
@@ -99,12 +99,15 @@ def _make_genai_config(temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024):
     return cfg
 
 
+# ── 行编辑器 ────────────────────────────────────────────
+# 支持方向键、Home/End、退格、Delete、历史记录（仿 llama.cpp）
+
+
 def has_chinese(text):
     return any('\u4e00' <= c <= '\u9fff' for c in text[:30])
 
 
 def read_multiline(prompt=">>> "):
-    """读取用户输入，自动检测多行粘贴。Windows 退化为单行输入。"""
     import sys as _sys
     if _sys.platform == "win32":
         try:
@@ -117,6 +120,7 @@ def read_multiline(prompt=">>> "):
         return ""
     if not line:
         return ""
+    import select
     lines = [line.rstrip("\n")]
     try:
         while True:
@@ -132,9 +136,237 @@ def read_multiline(prompt=">>> "):
     return "\n".join(lines)
 
 
+def _count_tokens(ctx, text):
+    if not text:
+        return 0
+    try:
+        if ctx.get("optimum"):
+            return len(ctx["processor"].tokenizer.encode(text))
+        else:
+            r = ctx["pipe"].get_tokenizer().encode(text)
+            return r.input_ids.shape[-1]
+    except Exception:
+        return 0
+
+
+_hist = []
+_hist_idx = -1
+_in_readline = False
 
 
 
+def _char_width(ch):
+    cp = ord(ch)
+    if cp < 0x80:
+        return 1
+    if 0x4E00 <= cp <= 0x9FFF or 0x3000 <= cp <= 0x303F or 0xFF00 <= cp <= 0xFFEF:
+        return 2
+    return 1
+
+
+def _total_width(chars, start=0, end=None):
+    if end is None:
+        end = len(chars)
+    return sum(_char_width(c) for c in chars[start:end])
+
+
+def _move_cursor(delta):
+    if delta < 0:
+        import sys as _sys
+        _sys.stdout.write("\b" * (-delta))
+    elif delta > 0:
+        import sys as _sys
+        _sys.stdout.write("\033[C" * delta)
+
+
+def _clear_line(_total_w):
+    import sys as _sys
+    _sys.stdout.write("\r\033[K")
+
+
+def _draw_prompt():
+    import sys as _sys
+    _sys.stdout.write(">>> ")
+
+
+def readline():
+    global _hist, _hist_idx, _in_readline
+    import os as _os
+    if _in_readline or _os.name == "nt":
+        try:
+            return input(">>> ")
+        except EOFError:
+            return ""
+    _in_readline = True
+
+    import sys as _sys, tty, termios
+    fd = _sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    tty.setraw(fd)
+
+    buf, widths = [], []
+    char_pos = 0
+
+    try:
+        _draw_prompt()
+        _sys.stdout.flush()
+        while True:
+            raw = _os.read(fd, 1)
+            if not raw:
+                break
+            b = raw[0]
+            if b == 3:
+                raise KeyboardInterrupt
+            if b == 4:
+                break
+            if b in (13, 10):
+                _sys.stdout.write("\r\n")
+                _sys.stdout.flush()
+                break
+            if b == 9:
+                continue
+
+            if b & 0xE0 == 0xC0:
+                raw += _os.read(fd, 1)
+            elif b & 0xF0 == 0xE0:
+                raw += _os.read(fd, 2)
+            elif b & 0xF8 == 0xF0:
+                raw += _os.read(fd, 3)
+            ch = raw.decode("utf-8", errors="replace")
+
+            if b == 27:
+                nxt = _os.read(fd, 1)
+                if nxt == b"[":
+                    params = b""
+                    while True:
+                        c = _os.read(fd, 1)
+                        if c in [b"A", b"B", b"C", b"D", b"H", b"F", b"~"] or (c.isalpha() and c.isupper()):
+                            code = c
+                            if code == b"3":
+                                _os.read(fd, 1)
+                            break
+                        params += c
+                    if code == b"D" and char_pos > 0:
+                        char_pos -= 1
+                        _move_cursor(-_char_width(buf[char_pos]))
+                    elif code == b"C" and char_pos < len(buf):
+                        _move_cursor(_char_width(buf[char_pos]))
+                        char_pos += 1
+                    elif code == b"H":
+                        _move_cursor(-_total_width(buf[:char_pos]))
+                        char_pos = 0
+                    elif code == b"F":
+                        _move_cursor(_total_width(buf[char_pos:]))
+                        char_pos = len(buf)
+                    elif code == b"A":
+                        char_pos = _hist_up(buf, widths, char_pos)
+                    elif code == b"B":
+                        char_pos = _hist_down(buf, widths, char_pos)
+                    elif code == b"~" and params == b"3":
+                        if char_pos < len(buf):
+                            dw = _char_width(buf[char_pos])
+                            del buf[char_pos]
+                            del widths[char_pos]
+                            tail = "".join(buf[char_pos:])
+                            _sys.stdout.write(tail + " ")
+                            _move_cursor(-_total_width(buf[char_pos:]) - dw - 1)
+                        _sys.stdout.flush()
+                _sys.stdout.flush()
+                continue
+
+            if b in (127, 8):
+                if char_pos > 0:
+                    dw = _char_width(buf[char_pos - 1])
+                    del buf[char_pos - 1]
+                    del widths[char_pos - 1]
+                    char_pos -= 1
+                    _move_cursor(-dw)
+                    tail = "".join(buf[char_pos:])
+                    _sys.stdout.write(tail + " ")
+                    _move_cursor(-_total_width(buf[char_pos:]) - 1)
+                _sys.stdout.flush()
+                continue
+
+            w = _char_width(ch)
+            if char_pos == len(buf):
+                _sys.stdout.write(ch)
+            else:
+                tail = "".join(buf[char_pos:])
+                _sys.stdout.write(ch + tail)
+                _move_cursor(-_total_width(buf[char_pos:]))
+            buf.insert(char_pos, ch)
+            widths.insert(char_pos, w)
+            char_pos += 1
+            _sys.stdout.flush()
+    finally:
+        termios.tcsetattr(fd, termios.TCSANOW, old)
+        _in_readline = False
+
+    line = "".join(buf)
+    if line:
+        _hist.append(line)
+    _hist_idx = -1
+    return line
+
+
+def _hist_up(buf, widths, char_pos):
+    global _hist_idx, _hist_buf
+    import sys as _sys
+    if not _hist:
+        return char_pos
+    if _hist_idx == -1:
+        _hist_buf = "".join(buf)
+    if _hist_idx + 1 < len(_hist):
+        _hist_idx += 1
+        s = _hist[-(_hist_idx + 1)]
+        _sys.stdout.write("\r")
+        _clear_line(_total_width(buf))
+        _draw_prompt()
+        for c in s:
+            _sys.stdout.write(c)
+        buf.clear()
+        buf.extend(s)
+        widths.clear()
+        widths.extend(_char_width(c) for c in s)
+        return len(s)
+    return char_pos
+
+
+def _hist_down(buf, widths, char_pos):
+    global _hist_idx, _hist_buf
+    import sys as _sys
+    if _hist_idx <= 0:
+        if _hist_idx == 0:
+            _sys.stdout.write("\r")
+            _clear_line(_total_width(buf))
+            _draw_prompt()
+            for c in _hist_buf:
+                _sys.stdout.write(c)
+            buf.clear()
+            buf.extend(_hist_buf)
+            widths.clear()
+            widths.extend(_char_width(c) for c in _hist_buf)
+            _hist_idx = -1
+            return len(_hist_buf)
+        return char_pos
+    _hist_idx -= 1
+    s = _hist[-(_hist_idx + 1)]
+    _move_cursor(-_total_width(buf[:char_pos]) - 4)
+    _clear_line(_total_width(buf))
+    _draw_prompt()
+    for c in s:
+        _sys.stdout.write(c)
+    buf.clear()
+    buf.extend(s)
+    widths.clear()
+    widths.extend(_char_width(c) for c in s)
+    return len(s)
+
+
+_hist = []
+_hist_idx = -1
+_in_readline = False
+_hist_buf = ""
 def run_chat(ctx, system="You are a helpful AI assistant.",
              temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024,
              image_path=None):
@@ -238,6 +470,20 @@ def _load_optimum(ov_path, device):
     }
 
 
+def _count_tokens(ctx, text):
+    """统计文本的 token 数。"""
+    if not text:
+        return 0
+    try:
+        if ctx.get("optimum"):
+            return len(ctx["processor"].tokenizer.encode(text))
+        else:
+            r = ctx["pipe"].get_tokenizer().encode(text)
+            return r.input_ids.shape[-1]
+    except Exception:
+        return 0
+
+
 def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_path=None):
     """Optimum 格式聊天模式（OVModelForVisualCausalLM + AutoProcessor）。"""
     model = ctx["model"]
@@ -258,7 +504,7 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
     conv = []
     while True:
         try:
-            text = read_multiline(">>> ")
+            text = readline()
         except (EOFError, KeyboardInterrupt):
             print()
             break
@@ -371,8 +617,9 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
         if current_image is not None:
             current_image = None
         char_count = len(reply_text.replace(" ", ""))
+        tok_count = _count_tokens(ctx, reply_text)
         print()
-        print(f"  [{elapsed:.1f}s | {char_count} {TR('chars', 'chars')} | {char_count/elapsed:.1f} ch/s]")
+        print(f"  [{elapsed:.1f}s | {char_count} chars | {char_count/elapsed:.1f} ch/s | {tok_count/elapsed:.1f} tok/s]")
         print()
 
 
@@ -394,7 +641,7 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
     conv = []
     while True:
         try:
-            text = read_multiline(">>> ")
+            text = readline()
         except (EOFError, KeyboardInterrupt):
             print()
             break
@@ -482,8 +729,9 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
         if current_image is not None:
             current_image = None
         char_count = len(reply_text.replace(" ", ""))
+        tok_count = _count_tokens(ctx, reply_text)
         print()
-        print(f"  [{elapsed:.1f}s | {char_count} {TR('chars', 'chars')} | {char_count/elapsed:.1f} ch/s]")
+        print(f"  [{elapsed:.1f}s | {char_count} chars | {char_count/elapsed:.1f} ch/s | {tok_count/elapsed:.1f} tok/s]")
         print()
 
 
@@ -509,7 +757,7 @@ def _run_translate_genai(ctx, max_tokens):
 
     while True:
         try:
-            text = read_multiline(">>> ")
+            text = readline()
         except (EOFError, KeyboardInterrupt):
             print()
             break
@@ -571,8 +819,9 @@ def _run_translate_genai(ctx, max_tokens):
         elapsed = time.time() - t0
         reply_text = "".join(reply_parts)
         char_count = len(reply_text.replace(" ", ""))
+        tok_count = _count_tokens(ctx, reply_text)
         print()
-        print(f"  [{elapsed:.1f}s | {char_count} {TR('chars', 'chars')} | {char_count/elapsed:.1f} ch/s]")
+        print(f"  [{elapsed:.1f}s | {char_count} chars | {char_count/elapsed:.1f} ch/s | {tok_count/elapsed:.1f} tok/s]")
         print()
 
 
