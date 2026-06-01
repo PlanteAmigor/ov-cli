@@ -214,8 +214,7 @@ def cmd_setup(args):
         print(f"  {TR('4. 安装编译产物到虚拟环境', '4. Install to venv')}")
         print()
         print(f"  {TR('前置条件', 'Prerequisites')}:")
-        print(f"  • cmake ≥ 3.23")
-        print(f"  • gcc/g++")
+        print(f"  • cmake, gcc/g++, make, patchelf")
         print(f"  • {TR('首次编译需联网下载依赖 (~100MB)', 'First build downloads deps (~100MB)')}")
         print(f"  • {TR('编译耗时约 2-5 分钟', 'Build takes ~2-5 minutes')}")
         print("=" * 54)
@@ -276,8 +275,16 @@ def cmd_setup(args):
     # 编译 GenAI 源码（模式2）
     if mode == 2:
         import shutil
-        if not shutil.which("cmake"):
-            print(f"  ❌ {TR('未找到 cmake，请先安装 (sudo apt install cmake)', 'cmake not found, install: sudo apt install cmake')}")
+        deps_ok = True
+        for dep, hint in [("cmake", "sudo apt install cmake"),
+                          ("gcc", "sudo apt install gcc"),
+                          ("g++", "sudo apt install g++"),
+                          ("make", "sudo apt install make"),
+                          ("patchelf", "sudo apt install patchelf")]:
+            if not shutil.which(dep):
+                print(f"  ❌ {TR('未找到 {dep}，请先安装 ({hint})', '{dep} not found, install: {hint}').format(dep=dep, hint=hint)}")
+                deps_ok = False
+        if not deps_ok:
             sys.exit(1)
         _build_genai_from_source(venv_path, genai_src)
 
