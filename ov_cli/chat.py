@@ -17,14 +17,9 @@ import openvino_genai as ov_genai
 # 如果重装 optimum-intel 后需要重新应用此补丁。
 
 
-def _make_streamer(reply_parts, stop_flag, show_reasoning=True):
-    """创建 streamer callback。
-
-    当 show_reasoning=False 时，过滤掉 <think>...</think> 思考内容，
-    只显示最终回答。适用于 Qwen3.6 等天生思考的模型。
-    """
+def _make_streamer(reply_parts, stop_flag):
+    """创建 streamer callback（仅处理 Ctrl+C）。"""
     import select as _sel
-    _in_think = [not show_reasoning]  # 不显示思考时默认已在 think 块内（prompt 末尾有 <think>\n）
 
     def cb(t):
         if stop_flag[0]:
@@ -35,46 +30,6 @@ def _make_streamer(reply_parts, stop_flag, show_reasoning=True):
             if c == '\x03':
                 stop_flag[0] = True
                 return True
-
-        if not show_reasoning:
-            # 过滤 <think>...</think> 内容
-            if _in_think[0]:
-                if '</think>' in t:
-                    idx = t.index('</think>')
-                    after = t[idx + 8:]  # len('</think>') == 8
-                    if after:
-                        reply_parts.append(after)
-                        sys.stdout.write(after)
-                        sys.stdout.flush()
-                    _in_think[0] = False
-                # 还在 think 块内，丢弃
-                return False
-            # 不在 think 块内
-            if '<think>' in t:
-                idx = t.index('<think>')
-                before = t[:idx]
-                after = t[idx + 7:]  # len('<think>') == 7
-                if before:
-                    reply_parts.append(before)
-                    sys.stdout.write(before)
-                    sys.stdout.flush()
-                if after:
-                    if '</think>' in after:
-                        idx2 = after.index('</think>')
-                        after_think = after[idx2 + 8:]
-                        if after_think:
-                            reply_parts.append(after_think)
-                            sys.stdout.write(after_think)
-                            sys.stdout.flush()
-                    else:
-                        _in_think[0] = True
-                return False
-            reply_parts.append(t)
-            sys.stdout.write(t)
-            sys.stdout.flush()
-            return False
-
-        # show_reasoning: 直接输出
         reply_parts.append(t)
         sys.stdout.write(t)
         sys.stdout.flush()
@@ -833,7 +788,7 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
 
         reply_parts = []
         stop_flag = [False]
-        streamer_callback = _make_streamer(reply_parts, stop_flag, show_reasoning=reasoning)
+        streamer_callback = _make_streamer(reply_parts, stop_flag)
 
         old_handler = signal.signal(signal.SIGINT, lambda s, f: stop_flag.__setitem__(0, True))
         try:
@@ -929,7 +884,7 @@ def _run_translate_genai(ctx, max_tokens):
         sys.stdout.flush()
         reply_parts = []
         stop_flag = [False]
-        streamer_callback = _make_streamer(reply_parts, stop_flag, show_reasoning=True)
+        streamer_callback = _make_streamer(reply_parts, stop_flag)
 
         old_handler = signal.signal(signal.SIGINT, lambda s, f: stop_flag.__setitem__(0, True))
         try:
