@@ -159,8 +159,8 @@ eval "$(./ov-cli venv --venv ./my-venv)"
 - **Qwen3-VL 小模型**：自转 2B 视觉编码器导出有 bug（`aten::view/Reshape` 形状不匹配）；Qwen3.5 0.8B 视觉编码器相同问题。官方预转换 8B 和 35B-A3B 正常
 - **Ctrl+C 中断延迟**：生成期间按 Ctrl+C 可中断，但最坏情况下需等待当前 token 生成完毕（约 20-200ms 不等），无法达到像 llama.cpp 的即时中断。中断时 `^C` 字符可能出现在输出中
 - **`--reasoning off` 对思考型模型**：Qwen3.6 等天生思考的模型通过 prompt 无法真正禁用推理。`ov-cli` 通过修改 OpenVINO GenAI 源码（`ThinkingBudgetTransform`）实现了 logit 级别的 `</think>` 强制结束思考，效果类似 llama.cpp 的 reasoning budget sampler。
-  - 使用 `setup` 完整模式（交互选 2）自动编译安装修改版 GenAI，仅 **Linux** 支持
-  - 简易模式（默认）下 `--reasoning off` 仅过滤显示 `<think>...</think>` 内容，不节省时间
+  - 使用 `setup` **完整模式**（交互选 2）自动编译安装修改版 GenAI 后，`--reasoning off` 才有效。仅 **Linux** 支持
+  - **简易模式**（默认）下 `--reasoning off` 无效，模型正常输出思考内容
 - 预转换 OpenVINO 模型可在 [ModelScope OpenVINO 组织](https://www.modelscope.cn/organization/OpenVINO) 查找
 
 ## 项目结构
