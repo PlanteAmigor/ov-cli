@@ -394,19 +394,37 @@ def run_chat(ctx, system="You are a helpful AI assistant.",
         _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_path)
 
 
-def _build_prompt(messages):
-    """将消息列表转为纯文本 prompt（用于 VLMPipeline 等不支持 ChatHistory 的管道）。"""
+def _build_prompt(messages, model_type=""):
+    """将消息列表转为纯文本 prompt（用于 VLMPipeline 等不支持 ChatHistory 的管道）。
+
+    根据模型类型选择合适的模板格式。
+    """
+    # ChatML 格式（Qwen、Qwen3.5 等）
+    if "qwen" in (model_type or "").lower():
+        prompt = ""
+        for m in messages:
+            role = m["role"]
+            content = m["content"]
+            if role == "system":
+                prompt += f"<|im_start|>system\n{content}\n<|im_end|>\n"
+            elif role == "user":
+                prompt += f"<|im_start|>user\n{content}\n<|im_end|>\n"
+            elif role == "assistant":
+                prompt += f"<|im_start|>assistant\n{content}\n<|im_end|>\n"
+        prompt += "<|im_start|>assistant\n"
+        return prompt
+    # 通用模板（Gemma、Hunyuan 等）
     prompt = ""
     for m in messages:
         role = m["role"]
         content = m["content"]
         if role == "system":
-            prompt += f"<|system|>\n{content}\n"
+            prompt += f"<bos><start_of_turn>system\n{content}\n<end_of_turn>\n"
         elif role == "user":
-            prompt += f"<|user|>\n{content}\n"
+            prompt += f"<start_of_turn>user\n{content}\n<end_of_turn>\n"
         elif role == "assistant":
-            prompt += f"<|assistant|>\n{content}\n"
-    prompt += "<|assistant|>\n"
+            prompt += f"<start_of_turn>model\n{content}\n<end_of_turn>\n"
+    prompt += "<start_of_turn>model\n"
     return prompt
 
 
@@ -716,7 +734,7 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
                 kwargs = {"generation_config": gen_cfg, "streamer": streamer_callback}
                 if current_image is not None:
                     kwargs["image"] = current_image
-                pipe.generate(_build_prompt(messages), **kwargs)
+                pipe.generate(_build_prompt(messages, ctx.get("model_type", "")), **kwargs)
             else:
                 pipe.generate(ov_genai.ChatHistory(messages), gen_cfg, streamer_callback)
         finally:
