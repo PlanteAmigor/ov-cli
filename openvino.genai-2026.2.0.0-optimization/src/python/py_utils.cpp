@@ -1,0 +1,652 @@
+// Copyright (C) 2023-2026 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0
+
+#include "py_utils.hpp"
+
+#include <memory>
+
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/stl_bind.h>
+#include <pybind11/stl/filesystem.h>
+#include <pybind11/functional.h>
+
+#include <openvino/runtime/auto/properties.hpp>
+
+#include "tokenizer/tokenizers_path.hpp"
+#include "openvino/genai/llm_pipeline.hpp"
+#include "openvino/genai/visual_language/pipeline.hpp"
+#include "openvino/genai/image_generation/generation_config.hpp"
+#include "openvino/genai/extensions.hpp"
+#include "openvino/genai/taylorseer_config.hpp"
+#include "openvino/genai/whisper_generation_config.hpp"
+#include "openvino/genai/whisper_pipeline.hpp"
+#include "openvino/genai/rag/text_embedding_pipeline.hpp"
+#include "openvino/core/extension.hpp"
+#include "utils.hpp"
+
+namespace py = pybind11;
+
+namespace {
+
+class GilSafeGeneratorWrapper : public ov::genai::Generator {
+    std::shared_ptr<ov::genai::Generator> m_impl;
+    py::object m_py_ref;
+
+public:
+    GilSafeGeneratorWrapper(std::shared_ptr<ov::genai::Generator>&& impl, py::object&& py_ref)
+        : m_impl(std::move(impl)), m_py_ref(std::move(py_ref)) {}
+
+    ~GilSafeGeneratorWrapper() override {
+        if (Py_IsInitialized()) {
+            try {
+                py::gil_scoped_acquire acquire;
+                m_impl.reset();
+                m_py_ref = py::object();
+                return;
+            } catch (...) {
+            }
+        }
+        m_py_ref.release();
+    }
+
+    float next() override { return m_impl->next(); }
+    ov::Tensor randn_tensor(const ov::Shape& shape) override { return m_impl->randn_tensor(shape); }
+    void seed(size_t new_seed) override { m_impl->seed(new_seed); }
+};
+
+}  // namespace
+
+namespace ov::genai::pybind::utils {
+
+py::str handle_utf8(const std::string& text) {
+    // pybind11 decodes strings similar to Pythons's
+    // bytes.decode('utf-8'). It raises if the decoding fails.
+    // generate() may return incomplete Unicode points if max_new_tokens
+    // was reached. Replace such points with � instead of raising an exception
+    PyObject* py_s = PyUnicode_DecodeUTF8(text.data(), text.length(), "replace");
+    return py::reinterpret_steal<py::object>(py_s);
+}
+
+py::list handle_utf8(const std::vector<std::string>& decoded_res) {
+    py::list res;
+    for (const auto s: decoded_res) {
+        py::str r = handle_utf8(s);
+        res.append(r);
+    }
+    return res;
+}
+
+bool py_object_is_any_map(const py::object& py_obj) {
+    if (!py::isinstance<py::dict>(py_obj)) {
+        return false;
+    }
+    auto dict = py::cast<py::dict>(py_obj);
+    return std::all_of(dict.begin(), dict.end(), [&](const std::pair<py::object::handle, py::object::handle>& elem) {
+        return py::isinstance<py::str>(elem.first);
+    });
+}
+
+ov::Any py_object_to_any(const py::object& py_obj, std::string property_name);
+
+ov::AnyMap py_object_to_any_map(const py::object& py_obj) {
+    OPENVINO_ASSERT(py_object_is_any_map(py_obj), "Unsupported attribute type.");
+    ov::AnyMap return_value = {};
+    for (auto& item : py::cast<py::dict>(py_obj)) {
+        std::string key = py::cast<std::string>(item.first);
+        py::object value = py::cast<py::object>(item.second);
+        if (py_object_is_any_map(value)) {
+            return_value[key] = py_object_to_any_map(value);
+        } else {
+            return_value[key] = py_object_to_any(value, key);
+        }
+    }
+    return return_value;
+}
+
+ov::Any py_object_to_any(const py::object& py_obj, std::string property_name) {
+    // These properties should be casted to ov::AnyMap, instead of std::map. 
+    std::set<std::string> any_map_properties = {
+        "GENERATE_CONFIG",
+        "PREFILL_CONFIG",
+        "SHARED_HEAD_CONFIG",
+        "NPUW_LLM_GENERATE_CONFIG",
+        "NPUW_LLM_PREFILL_CONFIG",
+        "NPUW_LLM_SHARED_HEAD_CONFIG",
+        "++GENERATE_CONFIG",
+        "++PREFILL_CONFIG",
+        "++SHARED_HEAD_CONFIG",
+        "++NPUW_LLM_GENERATE_CONFIG",
+        "++NPUW_LLM_PREFILL_CONFIG",
+        "++NPUW_LLM_SHARED_HEAD_CONFIG"
+    };
+
+    py::object float_32_type = py::module_::import("numpy").attr("float32");
+    if (py::isinstance<py::str>(py_obj)) {
+        if (property_name == "structural_tags_config") {
+            std::variant<ov::genai::StructuralTagsConfig, ov::genai::StructuredOutputConfig::StructuralTag> variant_value =
+                py_obj.cast<std::string>();
+            return variant_value;
+        }
+        return py_obj.cast<std::string>();
+    } else if (py::isinstance<py::bool_>(py_obj)) {
+        return py_obj.cast<bool>();
+    } else if (py::isinstance<py::bytes>(py_obj)) {
+        return py_obj.cast<std::string>();
+    } else if (py::isinstance<py::float_>(py_obj)) {
+        return py_obj.cast<float>();
+    } else if (py::isinstance(py_obj, float_32_type)) {
+        return py_obj.cast<float>();
+    } else if (py::isinstance<py::int_>(py_obj)) {
+        return py_obj.cast<int64_t>();
+    } else if (py::isinstance<py::none>(py_obj)) {
+        return {};
+    } else if (py::isinstance<py::list>(py_obj)) {
+        if (property_name == ov::cache_encryption_callbacks.name()) {
+            // this impl is based on OpenVINO python bindings impl.
+            auto property_list = py_obj.cast<py::list>();
+            // Wrapped to sp due-to we need to hold GIL upon destruction of python function
+            auto py_encrypt = std::shared_ptr<py::function>(new py::function(std::move(property_list[0])),
+                                                            [](py::function* py_encrypt) {
+                                                                py::gil_scoped_acquire acquire;
+                                                                delete py_encrypt;
+                                                            });
+            auto py_decrypt = std::shared_ptr<py::function>(new py::function(std::move(property_list[1])),
+                                                            [](py::function* py_decrypt) {
+                                                                py::gil_scoped_acquire acquire;
+                                                                delete py_decrypt;
+                                                            });
+
+            std::function<std::string(const std::string&)> encrypt_func =
+                [py_encrypt](const std::string& in_str) -> std::string {
+                // Acquire GIL, execute Python function
+                py::gil_scoped_acquire acquire;
+                return (*py_encrypt)(py::bytes(in_str)).cast<std::string>();
+            };
+
+            std::function<std::string(const std::string&)> decrypt_func =
+                [py_decrypt](const std::string& in_str) -> std::string {
+                // Acquire GIL, execute Python function
+                py::gil_scoped_acquire acquire;
+                return (*py_decrypt)(py::bytes(in_str)).cast<std::string>();
+            };
+            ov::EncryptionCallbacks encryption_callbacks{
+                std::move(encrypt_func), std::move(decrypt_func)
+            };
+            return encryption_callbacks;
+        } else if (property_name == "structural_tags") {
+            // this impl is based on OpenVINO python bindings impl.
+            auto property_list = py_obj.cast<py::list>();
+            std::vector<ov::genai::StructuralTagItem> structural_tags;
+            for (const auto& item : property_list) {
+                if (py::isinstance<ov::genai::StructuralTagItem>(item)) {
+                    structural_tags.push_back(item.cast<ov::genai::StructuralTagItem>());
+                } else {
+                    OPENVINO_THROW("Incorrect value in \"", property_name, "\". Expected StructuralTagItem.");
+                }
+            }
+            return structural_tags;
+        } else if (property_name == "parsers") {
+            auto property_list = py_obj.cast<py::list>();
+            std::vector<std::shared_ptr<ov::genai::Parser>> parsers;
+            for (const auto& item : property_list) {
+                if (py::isinstance<ov::genai::Parser>(item)) {
+                    parsers.push_back(item.cast<std::shared_ptr<ov::genai::Parser>>());
+                } else {
+                    OPENVINO_THROW("Incorrect value in \"", property_name, "\". Expected Parser.");
+                }
+            }
+            return parsers;
+        } else if (property_name == "extensions") {
+            auto property_list = py_obj.cast<py::list>();
+            ov::genai::ExtensionList extensions;
+            py::object pathlib_path = py::module_::import("pathlib").attr("Path");
+            py::object op_extension_ctor = py::module_::import("openvino").attr("OpExtension");
+            for (const auto& item : property_list) {
+                if (py::isinstance<py::str>(item) || py::isinstance<py::bytes>(item) || py::isinstance(item, pathlib_path)) {
+                    extensions.push_back(item.cast<std::filesystem::path>());
+                    continue;
+                }
+                if (py::isinstance<ov::Extension>(item)) {
+                    extensions.push_back(item.cast<std::shared_ptr<ov::Extension>>());
+                    continue;
+                }
+                if (py::isinstance<py::type>(item)) {
+                    try {
+                        auto py_ext = op_extension_ctor(item);
+                        extensions.push_back(py_ext.cast<std::shared_ptr<ov::Extension>>());
+                        continue;
+                    } catch (py::error_already_set& e) {
+                        e.clear();
+                    }
+                }
+                OPENVINO_THROW("Incorrect value in \"",
+                               property_name,
+                               "\". Expected extension path (str/bytes/pathlib.Path), ov::Extension object, or custom op type.");
+            }
+            return extensions;
+        } else if (property_name == ov::genai::videos_metadata.name()) {
+            auto property_list = py_obj.cast<py::list>();
+            std::vector<ov::genai::VideoMetadata> videos_metadata;
+            for (const auto& item : property_list) {
+                OPENVINO_ASSERT(py::isinstance<ov::genai::VideoMetadata>(item),
+                    "Incorrect value in \"" + property_name + "\". Expected VideoMetadata.");
+                videos_metadata.push_back(item.cast<ov::genai::VideoMetadata>());
+            }
+            return videos_metadata;
+        } else {
+            auto _list = py_obj.cast<py::list>();
+            enum class PY_TYPE : int { UNKNOWN = 0, STR, INT, FLOAT, BOOL, PARTIAL_SHAPE, TENSOR, DICT};
+            PY_TYPE detected_type = PY_TYPE::UNKNOWN;
+            for (const auto& it : _list) {
+                auto check_type = [&](PY_TYPE type) {
+                    if (detected_type == PY_TYPE::UNKNOWN || detected_type == type) {
+                        detected_type = type;
+                        return;
+                    }
+                    OPENVINO_THROW("Incorrect value in \"" + property_name + "\". Mixed types in the list are not allowed.");
+                };
+                if (py::isinstance<py::str>(it)) {
+                    check_type(PY_TYPE::STR);
+                } else if (py::isinstance<py::int_>(it)) {
+                    check_type(PY_TYPE::INT);
+                } else if (py::isinstance<py::float_>(it)) {
+                    check_type(PY_TYPE::FLOAT);
+                } else if (py::isinstance<py::bool_>(it)) {
+                    check_type(PY_TYPE::BOOL);
+                } else if (py::isinstance<ov::PartialShape>(it)) {
+                    check_type(PY_TYPE::PARTIAL_SHAPE);
+                } else if (py::isinstance<ov::Tensor>(it)) {
+                    check_type(PY_TYPE::TENSOR);
+                } else if (py::isinstance<py::dict>(it)) {
+                    check_type(PY_TYPE::DICT);
+                }
+            }
+
+            if (_list.empty())
+                return ov::Any();
+
+            switch (detected_type) {
+            case PY_TYPE::STR:
+                return _list.cast<std::vector<std::string>>();
+            case PY_TYPE::FLOAT:
+                return _list.cast<std::vector<double>>();
+            case PY_TYPE::INT:
+                return _list.cast<std::vector<int64_t>>();
+            case PY_TYPE::BOOL:
+                return _list.cast<std::vector<bool>>();
+            case PY_TYPE::PARTIAL_SHAPE:
+                return _list.cast<std::vector<ov::PartialShape>>();
+            case PY_TYPE::TENSOR:
+                return _list.cast<std::vector<ov::Tensor>>();
+            case PY_TYPE::DICT: {
+                std::vector<ov::AnyMap> any_map_list(_list.size());
+                for (const auto& item : _list) {
+                    any_map_list.push_back(py_object_to_any_map(item.cast<py::dict>()));
+                }
+                return any_map_list;
+            }
+            default:
+                OPENVINO_THROW("Property \"" + property_name + "\" got unsupported type.");
+            }
+        }
+
+    } else if (py::isinstance<py::dict>(py_obj) && any_map_properties.find(property_name) == any_map_properties.end()) {
+        auto _dict = py_obj.cast<py::dict>();
+        enum class PY_TYPE : int { UNKNOWN = 0, STR, INT};
+        PY_TYPE detected_key_type = PY_TYPE::UNKNOWN;
+        PY_TYPE detected_value_type = PY_TYPE::UNKNOWN;
+        for (const auto& it : _dict) {
+            auto check_type = [&](PY_TYPE type, PY_TYPE& detected_type) {
+                if (detected_type == PY_TYPE::UNKNOWN || detected_type == type) {
+                    detected_type = type;
+                    return;
+                }
+                OPENVINO_THROW("Incorrect value in \"" + property_name + "\". Mixed types in the dict are not allowed.");
+            };
+            // check key type
+            if (py::isinstance<py::str>(it.first)) {
+                check_type(PY_TYPE::STR, detected_key_type);
+            }
+
+            // check value type
+            if (py::isinstance<py::int_>(it.second)) {
+                check_type(PY_TYPE::INT, detected_value_type);
+            }
+        }
+        if (_dict.empty()) {
+            return ov::Any();
+        }
+
+        switch (detected_key_type) {
+        case PY_TYPE::STR:
+            switch (detected_value_type) {
+            case PY_TYPE::INT:
+                return _dict.cast<std::map<std::string, int64_t>>();
+            default:
+                OPENVINO_THROW("Property \"" + property_name + "\" got unsupported type.");
+            }
+        default:
+            OPENVINO_THROW("Property \"" + property_name + "\" got unsupported type.");
+        }
+    } else if (py::isinstance<py::set>(py_obj)) {
+        auto _set = py_obj.cast<py::set>();
+        enum class PY_TYPE : int { UNKNOWN = 0, STR, INT, FLOAT, BOOL};
+        PY_TYPE detected_type = PY_TYPE::UNKNOWN;
+        for (const auto& it : _set) {
+            auto check_type = [&](PY_TYPE type) {
+                if (detected_type == PY_TYPE::UNKNOWN || detected_type == type) {
+                    detected_type = type;
+                    return;
+                }
+                OPENVINO_THROW("Incorrect value in \"" + property_name + "\". Mixed types in the set are not allowed.");
+            };
+            if (py::isinstance<py::str>(it)) {
+                check_type(PY_TYPE::STR);
+            } else if (py::isinstance<py::int_>(it)) {
+                check_type(PY_TYPE::INT);
+            } else if (py::isinstance<py::float_>(it)) {
+                check_type(PY_TYPE::FLOAT);
+            } else if (py::isinstance<py::bool_>(it)) {
+                check_type(PY_TYPE::BOOL);
+            }
+        }
+
+        if (_set.empty())
+            return ov::Any();
+
+        switch (detected_type) {
+        case PY_TYPE::STR:
+            return _set.cast<std::set<std::string>>();
+        case PY_TYPE::FLOAT:
+            return _set.cast<std::set<double>>();
+        case PY_TYPE::INT:
+            return _set.cast<std::set<int64_t>>();
+        case PY_TYPE::BOOL:
+            return _set.cast<std::set<bool>>();
+        default:
+            OPENVINO_THROW("Property \"" + property_name + "\" got unsupported type.");
+        }
+
+    // OV types
+    } else if (py_object_is_any_map(py_obj)) {
+        return py_object_to_any_map(py_obj);
+    } else if (py::isinstance<ov::Any>(py_obj)) {
+        return py::cast<ov::Any>(py_obj);
+    } else if (py::isinstance<ov::element::Type>(py_obj)) {
+        return py::cast<ov::element::Type>(py_obj);
+    } else if (py::isinstance<ov::PartialShape>(py_obj)) {
+        return py::cast<ov::PartialShape>(py_obj);
+    } else if (py::isinstance<ov::hint::Priority>(py_obj)) {
+        return py::cast<ov::hint::Priority>(py_obj);
+    } else if (py::isinstance<ov::hint::PerformanceMode>(py_obj)) {
+        return py::cast<ov::hint::PerformanceMode>(py_obj);
+    } else if (py::isinstance<ov::intel_auto::SchedulePolicy>(py_obj)) {
+        return py::cast<ov::intel_auto::SchedulePolicy>(py_obj);
+    } else if (py::isinstance<ov::hint::SchedulingCoreType>(py_obj)) {
+        return py::cast<ov::hint::SchedulingCoreType>(py_obj);
+    } else if (py::isinstance<std::set<ov::hint::ModelDistributionPolicy>>(py_obj)) {
+        return py::cast<std::set<ov::hint::ModelDistributionPolicy>>(py_obj);
+    } else if (py::isinstance<ov::hint::ExecutionMode>(py_obj)) {
+        return py::cast<ov::hint::ExecutionMode>(py_obj);
+    } else if (py::isinstance<ov::log::Level>(py_obj)) {
+        return py::cast<ov::log::Level>(py_obj);
+    } else if (py::isinstance<ov::device::Type>(py_obj)) {
+        return py::cast<ov::device::Type>(py_obj);
+    } else if (py::isinstance<ov::streams::Num>(py_obj)) {
+        return py::cast<ov::streams::Num>(py_obj);
+    } else if (py::isinstance<ov::Tensor>(py_obj)) {
+        return py::cast<ov::Tensor>(py_obj);
+    } else if (py::isinstance<ov::Output<ov::Node>>(py_obj)) {
+        return py::cast<ov::Output<ov::Node>>(py_obj);
+    } else if (py::isinstance<ov::genai::SchedulerConfig>(py_obj)) {
+        return py::cast<ov::genai::SchedulerConfig>(py_obj);
+    } else if (py::isinstance<ov::genai::AdapterConfig>(py_obj)) {
+        return py::cast<ov::genai::AdapterConfig>(py_obj);
+    } else if (py::isinstance<ov::genai::StructuralTagItem>(py_obj)) {
+        return py::cast<ov::genai::StructuralTagItem>(py_obj);
+    } else if (py::isinstance<ov::genai::StructuralTagsConfig>(py_obj)) {
+        // For structural_tags_config property, wrap in variant
+        if (property_name == "structural_tags_config") {
+            std::variant<ov::genai::StructuralTagsConfig, ov::genai::StructuredOutputConfig::StructuralTag> variant_value = 
+                py::cast<ov::genai::StructuralTagsConfig>(py_obj);
+            return variant_value;
+        }
+        return py::cast<ov::genai::StructuralTagsConfig>(py_obj);
+    } else if (py::isinstance<ov::genai::StructuredOutputConfig::Regex>(py_obj)
+               || py::isinstance<ov::genai::StructuredOutputConfig::EBNF>(py_obj)
+               || py::isinstance<ov::genai::StructuredOutputConfig::JSONSchema>(py_obj)
+               || py::isinstance<ov::genai::StructuredOutputConfig::ConstString>(py_obj)
+               || py::isinstance<ov::genai::StructuredOutputConfig::AnyText>(py_obj)
+               || py::isinstance<ov::genai::StructuredOutputConfig::QwenXMLParametersFormat>(py_obj)
+               // python does not use std::shared_ptr to obj
+               || py::isinstance<ov::genai::StructuredOutputConfig::Union>(py_obj)
+               || py::isinstance<ov::genai::StructuredOutputConfig::Concat>(py_obj)
+               || py::isinstance<ov::genai::StructuredOutputConfig::Tag>(py_obj)
+               || py::isinstance<ov::genai::StructuredOutputConfig::TriggeredTags>(py_obj)
+               || py::isinstance<ov::genai::StructuredOutputConfig::TagsWithSeparator>(py_obj)) {
+        // For structural_tags_config property, wrap in variant
+        if (property_name == "structural_tags_config") {
+            std::variant<ov::genai::StructuralTagsConfig, ov::genai::StructuredOutputConfig::StructuralTag> variant_value = 
+                py_obj_to_structural_tag(py_obj);
+            return variant_value;
+        }
+        return py_obj_to_structural_tag(py_obj);
+    } else if (py::isinstance<ov::genai::GenerationConfig>(py_obj)) {
+        return py::cast<ov::genai::GenerationConfig>(py_obj);
+    } else if (py::isinstance<ov::genai::ImageGenerationConfig>(py_obj)) {
+        return py::cast<ov::genai::ImageGenerationConfig>(py_obj);
+    } else if (py::isinstance<ov::genai::TaylorSeerCacheConfig>(py_obj)) {
+        return py::cast<ov::genai::TaylorSeerCacheConfig>(py_obj);
+    } else if (py::isinstance<ov::genai::WhisperGenerationConfig>(py_obj)) {
+        return py::cast<ov::genai::WhisperGenerationConfig>(py_obj);
+    } else if (py::isinstance<ov::genai::TextEmbeddingPipeline::PoolingType>(py_obj)) {
+        return py::cast<ov::genai::TextEmbeddingPipeline::PoolingType>(py_obj);
+    } else if (py::isinstance<ov::genai::StopCriteria>(py_obj)) {
+        return py::cast<ov::genai::StopCriteria>(py_obj);
+    } else if (py::isinstance<ov::genai::Generator>(py_obj)) {
+        auto impl = py::cast<std::shared_ptr<ov::genai::Generator>>(py_obj);
+        std::shared_ptr<ov::genai::Generator> wrapper =
+            std::make_shared<GilSafeGeneratorWrapper>(std::move(impl), py::reinterpret_borrow<py::object>(py_obj));
+        return wrapper;
+    } else if (py::isinstance<py::function>(py_obj) && property_name == "callback") {
+        auto py_callback = py::cast<py::function>(py_obj);
+        auto shared_callback = std::shared_ptr<py::function>(
+            new py::function(py_callback),
+            [](py::function* f) {
+                if (Py_IsInitialized()) {
+                    py::gil_scoped_acquire acquire;
+                    delete f;
+                } else {
+                    delete f;
+                }
+            }
+        );
+
+        return std::function<bool(size_t, size_t, ov::Tensor&)>(
+            [shared_callback](size_t step, size_t num_steps, ov::Tensor& latent) -> bool {
+                py::gil_scoped_acquire acquire;
+                return (*shared_callback)(step, num_steps, latent).cast<bool>();
+            }
+        );
+    } else if ((py::isinstance<py::function>(py_obj) || py::isinstance<ov::genai::StreamerBase>(py_obj) || py::isinstance<std::monostate>(py_obj)) && property_name == "streamer") {
+        auto streamer = py::cast<ov::genai::pybind::utils::PyBindStreamerVariant>(py_obj);
+        return ov::genai::streamer(pystreamer_to_streamer(streamer)).second;
+    } else if (py::isinstance(py_obj, py::module_::import("pathlib").attr("Path"))) {
+        return py::cast<std::filesystem::path>(py_obj);
+    }
+    OPENVINO_THROW(py::str(py_obj.get_type()), " isn't supported for argument ", property_name);
+}
+
+ov::AnyMap properties_to_any_map(const std::map<std::string, py::object>& properties) {
+    ov::AnyMap properties_to_cpp;
+    for (const auto& property : properties) {
+        properties_to_cpp[property.first] = py_object_to_any(property.second, property.first);
+    }
+    return properties_to_cpp;
+}
+
+ov::AnyMap kwargs_to_any_map(const py::kwargs& kwargs) {
+    ov::AnyMap params = {};
+
+    for (const auto& item : kwargs) {
+        std::string key = py::cast<std::string>(item.first);
+        py::object value = py::cast<py::object>(item.second);
+        // we need to unpack only dictionaries, which are passed with "config" name,
+        // because there are dictionary properties that should not be unpacked
+        if (utils::py_object_is_any_map(value) && key == "config") {
+            auto map = utils::py_object_to_any_map(value);
+            params.insert(map.begin(), map.end());
+        } else if (py::isinstance<ov::genai::StructuredOutputConfig>(value)) {
+            params[key] = py::cast<ov::genai::StructuredOutputConfig>(value);
+        } else if (value.is_none() && key == "taylorseer_config") {
+            params[key] = ov::Any{};
+        } else {
+            OPENVINO_ASSERT(!value.is_none(), "Property \"", key, "\" can't be None.");
+            params[key] = utils::py_object_to_any(value, key);
+        }
+
+    }
+    return params;
+}
+
+std::filesystem::path ov_tokenizers_module_path() {
+    // Try a path relative to build artifacts folder first.
+    std::filesystem::path from_relative = tokenizers_relative_to_genai();
+    if (std::filesystem::exists(from_relative)) {
+        return from_relative;
+    }
+    return py::module_::import("openvino_tokenizers").attr("_ext_path").cast<std::filesystem::path>();
+}
+
+ov::genai::StreamerVariant pystreamer_to_streamer(const PyBindStreamerVariant& py_streamer) {
+    ov::genai::StreamerVariant streamer = std::monostate();
+
+    std::visit(overloaded {
+        [&streamer](const std::function<std::optional<uint16_t>(py::str)>& py_callback){
+            auto shared_callback = std::shared_ptr<std::function<std::optional<uint16_t>(py::str)>>(
+                new std::function<std::optional<uint16_t>(py::str)>(py_callback),
+                [](std::function<std::optional<uint16_t>(py::str)>* f) {
+                    if (Py_IsInitialized()) {
+                        py::gil_scoped_acquire acquire;
+                        delete f;
+                    } else {
+                        delete f;
+                    }
+                }
+            );
+
+            auto callback_wrapped = [shared_callback = std::move(shared_callback)](std::string subword) -> ov::genai::StreamingStatus {
+                py::gil_scoped_acquire acquire;
+                PyObject* py_str = PyUnicode_DecodeUTF8(subword.data(), subword.length(), "replace");
+                if (!py_str) {
+                    PyErr_WriteUnraisable(nullptr);
+                    return StreamingStatus::RUNNING;
+                }
+                auto py_str_obj = py::reinterpret_steal<py::str>(py_str);
+                std::optional<uint16_t> callback_output;
+                try {
+                    callback_output = (*shared_callback)(py_str_obj);
+                } catch (const py::error_already_set&) {
+                    return StreamingStatus::RUNNING;
+                }
+                if (callback_output.has_value()) {
+                    if (*callback_output == static_cast<uint16_t>(StreamingStatus::RUNNING))
+                        return StreamingStatus::RUNNING;
+                    else if (*callback_output == static_cast<uint16_t>(StreamingStatus::CANCEL))
+                        return StreamingStatus::CANCEL;
+                    return StreamingStatus::STOP;
+                }
+                return StreamingStatus::RUNNING;
+            };
+            streamer = callback_wrapped;
+        },
+        [&streamer](std::shared_ptr<StreamerBase> streamer_cls){
+            streamer = streamer_cls;
+        },
+        [](std::monostate none){ /*streamer is already a monostate */ }
+    }, py_streamer);
+    return streamer;
+}
+
+StructuredOutputConfig::StructuralTag py_obj_to_structural_tag(const py::object& py_obj) {
+    if (py::isinstance<ov::genai::StructuredOutputConfig::Regex>(py_obj)) {
+        return py::cast<ov::genai::StructuredOutputConfig::Regex>(py_obj);
+    } else if (py::isinstance<ov::genai::StructuredOutputConfig::JSONSchema>(py_obj)) {
+        return py::cast<ov::genai::StructuredOutputConfig::JSONSchema>(py_obj);
+    } else if (py::isinstance<ov::genai::StructuredOutputConfig::EBNF>(py_obj)) {
+        return py::cast<ov::genai::StructuredOutputConfig::EBNF>(py_obj);
+    } else if (py::isinstance<ov::genai::StructuredOutputConfig::ConstString>(py_obj)) {
+        return py::cast<ov::genai::StructuredOutputConfig::ConstString>(py_obj);
+    } else if (py::isinstance<ov::genai::StructuredOutputConfig::AnyText>(py_obj)) {
+        return py::cast<ov::genai::StructuredOutputConfig::AnyText>(py_obj);
+    } else if (py::isinstance<ov::genai::StructuredOutputConfig::QwenXMLParametersFormat>(py_obj)) {
+        return py::cast<ov::genai::StructuredOutputConfig::QwenXMLParametersFormat>(py_obj);
+    } else if (py::isinstance<py::str>(py_obj)) {
+        return py::cast<std::string>(py_obj);
+    } else if (py::isinstance<ov::genai::StructuredOutputConfig::Concat>(py_obj)) {
+        return py::cast<std::shared_ptr<ov::genai::StructuredOutputConfig::Concat>>(py_obj);
+    } else if (py::isinstance<ov::genai::StructuredOutputConfig::Union>(py_obj)) {
+        return py::cast<std::shared_ptr<ov::genai::StructuredOutputConfig::Union>>(py_obj);
+    } else if (py::isinstance<ov::genai::StructuredOutputConfig::Tag>(py_obj)) {
+        return py::cast<std::shared_ptr<ov::genai::StructuredOutputConfig::Tag>>(py_obj);
+    } else if (py::isinstance<ov::genai::StructuredOutputConfig::TriggeredTags>(py_obj)) {
+        return py::cast<std::shared_ptr<ov::genai::StructuredOutputConfig::TriggeredTags>>(py_obj);
+    } else if (py::isinstance<ov::genai::StructuredOutputConfig::TagsWithSeparator>(py_obj)) {
+        return py::cast<std::shared_ptr<ov::genai::StructuredOutputConfig::TagsWithSeparator>>(py_obj);
+    } else {
+        OPENVINO_THROW(py_obj.get_type(), " type isn't supported for StructuralTag: ", py::str(py_obj));
+    }
+}
+
+std::vector<ov::genai::VideoMetadata> get_videos_metadata_from_kwargs(const py::kwargs& kwargs) {
+    std::vector<ov::genai::VideoMetadata> videos_metadata;
+    if (kwargs.contains(ov::genai::videos_metadata.name())) {
+        const auto py_videos_metadata = kwargs[ov::genai::videos_metadata.name()];
+        OPENVINO_ASSERT(py::isinstance<py::list>(py_videos_metadata),
+            "\"videos_metadata\" should be a list of VideoMetadata.");
+        videos_metadata = py_videos_metadata.cast<std::vector<ov::genai::VideoMetadata>>();
+    }
+    return videos_metadata;
+}
+
+std::vector<std::vector<ov::genai::VideoMetadata>> get_videos_metadata_batches_from_kwargs(const py::kwargs& kwargs) {
+    std::vector<std::vector<ov::genai::VideoMetadata>> videos_metadata_batches;
+    if (kwargs.contains(ov::genai::utils::VIDEOS_METADATA_BATCHES_ARG_NAME)) {
+        const auto py_videos_metadata_batches = kwargs[ov::genai::utils::VIDEOS_METADATA_BATCHES_ARG_NAME.c_str()];
+        OPENVINO_ASSERT(py::isinstance<py::list>(py_videos_metadata_batches),
+            "\"videos_metadata_batches\" should be a list of lists of VideoMetadata.");
+        for (const auto& py_videos_metadata : py_videos_metadata_batches) {
+            OPENVINO_ASSERT(py::isinstance<py::list>(py_videos_metadata),
+                "Each item in \"videos_metadata_batches\" should be a list of VideoMetadata.");
+            videos_metadata_batches.push_back(
+                py_videos_metadata.cast<std::vector<ov::genai::VideoMetadata>>()
+            );
+        }
+    }
+    return videos_metadata_batches;
+}
+
+ov::genai::GenerationConfig update_config_from_kwargs(ov::genai::GenerationConfig config, const py::kwargs& kwargs) {
+    config.update_generation_config(kwargs_to_any_map(kwargs));
+    return config;
+}
+
+ov::genai::JsonContainer py_object_to_json_container(const py::object& obj) {
+    if (obj.is_none()) {
+        return JsonContainer();
+    }
+    // TODO Consider using direct native JsonContainer conversion instead of string serialization
+    py::module_ json_module = py::module_::import("json");
+    std::string json_string = py::cast<std::string>(json_module.attr("dumps")(obj));
+    return JsonContainer::from_json_string(json_string);
+}
+
+py::object json_container_to_py_object(const ov::genai::JsonContainer& container) {
+    // TODO Consider using direct native JsonContainer conversion instead of string serialization
+    std::string json_string = container.to_json_string();
+    py::module_ json_module = py::module_::import("json");
+    return json_module.attr("loads")(json_string);
+}
+
+}  // namespace ov::genai::pybind::utils

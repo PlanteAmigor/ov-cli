@@ -111,9 +111,114 @@ def _pip_path(venv_path):
     return os.path.join(venv_path, "bin", "pip")
 
 
+def _build_genai_from_source(venv_path, genai_src):
+    """从源码编译 openvino-genai 并安装到虚拟环境。
+
+    这是临时方案，直到 upstream 合入 reasoning_budget 支持。
+    """
+    import subprocess, shutil
+    import sysconfig
+
+    build_dir = os.path.join(genai_src, "build")
+    if os.path.isdir(build_dir):
+        shutil.rmtree(build_dir)
+
+    # 找到 venv 中的 OpenVINO cmake 配置
+    site_packages = os.path.join(venv_path, "lib", f"python{sys.version_info.major}.{sys.version_info.minor}", "site-packages")
+    openvino_dir = os.path.join(site_packages, "openvino", "cmake")
+    if not os.path.isdir(openvino_dir):
+        print(f"  ⚠ {TR('找不到 OpenVINO cmake 配置', 'OpenVINO cmake not found')}")
+        print(f"    {TR('请确保已安装 openvino', 'Make sure openvino is installed')}")
+        return False
+
+    env = os.environ.copy()
+    env["OpenVINO_DIR"] = openvino_dir
+
+    print(f"  {TR('配置 GenAI 源码...', 'Configuring GenAI source...')}")
+    try:
+        subprocess.check_call([
+            "cmake", "-DCMAKE_BUILD_TYPE=Release",
+            "-DBUILD_TOKENIZERS=OFF",
+            "-DENABLE_TOOLS=OFF",
+            "-DENABLE_TESTS=OFF",
+            "-DENABLE_SAMPLES=OFF",
+            "-DENABLE_GGUF=OFF",
+            "-DENABLE_XGRAMMAR=OFF",
+            "-S", genai_src, "-B", build_dir,
+        ], env=env)
+    except Exception as e:
+        print(f"  ⚠ {TR('cmake 配置失败', 'cmake configuration failed')}: {e}")
+        return False
+
+    print(f"  {TR('编译 GenAI...', 'Building GenAI...')}")
+    try:
+        subprocess.check_call(["cmake", "--build", build_dir, "--config", "Release", "-j"], env=env)
+    except Exception as e:
+        print(f"  ⚠ {TR('编译失败', 'Build failed')}: {e}")
+        return False
+
+    # 安装到 venv 的 site-packages
+    genai_out = os.path.join(build_dir, "openvino_genai")
+    target = os.path.join(site_packages, "openvino_genai")
+    ext = sysconfig.get_config_var("EXT_SUFFIX") or ".so"
+    for f in ["libopenvino_genai.so", f"py_openvino_genai{ext}"]:
+        src = os.path.join(genai_out, f)
+        dst = os.path.join(target, f)
+        if os.path.isfile(src):
+            shutil.copy2(src, dst)
+            print(f"  ✓ {TR('已安装', 'Installed')}: {f}")
+
+    print(f"  ✓ {TR('GenAI 编译安装完成', 'GenAI build & install complete')}")
+    return True
+
+
+def _prompt_mode(has_genai_src):
+    """交互选择安装模式：1=简易 2=完整（编译 GenAI）"""
+    if not has_genai_src:
+        return 1
+    while True:
+        try:
+            r = input(f"  {TR('选择安装模式', 'Select mode')}:\n"
+                      f"    1. {TR('简易模式 - 仅 pip 安装', 'Simple - pip only')}\n"
+                      f"    2. {TR('完整模式 - 编译 GenAI 源码启用 thinking budget', 'Full - build GenAI from source')}\n"
+                      f"  {TR('请输入 [1/2]', 'Enter [1/2]')} (1): ")
+            if r.strip() == "":
+                return 1
+            m = int(r.strip())
+            if m in (1, 2):
+                return m
+        except (ValueError, EOFError):
+            return 1
+
+
 def cmd_setup(args):
     """ov-cli setup: 创建虚拟环境并安装依赖"""
     workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    genai_src = os.path.join(workspace, "openvino.genai-2026.2.0.0-optimization")
+    mode = _prompt_mode(os.path.isdir(genai_src))
+
+    if mode == 2:
+        print()
+        print("=" * 54)
+        print(f"  {TR('完整模式将执行以下操作', 'Full mode will:')}")
+        print(f"  {TR('1. 检查编译环境 (cmake, gcc)', '1. Check build env (cmake, gcc)')}")
+        print(f"  {TR('2. 创建虚拟环境并 pip 安装依赖', '2. Create venv & pip install deps')}")
+        print(f"  {TR('3. 编译 GenAI 源码 → 启用 thinking budget', '3. Build GenAI from source')}")
+        print(f"  {TR('4. 安装编译产物到虚拟环境', '4. Install to venv')}")
+        print()
+        print(f"  {TR('前置条件', 'Prerequisites')}:")
+        print(f"  • cmake ≥ 3.23")
+        print(f"  • gcc/g++")
+        print(f"  • {TR('首次编译需联网下载依赖 (~100MB)', 'First build downloads deps (~100MB)')}")
+        print(f"  • {TR('编译耗时约 2-5 分钟', 'Build takes ~2-5 minutes')}")
+        print("=" * 54)
+        try:
+            r = input(f"  {TR('是否继续?', 'Continue?')} [y/N]: ")
+            if r.strip().lower() != "y":
+                mode = 1
+        except EOFError:
+            mode = 1
+
     venv_path = args.venv or os.path.join(workspace, ".venv")
     print(f"  {TR('创建虚拟环境', 'Creating venv')}: {venv_path}")
     import subprocess, sys as _sys
@@ -160,6 +265,14 @@ def cmd_setup(args):
 
     # 自动配置 VS Code 工作区设置
     _ensure_vscode_settings(venv_path)
+
+    # 编译 GenAI 源码（模式2）
+    if mode == 2:
+        import shutil
+        if not shutil.which("cmake"):
+            print(f"  ❌ {TR('未找到 cmake，请先安装 (sudo apt install cmake)', 'cmake not found, install: sudo apt install cmake')}")
+            sys.exit(1)
+        _build_genai_from_source(venv_path, genai_src)
 
     print()
     print(f"  {TR('✅ 完成!', '✅ Done!')}")

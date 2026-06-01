@@ -1,0 +1,59 @@
+{
+  "name": "openvino-genai-node",
+  "version": "2026.2.0",
+  "description": "OpenVINO™ GenAI pipelines for using from Node.js environment",
+  "license": "Apache-2.0",
+  "repository": {
+    "url": "git+https://github.com/openvinotoolkit/openvino.genai.git",
+    "type": "git",
+    "directory": "src/js"
+  },
+  "main": "./dist/index.js",
+  "types": "./types/index.d.ts",
+  "os": [
+    "linux",
+    "darwin",
+    "win32"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=21.0.0"
+  },
+  "keywords": [
+    "OpenVINO",
+    "OpenVINO GenAI",
+    "GenAI",
+    "LLM"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "format": "prettier --ignore-path .gitignore --write .",
+    "lint": "eslint .",
+    "postinstall": "node ./scripts/download-runtime.cjs --ignore-if-exists",
+    "prepare": "npm run build",
+    "test": "python ./tests/setup.py --to-env-file test.env && node --env-file=test.env --test ./tests/*.test.js"
+  },
+  "dependencies": {
+    "openvino-node": "2026.2.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "global-agent": "^3.0.0",
+    "globals": "^16.5.0",
+    "node-fetch": "^3.3.2",
+    "prettier": "3.7.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.48.0"
+  },
+  "binary": {
+    "version": "2026.2.0.0",
+    "module_path": "./bin/",
+    "remote_path": "./repositories/openvino_genai/nodejs_bindings/{version}/{platform}/",
+    "package_name": "openvino_genai_nodejs_bindings_{platform}_{version}_{arch}.tar.gz",
+    "host": "https://storage.openvinotoolkit.org"
+  }
+}
