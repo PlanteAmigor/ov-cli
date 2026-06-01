@@ -235,7 +235,8 @@ def cmd_chat(args):
         run_chat(ctx, system=args.system,
                  temperature=args.temp, top_p=args.top_p,
                  top_k=args.top_k, max_tokens=args.max_tokens,
-                 image_path=args.image)
+                 image_path=args.image,
+                 reasoning=args.reasoning == "on")
 
 
 def _build_help():
@@ -480,6 +481,8 @@ def main():
                                 "max tokens per reply (default: 1024)"))
     p_chat.add_argument("--image", "-i",
                         help=TR("初始图片路径 (VLM 模型)", "initial image path (VLM model)"))
+    p_chat.add_argument("--reasoning", choices=["on", "off"], default="on",
+                        help=TR("思考模式 (默认: on，仅支持思考的模型有效)", "reasoning mode (default: on)"))
 
     # ── benchmark ──
     p_bench = sub.add_parser(
