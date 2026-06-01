@@ -929,7 +929,7 @@ def _run_translate_genai(ctx, max_tokens):
         sys.stdout.flush()
         reply_parts = []
         stop_flag = [False]
-        streamer_callback = _make_streamer(reply_parts, stop_flag, show_reasoning=False)
+        streamer_callback = _make_streamer(reply_parts, stop_flag, show_reasoning=True)
 
         old_handler = signal.signal(signal.SIGINT, lambda s, f: stop_flag.__setitem__(0, True))
         try:
