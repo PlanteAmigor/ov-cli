@@ -17,6 +17,72 @@ import openvino_genai as ov_genai
 # 如果重装 optimum-intel 后需要重新应用此补丁。
 
 
+def _make_streamer(reply_parts, stop_flag, show_reasoning=True):
+    """创建 streamer callback。
+
+    当 show_reasoning=False 时，过滤掉 <think>...</think> 思考内容，
+    只显示最终回答。适用于 Qwen3.6 等天生思考的模型。
+    """
+    import select as _sel
+    _in_think = [not show_reasoning]  # 不显示思考时默认已在 think 块内（prompt 末尾有 <think>\n）
+
+    def cb(t):
+        if stop_flag[0]:
+            return True
+        # 非阻塞检查 stdin 的 Ctrl+C
+        if _sel.select([sys.stdin], [], [], 0)[0]:
+            c = sys.stdin.read(1)
+            if c == '\x03':
+                stop_flag[0] = True
+                return True
+
+        if not show_reasoning:
+            # 过滤 <think>...</think> 内容
+            if _in_think[0]:
+                if '</think>' in t:
+                    idx = t.index('</think>')
+                    after = t[idx + 8:]  # len('</think>') == 8
+                    if after:
+                        reply_parts.append(after)
+                        sys.stdout.write(after)
+                        sys.stdout.flush()
+                    _in_think[0] = False
+                # 还在 think 块内，丢弃
+                return False
+            # 不在 think 块内
+            if '<think>' in t:
+                idx = t.index('<think>')
+                before = t[:idx]
+                after = t[idx + 7:]  # len('<think>') == 7
+                if before:
+                    reply_parts.append(before)
+                    sys.stdout.write(before)
+                    sys.stdout.flush()
+                if after:
+                    if '</think>' in after:
+                        idx2 = after.index('</think>')
+                        after_think = after[idx2 + 8:]
+                        if after_think:
+                            reply_parts.append(after_think)
+                            sys.stdout.write(after_think)
+                            sys.stdout.flush()
+                    else:
+                        _in_think[0] = True
+                return False
+            reply_parts.append(t)
+            sys.stdout.write(t)
+            sys.stdout.flush()
+            return False
+
+        # show_reasoning: 直接输出
+        reply_parts.append(t)
+        sys.stdout.write(t)
+        sys.stdout.flush()
+        return False
+
+    return cb
+
+
 def _is_genai_format(model_path):
     """检测模型目录是否为 OpenVINO GenAI 格式。"""
     return os.path.isfile(os.path.join(model_path, "openvino_config.json"))
@@ -88,7 +154,7 @@ def load_model(ov_path):
 
 
 
-def _make_genai_config(temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024):
+def _make_genai_config(temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024, presence_penalty=None):
     """创建 GenAI GenerationConfig。"""
     cfg = ov_genai.GenerationConfig()
     cfg.max_new_tokens = max_tokens
@@ -96,6 +162,8 @@ def _make_genai_config(temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024):
     cfg.top_p = top_p
     cfg.top_k = top_k
     cfg.do_sample = temperature >= 0.01
+    if presence_penalty is not None:
+        cfg.presence_penalty = presence_penalty
     return cfg
 
 
@@ -389,41 +457,38 @@ def run_chat(ctx, system="You are a helpful AI assistant.",
     print()
 
     if ctx.get("optimum"):
-        _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_path)
+        _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_path, reasoning)
     else:
         _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_path, reasoning)
 
 
-def _build_prompt(messages, model_type="", enable_thinking=True):
-    """将消息列表转为纯文本 prompt。"""
-    is_qwen = "qwen" in (model_type or "").lower()
-    if is_qwen:
-        prompt = ""
-        for m in messages:
-            role = m["role"]
-            content = m["content"]
-            if role == "system":
-                prompt += f"<|im_start|>system\n{content}\n<|im_end|>\n"
-            elif role == "user":
-                prompt += f"<|im_start|>user\n{content}\n<|im_end|>\n"
-            elif role == "assistant":
-                prompt += f"<|im_start|>assistant\n{content}\n<|im_end|>\n"
-        if enable_thinking:
-            prompt += "<|im_start|>assistant\n<think>\n"
-        else:
-            prompt += "<|im_start|>assistant\n<think>\n\n</think>\n\n"
-        return prompt
+def _build_prompt(messages, tokenizer=None, enable_thinking=True):
+    """将消息列表转为纯文本 prompt。
+
+    优先使用模型的 chat template（通过 tokenizer.apply_chat_template），
+    回退到手动构建。
+    """
+    if tokenizer is not None:
+        try:
+            return tokenizer.apply_chat_template(
+                messages,
+                add_generation_prompt=True,
+                extra_context={"enable_thinking": enable_thinking},
+            )
+        except Exception:
+            pass
+    # 回退：手动构建 ChatML（通用兜底）
     prompt = ""
     for m in messages:
         role = m["role"]
         content = m["content"]
         if role == "system":
-            prompt += f"<bos><start_of_turn>system\n{content}\n<end_of_turn>\n"
+            prompt += f"<|im_start|>system\n{content}\n<|im_end|>\n"
         elif role == "user":
-            prompt += f"<start_of_turn>user\n{content}\n<end_of_turn>\n"
+            prompt += f"<|im_start|>user\n{content}\n<|im_end|>\n"
         elif role == "assistant":
-            prompt += f"<start_of_turn>model\n{content}\n<end_of_turn>\n"
-    prompt += "<start_of_turn>model\n"
+            prompt += f"<|im_start|>assistant\n{content}\n<|im_end|>\n"
+    prompt += "<|im_start|>assistant\n"
     return prompt
 
 
@@ -501,7 +566,7 @@ def _count_tokens(ctx, text):
         return 0
 
 
-def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_path=None):
+def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_path=None, reasoning=True):
     """Optimum 格式聊天模式（OVModelForVisualCausalLM + AutoProcessor）。"""
     model = ctx["model"]
     processor = ctx["processor"]
@@ -581,7 +646,7 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
             messages.append({"role": "system", "content": system})
         messages.extend(conv)
 
-        prompt = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        prompt = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, chat_template_kwargs={"enable_thinking": reasoning})
         if current_image is not None and is_vlm:
             inputs = processor(text=[prompt], images=[current_image], return_tensors="pt")
         else:
@@ -609,14 +674,51 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
         thread = Thread(target=model.generate, kwargs=gen_kwargs)
         thread.start()
 
+        thinking_filter = not reasoning  # True = 需要过滤思考内容
+        in_think = [thinking_filter]  # 过滤时默认已在 think 块内
         reply_parts = []
         try:
             for t in streamer:
                 if stop_flag[0]:
                     break
-                sys.stdout.write(t)
-                sys.stdout.flush()
-                reply_parts.append(t)
+                if thinking_filter:
+                    # 过滤 <think>...</think>
+                    if in_think[0]:
+                        if '</think>' in t:
+                            idx = t.index('</think>')
+                            after = t[idx + 8:]
+                            if after:
+                                reply_parts.append(after)
+                                sys.stdout.write(after)
+                                sys.stdout.flush()
+                            in_think[0] = False
+                        continue
+                    if '<think>' in t:
+                        idx = t.index('<think>')
+                        before = t[:idx]
+                        after = t[idx + 7:]
+                        if before:
+                            reply_parts.append(before)
+                            sys.stdout.write(before)
+                            sys.stdout.flush()
+                        if after:
+                            if '</think>' in after:
+                                idx2 = after.index('</think>')
+                                after_think = after[idx2 + 8:]
+                                if after_think:
+                                    reply_parts.append(after_think)
+                                    sys.stdout.write(after_think)
+                                    sys.stdout.flush()
+                            else:
+                                in_think[0] = True
+                        continue
+                    sys.stdout.write(t)
+                    sys.stdout.flush()
+                    reply_parts.append(t)
+                else:
+                    sys.stdout.write(t)
+                    sys.stdout.flush()
+                    reply_parts.append(t)
         finally:
             signal.signal(signal.SIGINT, old_handler)
 
@@ -712,31 +814,18 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
             messages.append({"role": "system", "content": system})
         messages.extend(conv)
 
-        gen_cfg = _make_genai_config(temperature, top_p, top_k, max_tokens)
+        pp = 1.5 if not reasoning else None
+        gen_cfg = _make_genai_config(temperature, top_p, top_k, max_tokens, presence_penalty=pp)
         t0 = time.time()
         print(f"  {TR('回复', 'Reply')}:", end=" ", flush=True)
 
         reply_parts = []
         stop_flag = [False]
-
-        def streamer_callback(t):
-            if stop_flag[0]:
-                return True
-            # 非阻塞检查 stdin 是否有 Ctrl+C
-            import select as _sel
-            if _sel.select([sys.stdin], [], [], 0)[0]:
-                c = sys.stdin.read(1)
-                if c == '\x03':
-                    stop_flag[0] = True
-                    return True
-            reply_parts.append(t)
-            sys.stdout.write(t)
-            sys.stdout.flush()
-            return False
+        streamer_callback = _make_streamer(reply_parts, stop_flag, show_reasoning=reasoning)
 
         old_handler = signal.signal(signal.SIGINT, lambda s, f: stop_flag.__setitem__(0, True))
         try:
-            prompt = _build_prompt(messages, ctx.get("model_type", ""), reasoning)
+            prompt = _build_prompt(messages, pipe.get_tokenizer(), reasoning)
             kwargs = {"generation_config": gen_cfg, "streamer": streamer_callback}
             if is_vlm:
                 if current_image is not None:
@@ -827,21 +916,8 @@ def _run_translate_genai(ctx, max_tokens):
         sys.stdout.write("  ")
         sys.stdout.flush()
         reply_parts = []
-
         stop_flag = [False]
-        def streamer_callback(t):
-            if stop_flag[0]:
-                return True
-            import select as _sel
-            if _sel.select([sys.stdin], [], [], 0)[0]:
-                c = sys.stdin.read(1)
-                if c == '\x03':
-                    stop_flag[0] = True
-                    return True
-            reply_parts.append(t)
-            sys.stdout.write(t)
-            sys.stdout.flush()
-            return False
+        streamer_callback = _make_streamer(reply_parts, stop_flag, show_reasoning=False)
 
         old_handler = signal.signal(signal.SIGINT, lambda s, f: stop_flag.__setitem__(0, True))
         try:
@@ -867,6 +943,6 @@ def run_translate(ctx, max_tokens=512):
     if ctx.get("optimum"):
         # Optimum 格式翻译（退化为聊天模式）
         print(f"  ⚠ {TR('翻译模式在 Optimum 格式下不可用，进入聊天模式', 'Translate mode not available, using chat mode')}")
-        _run_chat_optimum(ctx, None, 0, 0.9, 40, max_tokens, None)
+        _run_chat_optimum(ctx, None, 0, 0.9, 40, max_tokens, None, reasoning=False)
         return
     _run_translate_genai(ctx, max_tokens)

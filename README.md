@@ -86,9 +86,14 @@ eval "$(./ov-cli venv --venv ./my-venv)"
 
 ```bash
 # 聊天模式（自动检测格式）
-./ov-cli chat --model ./Qwen3/2B-ov        # GenAI 格式
-./ov-cli chat --model ./gemma-4-E2B-it-ov   # Optimum 格式（Gemma-4 等）
+./ov-cli chat --model ./Qwen3/2B-ov                               # GenAI 格式
+./ov-cli chat --model ./gemma-4-E2B-it-ov                          # Optimum 格式（Gemma-4 等）
 ./ov-cli chat --model ./model-ov --temp 0.9 --max-tokens 2048
+
+# 控制思考/推理（仅 GenAI 格式）
+./ov-cli chat --model ./Qwen3/2B-ov --reasoning on                 # 开启思考（默认）
+./ov-cli chat --model ./Qwen3.5/0.8B-ov --reasoning off            # 关闭思考（Qwen3.5 等有效）
+./ov-cli chat --model ./Qwen3.6/35B-A3B-ov --reasoning off         # 仅过滤显示，不节省时间（见局限）
 
 # 翻译模式（Hy-MT2 等翻译模型）
 ./ov-cli chat --model ./Hy-MT2-1.8B-ov --mode translate
@@ -148,6 +153,7 @@ eval "$(./ov-cli venv --venv ./my-venv)"
 - **Gemma-4**：导出需修改 `model_patcher.py` 中 `kv_shared_layer_index` → `layer_type`，`setup` 命令会自动打补丁
 - **Qwen3-VL 小模型**：自转 2B 视觉编码器导出有 bug（`aten::view/Reshape` 形状不匹配）；Qwen3.5 0.8B 视觉编码器相同问题。官方预转换 8B 和 35B-A3B 正常
 - **Ctrl+C 中断延迟**：生成期间按 Ctrl+C 可中断，但最坏情况下需等待当前 token 生成完毕（约 20-200ms 不等），无法达到像 llama.cpp 的即时中断。中断时 `^C` 字符可能出现在输出中
+- **`--reasoning off` 对思考型模型的局限**：Qwen3.6 等天生思考的模型无法通过 prompt 真正禁用推理过程。`--reasoning off` 仅过滤显示（隐藏 `<think>...</think>` 内容），模型仍会消耗时间和 token 进行内部推理。这是 OpenVINO GenAI API 的限制——无法像 llama.cpp 那样通过 logit 操作强制结束思考。对于 Qwen3.5 等非天生思考的模型，`--reasoning off` 可正常工作
 - 预转换 OpenVINO 模型可在 [ModelScope OpenVINO 组织](https://www.modelscope.cn/organization/OpenVINO) 查找
 
 ## 项目结构
