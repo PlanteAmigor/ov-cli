@@ -202,8 +202,11 @@ ov-cli/
 | **Qwen3/2B-ov** | int8 | 262ms | 33ms | 30.7 | 771ms | 35ms | 27.8 | 1207MB |
 | **Qwen3/8B-ov** | int4 AWQ | 402ms | 79ms | 12.9 | 2161ms | 82ms | 12.1 | 2010MB |
 | **Gemma-4-E2B-ov-test** | int4 | 342ms | 77ms | 14.2 | 1732ms | 196ms | 10.8 | 8278MB |
-| **Qwen3.6/35B-A3B-ov** | int4/8 mix | 1069ms | 88ms | 11.8 | 4518ms | 87ms | 11.6 | 1013MB |
+| **Qwen3.6/35B-A3B-ov** (reasoning on) | int4/8 mix | 1069ms | 88ms | 11.8 | 4518ms | 87ms | 11.6 | 1013MB |
+| **Qwen3.6/35B-A3B-ov** (reasoning off) | int4/8 mix | 1070ms | 92ms\* | 11.2 | 4571ms | 94ms\* | 10.9 | 1015MB |
 
+> \* reasoning off 模式下 2nd latency 包含了模型被迫结束思考的少量开销（约 1 个 thinking token + `</think>`），不影响实际回答吞吐量。tok/s 基于生成文本的编码结果计算，不受影响。
+>
 > tok/s 对应 BPE subword token，中文约 1.8 字符/subword。
 
 ## 工作流
