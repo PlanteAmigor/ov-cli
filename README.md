@@ -1,6 +1,6 @@
 # ov-cli
-**[中文](README.md) | [English](README_EN.md)**
 
+**[中文](README.md) | [English](README_EN.md)**
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License">
@@ -11,106 +11,98 @@
 
 **OpenVINO LLM 命令行工具** — 轻量、离线、CPU/GPU 皆可运行。
 
-*"官方的 OpenVINO 工具在日常 LLM 实验中略显繁琐，所以我写了 `ov-cli` 作为轻量替代。借助 AI 编程工具，我把工作流需求变成了一个简单的 CLI——setup、convert、chat，一站式搞定。"*
-
-> 演示视频（点击播放）：
-> 
-> [▶ 聊天终端](https://github.com/PlanteAmigor/ov-cli/raw/master/presentation/ov-cli.mp4) | [▶ 帮助](https://github.com/PlanteAmigor/ov-cli/raw/master/presentation/ov-cli1.mp4)
-
-基于 Optimum Intel + OpenVINO GenAI。支持模型转换（FP32/FP16/INT8/INT4）、交互式聊天（流式输出）、翻译。
-
-> 获取方式：`git clone https://github.com/PlanteAmigor/ov-cli.git` 或 `gh repo clone PlanteAmigor/ov-cli`，或直接下载 [ZIP](https://github.com/PlanteAmigor/ov-cli/archive/refs/heads/master.zip)，或 GitHub Releases。
+基于 Optimum Intel + OpenVINO GenAI 推理引擎。支持模型转换（7 种量化格式）、交互式聊天（流式/翻译/图片）、OpenAI 兼容 API 服务。
 
 ## 快速开始
 
 ```bash
-# 1. 一键创建环境（自动安装所有依赖 + 应用 Gemma-4 补丁）
+# 1. 一键创建环境（自动安装所有依赖）
 ./ov-cli setup
-eval "$(./ov-cli venv)"          # 进入虚拟环境
+eval "$(./ov-cli venv)"
 
-# 2. 转换模型
+# 2. 转换模型（HuggingFace → OpenVINO IR）
 ./ov-cli convert --model ./Qwen3/2B --format int8
 
-# 3. 聊天
+# 3. 聊天终端
 ./ov-cli chat --model ./Qwen3/2B-ov
+
+# 4. API 服务
+./ov-cli server --model ./Qwen3/2B-ov
 ```
 
 ## 命令
 
 ### `setup` — 创建环境
 
-创建 Python 虚拟环境并安装所有依赖（`openvino-genai`、`optimum-intel`、`transformers 5.9`、`torch` 等）。
+创建 Python 虚拟环境，安装所有依赖（openvino-genai、optimum-intel、transformers、torch 等），
+自动检测项目根目录下的 `optimum-intel-main/` 源码目录以跳过 GitHub 下载，
 安装完成后自动应用 Gemma-4 共享 KV 层补丁。
 
 ```bash
 ./ov-cli setup                          # 默认 ./.venv（交互选择安装模式）
 ./ov-cli setup --venv ./my-venv         # 指定路径
 ./ov-cli setup --optimum-dir ./optimum-intel-main  # 指定 optimum 源码
-
-> **提示**：setup 会自动检测项目根目录下的 `optimum-intel-main/` 目录作为本地源码。
-> 将 optimum-intel 源码解压到该目录可跳过 GitHub 下载。
-
-完整模式下，setup 会自动从源码编译 openvino-genai 以启用 thinking budget 功能
-（实现 logit 级别的 `</think>` 强制结束思考），仅 **Linux** 支持。
 ```
+
+**模式选择**（交互式，由 `setup` 提示）：
+1. **简易模式** — pip 安装，日常使用。`--reasoning off` 对思考型模型无效。
+2. **完整模式** — 从源码编译 OpenVINO GenAI 以启用 thinking budget 功能
+   （logit 级别的 `</think>` 强制结束思考）。
 
 ### `venv` — 进入虚拟环境
 
-打印虚拟环境的 activate 路径，配合 `eval` 使用：
-
 ```bash
-eval "$(./ov-cli venv)"                 # 一键激活
+eval "$(./ov-cli venv)"
 eval "$(./ov-cli venv --venv ./my-venv)"
 ```
 
 ### `convert` — 模型转换
 
-使用 Optimum Intel 官方工具将 HuggingFace 模型导出为 OpenVINO IR，自动推断 task 类型。
+使用 Optimum Intel 将 HuggingFace 模型导出为 OpenVINO IR，自动推断 task 类型。
 
 ```bash
-# 基本用法
-./ov-cli convert --model ./Qwen3/2B --format int8
-./ov-cli convert --model ./Qwen3/2B --format int4 -o ./Qwen3/2B-ov-int4
-./ov-cli convert --model ./model --format fp16       # 半精度
+./ov-cli convert --model ./Qwen3/2B --format int8     # 默认输出到 ./model-ov
+./ov-cli convert --model ./Qwen3/2B --format int4 -o ./custom-path
 ```
 
-**量化格式**：
+**量化格式**（7 种）：
 
 | 格式 | 体积 (相对 fp32) | 说明 |
-|------|-----------------|------|
-| `fp32` | 100% | 无损，体积最大 |
+|------|:-------------:|------|
+| `fp32` | 100% | 无损 |
 | `fp16` | ~50% | 半精度，几乎无损 |
 | `int8` | ~25% | 8-bit，几乎无损 |
 | `int4` | ~12.5% | 4-bit，有精度损失 |
+| `mxfp4` | ~12.5% | MX 浮点 4-bit |
+| `nf4` | ~12.5% | 正态分布 4-bit |
+| `cb4` | ~12.5% | 双峰 4-bit |
 
-**高级参数**：
+**INT4 混合精度**：
 
 ```bash
-# INT4 混合精度（80% INT4 + 20% INT8）
 ./ov-cli convert --model ./Hy-MT2/1.8B --format int4 --ratio 0.8 --group-size 128
 ```
 
 | 参数 | 默认 | 说明 |
 |------|------|------|
-| `--ratio` | 1.0 | INT4 比例 (0-1)，越小 INT8 越多 |
+| `--ratio` | 1.0 | INT4 比例 (0-1)，越低 INT8 越多 |
 | `--group-size` | 128 | 量化分组大小 |
 
 ### `chat` — 聊天终端
 
-加载 OpenVINO 模型并启动交互终端。自动识别三种模型格式，支持流式输出、多轮对话、图片（VLM）。
+交互式终端。自动检测模型格式（GenAI / Optimum），支持流式输出、多轮对话、图片。
 
 ```bash
-# 聊天模式（自动检测格式）
+# 聊天模式
 ./ov-cli chat --model ./Qwen3/2B-ov                               # GenAI 格式
-./ov-cli chat --model ./gemma-4-E2B-it-ov                          # Optimum 格式（Gemma-4 等）
+./ov-cli chat --model ./gemma-4-E2B-it-ov                          # Optimum 格式
 ./ov-cli chat --model ./model-ov --temp 0.9 --max-tokens 2048
 
-# 控制思考/推理（仅 GenAI 格式）
-./ov-cli chat --model ./Qwen3/2B-ov --reasoning on                 # 开启思考（默认）
-./ov-cli chat --model ./Qwen3.5/0.8B-ov --reasoning off            # 关闭思考（Qwen3.5 等有效）
-./ov-cli chat --model ./Qwen3.6/35B-A3B-ov --reasoning off         # 关闭思考（需编译修改版 GenAI，见下文）
+# 推理控制（仅 GenAI 格式）
+./ov-cli chat --model ./Qwen3.5/0.8B-ov --reasoning off            # 关闭思考（过滤<think>块）
+./ov-cli chat --model ./Qwen3.6/35B-A3B-ov --reasoning off         # 关闭思考（需完整模式）
 
-# 翻译模式（Hy-MT2 等翻译模型）
+# 翻译模式
 ./ov-cli chat --model ./Hy-MT2-1.8B-ov --mode translate
 
 # VLM 图片支持
@@ -124,121 +116,144 @@ eval "$(./ov-cli venv --venv ./my-venv)"
 
 | 命令 | 说明 |
 |------|------|
-| `//img PATH` | 加载/切换图片（VLM 模型） |
-| `/temp 0.7` | 设置温度 (0-2) |
+| `//img PATH` | 加载/切换图片（VLM） |
+| `/temp 0.7` | 设置温度 |
 | `/system ...` | 设置系统提示词 |
-| `/clear` | 清空对话上下文 |
+| `/clear` | 清空上下文 |
 | `/help` | 帮助 |
 | `/exit` | 退出 |
 
-**翻译模式命令**：
+**翻译模式**：自动检测语言方向；`//en 文本` 强制译英，`//zh 文本` 强制译中。
 
-| 命令 | 说明 |
-|------|------|
-| `//en 文本` | 强制翻译为英语 |
-| `//zh 文本` | 强制翻译为中文 |
-| 直接输入 | 自动检测语言方向 |
+### `server` — API 服务
 
-> **提示**：翻译模式每次输入一行，多行文本请分多次输入。
+启动 OpenAI 兼容的 HTTP API 服务器。
 
-### ✅ 两种推理格式
+```bash
+./ov-cli server --model ./Qwen3/8B-ov                              # 默认端口 8080
+./ov-cli server --model ./model-ov --port 8081 --host 0.0.0.0
+./ov-cli server --model ./model-ov --device CPU                     # 指定 CPU
+```
 
-| 格式 | 加载方式 | 适用模型 | 特征 |
-|------|---------|---------|------|
-| **GenAI** | `LLMPipeline` / `VLMPipeline` | 常规 optimum-cli 导出模型 | `openvino_config.json`，无逐层输入 |
-| **Optimum** | `OVModelForVisualCausalLM` | Gemma-4 等 VLM | 有 `openvino_text_embeddings_per_layer_model.xml` |
+**API 端点**：
 
-### ✅ 实测验证（✓ = 实际跑通过）
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `GET` | `/v1/models` | 模型列表 + 能力（视觉/文字） |
+| `POST` | `/v1/chat/completions` | 聊天补全（流式 + 非流式） |
+| `POST` | `/v1/chat/completions/control` | 停止生成 |
+| `GET` | `/props` | 服务器属性 |
+| `GET` | `/health` | 健康检查 |
+| `POST` | `/token` | Token 计数 |
+
+**curl 示例**：
+
+```bash
+# 文字聊天
+curl -s http://localhost:8080/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"8B-ov","messages":[{"role":"user","content":"你好"}],"stream":false,"max_tokens":100}' \
+  | python3 -m json.tool
+
+# 流式输出
+curl -s -N http://localhost:8080/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"8B-ov","messages":[{"role":"user","content":"数数 1 2 3"}],"stream":true,"max_tokens":50}'
+
+# 图片推理
+curl -s http://localhost:8080/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d "$(cat <<EOF
+{"model":"8B-ov","messages":[{"role":"user","content":[
+  {"type":"image_url","image_url":{"url":"data:image/jpeg;base64,$(base64 -w0 /path/to/photo.jpg)"}},
+  {"type":"text","text":"什么颜色？"}
+]}],"stream":false,"max_tokens":50}
+EOF
+)" | python3 -m json.tool
+```
+
+### `benchmark` — 性能测试
+
+```bash
+./ov-cli benchmark --model ./Qwen3.5/0.8B-ov
+./ov-cli benchmark --model ./Qwen3.6/35B-A3B-ov --reasoning off
+```
+
+## 模型支持
+
+### 两种推理格式
+
+| 格式 | 加载方式 | 特征 |
+|------|---------|------|
+| **GenAI** | `LLMPipeline` / `VLMPipeline` | 标准 optimum-cli 导出，`openvino_config.json` |
+| **Optimum** | `OVModelForVisualCausalLM` + `AutoProcessor` | Gemma-4 等，有 `openvino_text_embeddings_per_layer_model.xml` |
+
+### 实测验证
 
 | 模型 | 格式 | 文字 | 图片 | 翻译 | 说明 |
 |------|------|:----:|:----:|:----:|------|
-| **Hy-MT2 1.8B** | GenAI | | | ✅ | `--mode translate`，FP32/FP16/INT8/INT4 四种精度全通过 |
-| **Gemma-4 E2B** | Optimum | ✅ | ✅ | | INT4 导出+推理，需 `kv_shared_layer` 补丁 |
-| **Qwen3-VL 8B** | GenAI | ✅ | ✅ | | ✅ 官方预转换，OpenVINO 支持的三个 VLM 之一 |
-| **Qwen3.6 35B-A3B** | GenAI | ✅ | ✅ | | ✅ MoE，官方预转换 VLM |
-| **Qwen3.5 0.8B** | GenAI | ✅ | ❌ | | 视觉编码器不支持（OpenVINO 未实现小模型 VLM） |
-| **Qwen3 2B** | GenAI | ✅ | ❌ | | 文字正常，自转视觉编码器 reshape 有 bug |
+| **Hy-MT2 1.8B** | GenAI | | | ✅ | 翻译模型，4 种精度全通过 |
+| **Gemma-4 E2B** | Optimum | ✅ | ✅ | | INT4，需 `kv_shared_layer` 补丁 |
+| **Qwen3-VL 8B** | GenAI | ✅ | ✅ | | 官方预转换，OpenVINO 3 个受支持 VLM 之一 |
+| **Qwen3.6 35B-A3B** | GenAI | ✅ | ✅ | | MoE，官方预转换 |
+| **Qwen3.5 0.8B** | GenAI | ✅ | ❌ | | 小模型 VLM 不支持 |
+| **Qwen3 2B** | GenAI | ✅ | ❌ | | 视觉编码器 reshape 有 bug |
 
-> **VLM 说明**：OpenVINO GenAI 的 `VLMPipeline` 目前对 Qwen 系列只支持 **Qwen3-VL 8B**、**Qwen3.6 35B-A3B**、**Qwen3.5 35B-A3B** 三个模型的视觉能力。其他 Qwen 小模型（0.8B、2B 等）虽标注 vision，但视觉编码器在 OpenVINO 上无法正常工作。其他品牌的 VLM（如 Gemma-4 Optimum 格式已验证支持）未充分测试。
+> **VLM 说明**：GenAI 格式的 `VLMPipeline` 对 Qwen 系列只支持 **Qwen3-VL 8B**、**Qwen3.6 35B-A3B**、**Qwen3.5 35B-A3B** 三个模型的视觉能力。小模型（0.8B、2B）视觉编码器在 OpenVINO 上无法正常工作。Optimum 格式（Gemma-4）不受此限制。
 
-### 📌 适用范围
+### 适用范围
 
-理论上支持所有 transformers 标准架构（Llama、Mistral、DeepSeek、Phi、Gemma 等），只需 `optimum-cli` 能成功导出即可推理。
+理论上支持所有 transformers 标准架构（Llama、Mistral、DeepSeek、Phi、Gemma 等），
+只需 `optimum-cli` 能成功导出即可推理。
 
-### ⚠️ 注意事项
+### 注意事项
 
-- **Gemma-4**：导出需修改 `model_patcher.py` 中 `kv_shared_layer_index` → `layer_type`，`setup` 命令会自动打补丁
-- **Qwen3-VL 小模型**：自转 2B 视觉编码器导出有 bug（`aten::view/Reshape` 形状不匹配）；Qwen3.5 0.8B 视觉编码器相同问题。官方预转换 8B 和 35B-A3B 正常
-- **Ctrl+C 中断延迟**：生成期间按 Ctrl+C 可中断，但最坏情况下需等待当前 token 生成完毕（约 20-200ms 不等），无法达到像 llama.cpp 的即时中断。中断时 `^C` 字符可能出现在输出中
-- **`--reasoning off` 对思考型模型（Qwen3.6 等）**：Qwen3.6 是天生思考模型——无论 prompt 怎么写，它都会先推理后回答。简单的 prompt 技巧（空 `<think>` 块、system prompt 抑制）都无法阻止。
-  
-  **解决方案**：`ov-cli` 修改了 OpenVINO GenAI 的采样链，在 `LogitProcessor` 中插入了一个 `ThinkingBudgetTransform`。该组件在每次 token 生成前检查思考预算，一旦耗尽就将所有 token 的 logit 设为 `-∞`，只保留 `</think>` 的 logit，强制模型结束思考。效果类似 llama.cpp 的 reasoning budget sampler。
-  
-  启用方式：`setup` **完整模式**（交互选 2）自动编译安装修改版 GenAI 后，`--reasoning off` 才有效。仅 **Linux** 支持。**简易模式**（默认）下 `--reasoning off` 无效。
-- 预转换 OpenVINO 模型可在 [ModelScope OpenVINO 组织](https://www.modelscope.cn/organization/OpenVINO) 查找
+- **Gemma-4**：导出需修改 `model_patcher.py` 中 `kv_shared_layer_index` → `layer_type`，`setup` 自动打补丁。
+- **Ctrl+C 中断**：生成期间按 Ctrl+C 可中断，但需等待当前 token 生成完毕（约 20-200ms）。
+- **`--reasoning off`**：Qwen3.6 等天生思考模型无法通过 prompt 技巧阻止推理。
+  解决方案：ov-cli 在 LogitProcessor 中插入 `ThinkingBudgetTransform`，
+  预算耗尽后强制输出 `</think>`。需 `setup` **完整模式**编译修改版 GenAI。
+  简易模式下 `--reasoning off` 仅过滤输出中的 `<think>` 块。
+- **预转换模型**：可在 [ModelScope OpenVINO 组织](https://www.modelscope.cn/organization/OpenVINO) 查找。
+
+## 性能参考
+
+测试环境: Intel Arc Pro 130T/140T (Arrow Lake-P) GPU | openvino-genai 2026.2 | 3 轮预热
+
+| 模型 | 量化 | 32 1st | 32 2nd | 32 tok/s | 1024 1st | 1024 2nd | 1024 tok/s | RSS |
+|:-----|:----:|:------:|:------:|:--------:|:---------:|:---------:|:----------:|:---:|
+| **Qwen3.5/0.8B** | int8 | 297ms | 19ms | 54.9 | 660ms | 20ms | 51.8 | 826MB |
+| **Hy-MT2/1.8B** | int4 | 267ms | 25ms | 40.6 | 710ms | 24ms | 38.2 | 916MB |
+| **Qwen3/2B** | int8 | 262ms | 33ms | 30.7 | 771ms | 35ms | 27.8 | 1207MB |
+| **Qwen3/8B** | int4 AWQ | 402ms | 79ms | 12.9 | 2161ms | 82ms | 12.1 | 2010MB |
+| **Gemma-4 E2B** | int4 | 342ms | 77ms | 14.2 | 1732ms | 196ms | 10.8 | 8278MB |
+| **Qwen3.6/35B** (思考开) | int4/8 | 1069ms | 88ms | 11.8 | 4518ms | 87ms | 11.6 | 1013MB |
+| **Qwen3.6/35B** (思考关) | int4/8 | 1070ms | 92ms | 11.2 | 4571ms | 94ms | 10.9 | 1015MB |
+
+> tok/s 基于生成文本的编码结果。中文约 1.8 字符/subword。
 
 ## 项目结构
 
 ```
 ov-cli/
-├── ov-cli                   # Shell 入口脚本（自动发现 .venv）
+├── ov-cli                   # 入口脚本（自动发现 .venv）
 ├── pyproject.toml
-├── README.md
-├── GEMMA4-DEVLOG.md         # Gemma-4 适配开发日志
-├── KV-CACHE-DEVLOG.md       # KV Cache 探索开发日志
+├── README.md / README_EN.md
 │
 ├── ov_cli/
 │   ├── __init__.py          # 包信息 + i18n
 │   ├── __main__.py          # python -m ov_cli 入口
-│   ├── cli.py               # CLI 参数解析 + 命令分发 + setup 自动打补丁
-│   ├── chat.py              # 聊天/翻译终端（GenAI + Optimum 双格式）
-│   └── convert.py           # optimum-cli 模型转换
+│   ├── cli.py               # CLI 参数解析 + 命令分发 + setup
+│   ├── chat.py              # 聊天/翻译终端（GenAI + Optimum）
+│   ├── convert.py           # 模型转换（7 种量化）
+│   ├── server.py            # FastAPI OpenAI 兼容服务
+│   └── benchmark.py         # 性能测试
 │
 ├── openvino.genai-2026.2.0.0-optimization/  # 修改版 GenAI 源码（setup 完整模式用）
 │
 ├── model/                   # 模型文件（用户自行下载/转换）
-│   ├── Qwen3/
-│   ├── Qwen3.5/
-│   ├── gemma/
-│   └── Hy-MT2/
 │
 └── optimum-intel-main/      # optimum-intel 源码（可选）
-```
-
-## 性能参考
-
-测试环境: Intel Arc Pro 130T/140T (Arrow Lake-P) GPU | openvino-genai 2026.2 | 3 轮 "你好" 预热后
-
-| 模型 | 量化 | 32 1st | 32 2nd | 32 tok/s | 1024 1st | 1024 2nd | 1024 tok/s | RSS |
-|:-----|:----:|:------:|:------:|:--------:|:---------:|:---------:|:----------:|:---:|
-| **Qwen3.5/0.8B-ov** | int8 | 297ms | 19ms | **54.9** | 660ms | 20ms | **51.8** | 826MB |
-| **Qwen3.5/0.8B-ov** | int8 | 308ms | 19ms | **56.0** | 630ms | 19ms | **51.7** | 812MB |
-| **Hy-MT2/1.8B-ov** | int4 | 267ms | 25ms | 40.6 | 710ms | 24ms | 38.2 | 916MB |
-| **Hy-MT2/INT8** | int8 | 232ms | 25ms | 34.4 | 646ms | 33ms | 32.2 | 1033MB |
-| **Qwen3/2B-ov** | int8 | 262ms | 33ms | 30.7 | 771ms | 35ms | 27.8 | 1207MB |
-| **Qwen3/8B-ov** | int4 AWQ | 402ms | 79ms | 12.9 | 2161ms | 82ms | 12.1 | 2010MB |
-| **Gemma-4-E2B-ov-test** | int4 | 342ms | 77ms | 14.2 | 1732ms | 196ms | 10.8 | 8278MB |
-| **Qwen3.6/35B-A3B-ov** (reasoning on) | int4/8 mix | 1069ms | 88ms | 11.8 | 4518ms | 87ms | 11.6 | 1013MB |
-| **Qwen3.6/35B-A3B-ov** (reasoning off) | int4/8 mix | 1070ms | 92ms\* | 11.2 | 4571ms | 94ms\* | 10.9 | 1015MB |
-
-> \* reasoning off 模式下 2nd latency 包含了模型被迫结束思考的少量开销（约 1 个 thinking token + `</think>`），不影响实际回答吞吐量。tok/s 基于生成文本的编码结果计算，不受影响。
->
-> tok/s 对应 BPE subword token，中文约 1.8 字符/subword。
-
-## 工作流
-
-```
-HuggingFace 模型
-      │
-      ▼
-optimum-cli export openvino  ─── 自动推断 task + 量化
-      │
-      ├──→ GenAI 格式 ──→ LLMPipeline / VLMPipeline
-      │                     ├── chat  ── 流式、多轮对话、图片（VLM）
-      │                     └── translate ── 自动检测方向、33 种语言
-      │
-      └──→ Optimum 格式 ──→ OVModelForVisualCausalLM
-                              └── chat  ── 流式、多轮对话、图片（Gemma-4）
 ```
 
 ## 依赖
@@ -247,6 +262,5 @@ optimum-cli export openvino  ─── 自动推断 task + 量化
 - OpenVINO >= 2026.2, openvino-genai
 - Optimum Intel >= 1.27.0（GitHub 源码）
 - transformers >= 5.9, torch, torchvision
-- 支持 GPU: Intel 集成显卡 / Arc 独显（自动检测，GPU 优先）
-- 支持 CPU: 任意 x86-64 处理器
-
+- GPU: Intel 集成显卡 / Arc 独显（自动检测）
+- CPU: 任意 x86-64
