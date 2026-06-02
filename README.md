@@ -9,6 +9,8 @@
   <img src="https://img.shields.io/badge/platform-Linux-lightgrey" alt="Platform">
 </p>
 
+> 我发现官方的 OpenVINO 工具在日常 LLM 实验中较为繁琐，因此我开发了 ov-cli 作为轻量级的替代方案。借助 AI 编码工具，我将我的工作流需求转化为简单的 CLI 操作——设置、转换、聊天——所有操作都可以在同一个地方完成。
+
 **OpenVINO LLM 命令行工具** — 轻量、离线、CPU/GPU 皆可运行。
 
 基于 Optimum Intel + OpenVINO GenAI 推理引擎。支持模型转换（7 种量化格式）、交互式聊天（流式/翻译/图片）、OpenAI 兼容 API 服务。
@@ -199,7 +201,7 @@ EOF
 | **Qwen3.5 0.8B** | GenAI | ✅ | ❌ | | 小模型 VLM 不支持 |
 | **Qwen3 2B** | GenAI | ✅ | ❌ | | 视觉编码器 reshape 有 bug |
 
-> **VLM 说明**：GenAI 格式的 `VLMPipeline` 对 Qwen 系列只支持 **Qwen3-VL 8B**、**Qwen3.6 35B-A3B**、**Qwen3.5 35B-A3B** 三个模型的视觉能力。小模型（0.8B、2B）视觉编码器在 OpenVINO 上无法正常工作。Optimum 格式（Gemma-4）不受此限制。
+> **VLM 说明**：GenAI 格式的 `VLMPipeline` 对 Qwen 系列只支持 **Qwen3-VL 8B**、**Qwen3.6 35B-A3B**、**Qwen3.5 35B-A3B** 三个模型的视觉能力。小模型（0.8B、2B）视觉编码器在 OpenVINO 上无法正常工作。Optimum 格式（Gemma-4）可能不受此限制。
 
 ### 适用范围
 
@@ -213,8 +215,8 @@ EOF
 - **`--reasoning off`**：Qwen3.6 等天生思考模型无法通过 prompt 技巧阻止推理。
   解决方案：ov-cli 在 LogitProcessor 中插入 `ThinkingBudgetTransform`，
   预算耗尽后强制输出 `</think>`。需 `setup` **完整模式**编译修改版 GenAI。
-  简易模式下 `--reasoning off` 仅过滤输出中的 `<think>` 块。
-- **预转换模型**：可在 [ModelScope OpenVINO 组织](https://www.modelscope.cn/organization/OpenVINO) 查找。
+  简易模式下 `--reasoning off` 仅过滤输出中的 `<think>` 块，但无法阻止推理。
+- **预转换模型**：可在 [ModelScope OpenVINO 组织](https://www.modelscope.cn/organization/OpenVINO) 或 [HuggingFace OpenVINO](https://huggingface.co/OpenVINO) 查找。
 
 ## 性能参考
 
@@ -261,6 +263,10 @@ ov-cli/
 - GPU: Intel 集成显卡 / Arc 独显（自动检测）
 - CPU: 任意 x86-64
 
----
+## 相关链接
 
-> 此项目由 AI 辅助完成
+- [OpenVINO 文档](https://docs.openvino.ai/)
+- [OpenVINO GitHub](https://github.com/openvinotoolkit/openvino)
+- [OpenVINO Toolkit 仓库](https://github.com/orgs/openvinotoolkit/repositories?type=all)
+
+
