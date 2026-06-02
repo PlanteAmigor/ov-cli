@@ -247,11 +247,7 @@ ov-cli/
 │   ├── server.py            # FastAPI OpenAI-compatible server
 │   └── benchmark.py         # Performance benchmark
 │
-├── openvino.genai-2026.2.0.0-optimization/  # Modified GenAI source (full mode)
-│
-├── model/                   # Model files (user downloaded/converted)
-│
-└── optimum-intel-main/      # Optimum Intel source (optional)
+└── openvino.genai-2026.2.0.0-optimization/  # Modified GenAI source (full mode)
 ```
 
 ## Dependencies
@@ -262,3 +258,7 @@ ov-cli/
 - transformers >= 5.9, torch, torchvision
 - GPU: Intel integrated / Arc (auto-detected)
 - CPU: Any x86-64
+
+---
+
+> This project was completed with AI assistance
