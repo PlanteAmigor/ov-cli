@@ -16,8 +16,7 @@
 
 > 演示视频（点击播放）：
 > 
-> <video src="https://github.com/PlanteAmigor/ov-cli/raw/master/presentation/ov-cli.mp4" controls width="360"></video>
-> <video src="https://github.com/PlanteAmigor/ov-cli/raw/master/presentation/ov-cli1.mp4" controls width="360"></video>
+> [▶ 聊天终端](https://github.com/PlanteAmigor/ov-cli/raw/master/presentation/ov-cli.mp4) | [▶ 帮助](https://github.com/PlanteAmigor/ov-cli/raw/master/presentation/ov-cli1.mp4)
 
 基于 Optimum Intel + OpenVINO GenAI。支持模型转换（FP32/FP16/INT8/INT4）、交互式聊天（流式输出）、翻译。
 
