@@ -15,7 +15,7 @@
 *"I found the official OpenVINO tools a bit cumbersome for daily LLM experiments, so I built `ov-cli` as a lightweight alternative. With the help of AI coding tools, I turned my workflow needs into a simple CLI — setup, convert, chat — all in one place."*
 
 > Demo videos:
-> - [Chat Terminal (Gemma-4 VLM)](presentation/ov-cli.mp4) | [Model Conversion + Benchmark](presentation/ov-cli1.mp4)
+> - [Chat Terminal (Gemma-4 VLM)](presentation/ov-cli.mp4) | [Help](presentation/ov-cli1.mp4)
 
 Built on Optimum Intel + OpenVINO GenAI. Supports model conversion (FP32/FP16/INT8/INT4), interactive chat (streaming), and translation.
 
