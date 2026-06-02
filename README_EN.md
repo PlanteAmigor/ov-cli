@@ -9,6 +9,8 @@
   <img src="https://img.shields.io/badge/platform-Linux-lightgrey" alt="Platform">
 </p>
 
+> I found the official OpenVINO tools a bit cumbersome for daily LLM experiments, so I built ov-cli as a lightweight alternative. With the help of AI coding tools, I turned my workflow needs into a simple CLI — setup, convert, chat — all in one place.
+
 **OpenVINO LLM CLI Tool** — Lightweight, offline LLM inference on CPU & GPU.
 
 Built on Optimum Intel + OpenVINO GenAI. Features: model conversion (7 quantization formats), interactive chat (streaming, translation, VLM), OpenAI-compatible API server.
@@ -197,7 +199,7 @@ EOF
 | **Qwen3.5 0.8B** | GenAI | ✅ | ❌ | | Small model VLM unsupported |
 | **Qwen3 2B** | GenAI | ✅ | ❌ | | Vision encoder reshape bug |
 
-> **VLM note**: Among Qwen models, GenAI `VLMPipeline` only supports vision for **Qwen3-VL 8B**, **Qwen3.6 35B-A3B**, **Qwen3.5 35B-A3B**. Small models (0.8B, 2B) have vision encoder issues. Optimum format models (Gemma-4) not affected.
+> **VLM note**: Among Qwen models, GenAI `VLMPipeline` only supports vision for **Qwen3-VL 8B**, **Qwen3.6 35B-A3B**, **Qwen3.5 35B-A3B**. Small models (0.8B, 2B) have vision encoder issues. Optimum format models (Gemma-4) may not be affected.
 
 ### Scope
 
@@ -211,8 +213,8 @@ as long as `optimum-cli` can export them.
 - **`--reasoning off`**: Inherent thinking models (Qwen3.6 etc.) cannot be stopped by prompt tricks.
   ov-cli inserts a `ThinkingBudgetTransform` into the LogitProcessor chain to force `</think>`.
   Requires `setup` **full mode** (compiled GenAI).
-  Simple mode `--reasoning off` only filters `<think>` blocks from output.
-- **Pre-converted models**: Available at [ModelScope OpenVINO](https://www.modelscope.cn/organization/OpenVINO).
+  Simple mode `--reasoning off` only filters `<think>` blocks from output, but cannot prevent the model from reasoning.
+- **Pre-converted models**: Available at [ModelScope OpenVINO](https://www.modelscope.cn/organization/OpenVINO) or [HuggingFace OpenVINO](https://huggingface.co/OpenVINO).
 
 ## Performance
 
@@ -259,6 +261,10 @@ ov-cli/
 - GPU: Intel integrated / Arc (auto-detected)
 - CPU: Any x86-64
 
----
+## Related Links
 
-> This project was completed with AI assistance
+- [OpenVINO Documentation](https://docs.openvino.ai/)
+- [OpenVINO GitHub](https://github.com/openvinotoolkit/openvino)
+- [OpenVINO Toolkit Repositories](https://github.com/orgs/openvinotoolkit/repositories?type=all)
+
+
