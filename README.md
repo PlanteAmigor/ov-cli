@@ -40,6 +40,9 @@ eval "$(./ov-cli venv)"          # 进入虚拟环境
 ./ov-cli setup --venv ./my-venv         # 指定路径
 ./ov-cli setup --optimum-dir ./optimum-intel-main  # 指定 optimum 源码
 
+> **提示**：setup 会自动检测项目根目录下的 `optimum-intel-main/` 目录作为本地源码。
+> 将 optimum-intel 源码解压到该目录可跳过 GitHub 下载。
+
 完整模式下，setup 会自动从源码编译 openvino-genai 以启用 thinking budget 功能
 （实现 logit 级别的 `</think>` 强制结束思考），仅 **Linux** 支持。
 ```

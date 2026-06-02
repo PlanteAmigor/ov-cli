@@ -40,6 +40,9 @@ then applies the Gemma-4 shared KV layer patch.
 ./ov-cli setup --venv ./my-venv         # custom path
 ./ov-cli setup --optimum-dir ./optimum-intel-main
 
+> **Note**: `setup` auto-detects `optimum-intel-main/` in the project root.
+> Extract optimum-intel source there to skip GitHub download.
+
 # Full mode compiles openvino-genai from source to enable reasoning budget
 # (logit-level `</think>` forcing). **Linux only**.
 ```
