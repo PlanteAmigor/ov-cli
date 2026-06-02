@@ -14,6 +14,9 @@
 
 *"官方的 OpenVINO 工具在日常 LLM 实验中略显繁琐，所以我写了 `ov-cli` 作为轻量替代。借助 AI 编程工具，我把工作流需求变成了一个简单的 CLI——setup、convert、chat，一站式搞定。"*
 
+> 演示视频：
+> - [聊天终端（Gemma-4 VLM）](presentation/ov-cli.mp4) | [模型转换 + Benchmark](presentation/ov-cli1.mp4)
+
 基于 Optimum Intel + OpenVINO GenAI。支持模型转换（FP32/FP16/INT8/INT4）、交互式聊天（流式输出）、翻译。
 
 > 获取方式：`git clone https://github.com/PlanteAmigor/ov-cli.git` 或 `gh repo clone PlanteAmigor/ov-cli`，或直接下载 [ZIP](https://github.com/PlanteAmigor/ov-cli/archive/refs/heads/master.zip)。无 GitHub Releases。
