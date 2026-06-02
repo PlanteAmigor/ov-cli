@@ -12,6 +12,8 @@
 
 **OpenVINO LLM CLI Tool** — Lightweight, offline, runs on CPU & GPU.
 
+*"I found the official OpenVINO tools a bit cumbersome for daily LLM experiments, so I built `ov-cli` as a lightweight alternative. With the help of AI coding tools, I turned my workflow needs into a simple CLI — setup, convert, chat — all in one place."*
+
 Built on Optimum Intel + OpenVINO GenAI. Supports model conversion (FP32/FP16/INT8/INT4), interactive chat (streaming), and translation.
 
 > Get it: `git clone https://github.com/PlanteAmigor/ov-cli.git` or `gh repo clone PlanteAmigor/ov-cli`, or download [ZIP](https://github.com/PlanteAmigor/ov-cli/archive/refs/heads/master.zip). No GitHub Releases.
@@ -161,7 +163,11 @@ Loads an OpenVINO model and starts an interactive terminal. Auto-detects model f
 
 - **Gemma-4**: Export needs `model_patcher.py` patch (`kv_shared_layer_index` → `layer_type`), `setup` applies it automatically
 - **Ctrl+C latency**: Interrupt may take 20-200ms (one token time). `^C` may appear in output
-- **`--reasoning off` for thinking models**: Qwen3.6 etc. cannot truly disable reasoning via prompt. `ov-cli` patches OpenVINO GenAI (`ThinkingBudgetTransform`) for logit-level `</think>` forcing, similar to llama.cpp's reasoning budget. Use `setup` full mode (option 2) to auto-build. **Linux only. Simple mode (default) ignores `--reasoning off` entirely.**
+- **`--reasoning off` for thinking models (Qwen3.6 etc.)**: Qwen3.6 is inherently a "thinking model" — it always reasons before answering, and no prompt trick (empty `<think>` block, system prompt suppression) can stop it.
+  
+  **How it works**: `ov-cli` patches the OpenVINO GenAI sampling pipeline by inserting a `ThinkingBudgetTransform` into the `LogitProcessor` chain. Before each token generation, it checks a reasoning budget counter. Once the budget is exhausted, it sets every token's logit to `-∞` except the `</think>` token, forcing the model to end its thinking block immediately — similar to llama.cpp's reasoning budget sampler.
+  
+  Enable it via `setup` **full mode** (option 2) to auto-build the patched GenAI. **Linux only. Simple mode (default) ignores `--reasoning off` entirely.**
 - Pre-converted OpenVINO models: [ModelScope OpenVINO](https://www.modelscope.cn/organization/OpenVINO)
 
 ## Project Structure

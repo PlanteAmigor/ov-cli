@@ -12,6 +12,8 @@
 
 **OpenVINO LLM 命令行工具** — 轻量、离线、CPU/GPU 皆可运行。
 
+*"I found the official OpenVINO tools a bit cumbersome for daily LLM experiments, so I built `ov-cli` as a lightweight alternative. With the help of AI coding tools, I turned my workflow needs into a simple CLI — setup, convert, chat — all in one place.*"
+
 基于 Optimum Intel + OpenVINO GenAI。支持模型转换（FP32/FP16/INT8/INT4）、交互式聊天（流式输出）、翻译。
 
 > 获取方式：`git clone https://github.com/PlanteAmigor/ov-cli.git` 或 `gh repo clone PlanteAmigor/ov-cli`，或直接下载 [ZIP](https://github.com/PlanteAmigor/ov-cli/archive/refs/heads/master.zip)。无 GitHub Releases。
@@ -163,9 +165,11 @@ eval "$(./ov-cli venv --venv ./my-venv)"
 - **Gemma-4**：导出需修改 `model_patcher.py` 中 `kv_shared_layer_index` → `layer_type`，`setup` 命令会自动打补丁
 - **Qwen3-VL 小模型**：自转 2B 视觉编码器导出有 bug（`aten::view/Reshape` 形状不匹配）；Qwen3.5 0.8B 视觉编码器相同问题。官方预转换 8B 和 35B-A3B 正常
 - **Ctrl+C 中断延迟**：生成期间按 Ctrl+C 可中断，但最坏情况下需等待当前 token 生成完毕（约 20-200ms 不等），无法达到像 llama.cpp 的即时中断。中断时 `^C` 字符可能出现在输出中
-- **`--reasoning off` 对思考型模型**：Qwen3.6 等天生思考的模型通过 prompt 无法真正禁用推理。`ov-cli` 通过修改 OpenVINO GenAI 源码（`ThinkingBudgetTransform`）实现了 logit 级别的 `</think>` 强制结束思考，效果类似 llama.cpp 的 reasoning budget sampler。
-  - 使用 `setup` **完整模式**（交互选 2）自动编译安装修改版 GenAI 后，`--reasoning off` 才有效。仅 **Linux** 支持
-  - **简易模式**（默认）下 `--reasoning off` 无效，模型正常输出思考内容
+- **`--reasoning off` 对思考型模型（Qwen3.6 等）**：Qwen3.6 是天生思考模型——无论 prompt 怎么写，它都会先推理后回答。简单的 prompt 技巧（空 `<think>` 块、system prompt 抑制）都无法阻止。
+  
+  **解决方案**：`ov-cli` 修改了 OpenVINO GenAI 的采样链，在 `LogitProcessor` 中插入了一个 `ThinkingBudgetTransform`。该组件在每次 token 生成前检查思考预算，一旦耗尽就将所有 token 的 logit 设为 `-∞`，只保留 `</think>` 的 logit，强制模型结束思考。效果类似 llama.cpp 的 reasoning budget sampler。
+  
+  启用方式：`setup` **完整模式**（交互选 2）自动编译安装修改版 GenAI 后，`--reasoning off` 才有效。仅 **Linux** 支持。**简易模式**（默认）下 `--reasoning off` 无效。
 - 预转换 OpenVINO 模型可在 [ModelScope OpenVINO 组织](https://www.modelscope.cn/organization/OpenVINO) 查找
 
 ## 项目结构
