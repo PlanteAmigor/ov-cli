@@ -16,8 +16,7 @@
 
 > Demo videos (click to play):
 > 
-> <video src="https://github.com/PlanteAmigor/ov-cli/raw/master/presentation/ov-cli.mp4" controls width="360"></video>
-> <video src="https://github.com/PlanteAmigor/ov-cli/raw/master/presentation/ov-cli1.mp4" controls width="360"></video>
+> [▶ Chat Terminal](https://github.com/PlanteAmigor/ov-cli/raw/master/presentation/ov-cli.mp4) | [▶ Help](https://github.com/PlanteAmigor/ov-cli/raw/master/presentation/ov-cli1.mp4)
 
 Built on Optimum Intel + OpenVINO GenAI. Supports model conversion (FP32/FP16/INT8/INT4), interactive chat (streaming), and translation.
 
