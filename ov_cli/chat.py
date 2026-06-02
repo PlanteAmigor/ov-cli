@@ -806,6 +806,12 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
                 pipe.generate(prompt, **kwargs)
             else:
                 pipe.generate(prompt, gen_cfg, streamer_callback)
+        except RuntimeError as e:
+            err = str(e)
+            if "reshape" in err:
+                print(f"\n  ⚠ {TR('该模型不支持图像输入', 'This model does not support image input')}")
+            else:
+                print(f"\n  ⚠ {TR('生成失败', 'Generation failed')}: {err[:200]}")
         finally:
             signal.signal(signal.SIGINT, old_handler)
         reply_text = "".join(reply_parts)

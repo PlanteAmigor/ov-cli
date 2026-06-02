@@ -2,7 +2,7 @@
 ov-cli convert: 模型转换。
 
 使用 Optimum Intel 官方工具将 HuggingFace 模型导出为 OpenVINO IR 格式。
-支持 INT8/INT4 量化，自动推断 task 类型（text-generation / image-text-to-text）。
+支持 INT8/INT4/NF4/MXFP4/CB4 等多种量化，自动推断 task 类型。
 """
 
 import os, sys, time, json, subprocess
@@ -34,7 +34,8 @@ def convert_model(model_path, output_path, weight_format,
         print(f"  混合精度: ratio={ratio}, group_size={group_size}")
     print()
 
-    wf_map = {"fp32": "fp32", "fp16": "fp16", "int8": "int8", "int4": "int4"}
+    wf_map = {"fp32": "fp32", "fp16": "fp16", "int8": "int8", "int4": "int4",
+              "mxfp4": "mxfp4", "nf4": "nf4", "cb4": "cb4"}
     cmd = [
         "optimum-cli", "export", "openvino",
         "--model", model_path,
