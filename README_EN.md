@@ -19,7 +19,7 @@
 
 Built on Optimum Intel + OpenVINO GenAI. Supports model conversion (FP32/FP16/INT8/INT4), interactive chat (streaming), and translation.
 
-> Get it: `git clone https://github.com/PlanteAmigor/ov-cli.git` or `gh repo clone PlanteAmigor/ov-cli`, or download [ZIP](https://github.com/PlanteAmigor/ov-cli/archive/refs/heads/master.zip). No GitHub Releases.
+> Get it: `git clone https://github.com/PlanteAmigor/ov-cli.git` or `gh repo clone PlanteAmigor/ov-cli`, or download [ZIP](https://github.com/PlanteAmigor/ov-cli/archive/refs/heads/master.zip) , or GitHub Releases.
 
 ## Quick Start
 
