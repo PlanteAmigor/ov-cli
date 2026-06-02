@@ -6,8 +6,7 @@
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License">
   <img src="https://img.shields.io/badge/python-≥3.10-blue" alt="Python">
   <img src="https://img.shields.io/badge/OpenVINO-≥2026.2-purple" alt="OpenVINO">
-  <img src="https://img.shields.io/badge/platform-Linux%20|%20Windows-lightgrey" alt="Platform">
-  <img src="https://img.shields.io/github/stars/PlanteAmigor/ov-cli?style=flat&label=stars" alt="Stars">
+  <img src="https://img.shields.io/badge/platform-Linux-lightgrey" alt="Platform">
 </p>
 
 **OpenVINO LLM 命令行工具** — 轻量、离线、CPU/GPU 皆可运行。
@@ -155,10 +154,12 @@ eval "$(./ov-cli venv --venv ./my-venv)"
 |------|------|:----:|:----:|:----:|------|
 | **Hy-MT2 1.8B** | GenAI | | | ✅ | `--mode translate`，FP32/FP16/INT8/INT4 四种精度全通过 |
 | **Gemma-4 E2B** | Optimum | ✅ | ✅ | | INT4 导出+推理，需 `kv_shared_layer` 补丁 |
-| **Qwen3-VL 8B** | GenAI | ✅ | ✅ | | 官方预转换版，ModelScope 下载 |
-| **Qwen3.5 0.8B** | GenAI | ✅ | ❌ | | INT8，视觉编码器有 bug |
-| **Qwen3.6 35B-A3B** | GenAI | ✅ | ✅ | | MoE，混合精度，官方预转换 |
+| **Qwen3-VL 8B** | GenAI | ✅ | ✅ | | ✅ 官方预转换，OpenVINO 支持的三个 VLM 之一 |
+| **Qwen3.6 35B-A3B** | GenAI | ✅ | ✅ | | ✅ MoE，官方预转换 VLM |
+| **Qwen3.5 0.8B** | GenAI | ✅ | ❌ | | 视觉编码器不支持（OpenVINO 未实现小模型 VLM） |
 | **Qwen3 2B** | GenAI | ✅ | ❌ | | 文字正常，自转视觉编码器 reshape 有 bug |
+
+> **VLM 说明**：OpenVINO GenAI 的 `VLMPipeline` 目前对 Qwen 系列只支持 **Qwen3-VL 8B**、**Qwen3.6 35B-A3B**、**Qwen3.5 35B-A3B** 三个模型的视觉能力。其他 Qwen 小模型（0.8B、2B 等）虽标注 vision，但视觉编码器在 OpenVINO 上无法正常工作。其他品牌的 VLM（如 Gemma-4 Optimum 格式已验证支持）未充分测试。
 
 ### 📌 适用范围
 
@@ -249,24 +250,3 @@ optimum-cli export openvino  ─── 自动推断 task + 量化
 - 支持 GPU: Intel 集成显卡 / Arc 独显（自动检测，GPU 优先）
 - 支持 CPU: 任意 x86-64 处理器
 
-## Windows 支持
-
-Windows 上基本可用，以下注意事项：
-
-| 项目 | 说明 |
-|------|------|
-| **入口** | 使用 `ov-cli.bat` 替代 `./ov-cli`；或 `python -m ov_cli` |
-| **setup** | 自动检测 Windows 路径（`Scripts\` 而非 `bin/`） |
-| **多行输入** | 退化为单行输入（`select` 在 Windows 不支持） |
-| **benchmark RSS** | 暂不采集（`resource.getrusage` 仅 Unix） |
-| **不支持** | shell 入口脚本 `ov-cli`（bash 语法） |
-
-```bash
-# Windows 用法
-ov-cli.bat setup
-ov-cli.bat chat --model ./model-ov
-
-# 或直接 Python
-python -m ov_cli setup
-python -m ov_cli chat --model ./model-ov
-```
