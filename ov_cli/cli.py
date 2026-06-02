@@ -67,7 +67,7 @@ def _apply_gemma4_patch():
     patcher_path = None
     # 查找已安装的 model_patcher.py
     try:
-        import optimum.exporters.openvino.model_patcher as mp
+        import optimum.exporters.openvino.model_patcher as mp  # type: ignore[reportMissingImports]
         patcher_path = mp.__file__
     except (ImportError, AttributeError, ModuleNotFoundError):
         pass
@@ -238,13 +238,15 @@ def cmd_setup(args):
         "nncf>=3.0",
         "torch",
         "torchvision",
-        "tokenizers",
-        "jinja2",
         "pillow",
         "numpy",
+        "jinja2",
         "huggingface-hub",
         "safetensors",
         "sentencepiece",
+        "tokenizers",
+        "fastapi>=0.100",
+        "uvicorn[standard]>=0.20",
     ]
     cmd = [pip, "install", "-v"] + pkgs
     subprocess.check_call(cmd)
@@ -328,6 +330,15 @@ def cmd_benchmark(args):
     ov_path = os.path.abspath(args.model)
     run_benchmark(ov_path, args.reasoning == "on")
 
+def cmd_server(args):
+    """ov-cli server: 启动 API 服务 + Web UI"""
+    from .server import run_server
+    model_path = os.path.abspath(args.model)
+    if not os.path.isdir(model_path):
+        print(f"  ⚠ 模型路径不存在: {model_path}")
+        sys.exit(1)
+    run_server(model_path, args.device, args.host, args.port)
+
 
 def cmd_chat(args):
     """ov-cli chat"""
@@ -393,6 +404,7 @@ def _build_help():
             "  ./ov-cli convert --model ./Qwen3.5 --format int8\n"
             "  ./ov-cli convert --model ./Qwen3.5 --format int4 -o ./Qwen3.5-ov-int4\n"
             "  ./ov-cli convert --model ./Qwen3.5 --format fp16    # 半精度\n"
+            "  ./ov-cli convert --model ./Qwen3.5 --format nf4     # NF4 (QLoRA)\n"
             "\n"
             "  # 聊天模式 (通用对话)\n"
             "  ./ov-cli chat --model ./gemma-4-E2B-it-ov-int4\n"
@@ -400,6 +412,10 @@ def _build_help():
             "\n"
             "  # 翻译模式 (Hy-MT2 等翻译模型)\n"
             "  ./ov-cli chat --model ./Hy-MT2-1.8B-ov --mode translate\n"
+            "\n"
+            "  # API 服务 + Web UI\n"
+            "  ./ov-cli server --model ./model-ov --port 8080\n"
+            "  # → 浏览器打开 http://localhost:8080"
             "\n"
             "  # 指定语言\n"
             "  ./ov-cli --lang en chat --model ./model-ov\n"
@@ -430,6 +446,7 @@ def _build_help():
             "  ./ov-cli convert --model ./Qwen3.5 --format int8\n"
             "  ./ov-cli convert --model ./Qwen3.5 --format int4 -o ./Qwen3.5-ov-int4\n"
             "  ./ov-cli convert --model ./Qwen3.5 --format fp16     # half precision\n"
+            "  ./ov-cli convert --model ./Qwen3.5 --format nf4      # NF4 (QLoRA)\n"
             "\n"
             "  # Chat mode (general conversation)\n"
             "  ./ov-cli chat --model ./gemma-4-E2B-it-ov-int4\n"
@@ -437,6 +454,10 @@ def _build_help():
             "\n"
             "  # Translate mode (Hy-MT2 and similar)\n"
             "  ./ov-cli chat --model ./Hy-MT2-1.8B-ov --mode translate\n"
+            "\n"
+            "  # API server + Web UI\n"
+            "  ./ov-cli server --model ./model-ov --port 8080\n"
+            "  # → Open http://localhost:8080 in browser\n"
             "\n"
             "  # Set UI language\n"
             "  ./ov-cli --lang en chat --model ./model-ov\n"
@@ -504,7 +525,7 @@ def main():
         "convert",
         help=TR("转换 HuggingFace 模型 → OpenVINO IR", "Convert HF model → OpenVINO IR"),
         description=TR(
-            "转换 HuggingFace 模型 → OpenVINO IR (FP16/INT8/INT4 量化可选)\n"
+            "转换 HuggingFace 模型 → OpenVINO IR (支持多种量化格式)\n"
             "\n"
             "使用 Optimum Intel 官方工具，自动推断 task 类型。\n"
             "\n"
@@ -513,15 +534,19 @@ def main():
             "  2. 保存 .xml/.bin + tokenizer + 配置文件\n"
             "\n"
             "量化格式:\n"
-            "  fp32  浮点 (无损, 体积最大)\n"
-            "  fp16  半精度 (体积减半, 几乎无损)\n"
-            "  int8  8-bit (体积~25%, 几乎无损)\n"
-            "  int4  4-bit (体积~12.5%, 有精度损失)\n"
+            "  fp32   浮点 (无损, 体积最大)\n"
+            "  fp16   半精度 (体积减半, 几乎无损)\n"
+            "  int8   8-bit (体积~25%, 几乎无损)\n"
+            "  int4   4-bit (体积~12.5%, 有精度损失)\n"
+            "  mxfp4  MXFP4 (微缩放格式, OCP 标准)\n"
+            "  nf4    NF4 (QLoRA 格式, 高质量 4-bit)\n"
+            "  cb4    CodeBook (16 固定 fp8 码本)\n"
+
             "\n"
             "高级参数:\n"
             "  --ratio RATIO     INT4 混合精度比例 (0-1, 默认1.0)\n"
             "  --group-size GS   量化分组大小 (默认128, 越大精度越高)",
-            "Convert HuggingFace model → OpenVINO IR (FP16/INT8/INT4 optional)\n"
+            "Convert HuggingFace model → OpenVINO IR (multiple formats)\n"
             "\n"
             "Uses Optimum Intel official tool, auto-infers task type.\n"
             "\n"
@@ -530,10 +555,13 @@ def main():
             "  2. Save .xml/.bin + tokenizer + configs\n"
             "\n"
             "Quantization formats:\n"
-            "  fp32  full precision (lossless, largest)\n"
-            "  fp16  half precision (size ~half, near-lossless)\n"
-            "  int8  8-bit (size ~25%, near-lossless)\n"
-            "  int4  4-bit (size ~12.5%, some quality loss)\n"
+            "  fp32   full precision (lossless, largest)\n"
+            "  fp16   half precision (size ~half, near-lossless)\n"
+            "  int8   8-bit (size ~25%, near-lossless)\n"
+            "  int4   4-bit (size ~12.5%, some quality loss)\n"
+            "  mxfp4  MXFP4 (micro-scaling, OCP standard)\n"
+            "  nf4    NF4 (QLoRA format, high-quality 4-bit)\n"
+            "  cb4    CodeBook (16 fixed fp8 codebook)\n"
             "\n"
             "Advanced:\n"
             "  --ratio RATIO     INT4 mixed precision ratio (0-1, default 1.0)\n"
@@ -545,8 +573,10 @@ def main():
                         help=TR("HuggingFace 模型目录路径", "path to HuggingFace model dir"))
     p_conv.add_argument("--output", "-o",
                         help=TR("输出目录 (默认: {model}-ov)", "output dir (default: {model}-ov)"))
-    p_conv.add_argument("--format", choices=["fp32", "fp16", "int8", "int4"], default="fp32",
-                        help=TR("量化格式 (默认: fp32)", "quantization format (default: fp32)"))
+    p_conv.add_argument("--format", choices=["fp32", "fp16", "int8", "int4",
+                                               "mxfp4", "nf4", "cb4"], default="fp32",
+                        help=TR("量化格式: fp32/fp16/int8/int4/mxfp4/nf4/cb4 (默认: fp32)",
+                                "format: fp32/fp16/int8/int4/mxfp4/nf4/cb4 (default: fp32)"))
     p_conv.add_argument("--ratio", type=float, default=1.0,
                         help=TR("INT4 混合精度比例 0-1 (默认 1.0)", "INT4 mixed precision ratio 0-1 (default 1.0)"))
     p_conv.add_argument("--group-size", type=int, default=128, dest="group_size",
@@ -628,6 +658,43 @@ def main():
     p_bench.add_argument("--reasoning", choices=["on", "off"], default="on",
                          help=TR("思考模式 (默认: on)", "reasoning mode (default: on)"))
 
+    # ── server ──
+    p_serve = sub.add_parser(
+        "server",
+        help=TR("启动 API 服务 + Web UI", "Start API server + Web UI"),
+        description=TR(
+            "启动 OpenAI 兼容 API 服务，托管 Web 聊天界面。\n"
+            "\n"
+            "端点:\n"
+            "  POST /v1/chat/completions    聊天 (SSE 流式)\n"
+            "  GET  /v1/models               模型信息\n"
+            "  GET  /                        聊天界面\n"
+            "\n"
+            "示例:\n"
+            "  ./ov-cli server --model ./model-ov --port 8080\n"
+            "  curl http://localhost:8080/v1/models",
+            "Start OpenAI-compatible API server with Web UI.\n"
+            "\n"
+            "Endpoints:\n"
+            "  POST /v1/chat/completions    chat (SSE streaming)\n"
+            "  GET  /v1/models               model info\n"
+            "  GET  /                        chat UI\n"
+            "\n"
+            "Examples:\n"
+            "  ./ov-cli server --model ./model-ov --port 8080\n"
+            "  curl http://localhost:8080/v1/models",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_serve.add_argument("--model", "-m", required=True,
+                         help=TR("OpenVINO 模型目录路径", "path to OpenVINO model dir"))
+    p_serve.add_argument("--device", default="", choices=["CPU", "GPU"],
+                         help=TR("推理设备 (默认: 自动检测)", "inference device (default: auto)"))
+    p_serve.add_argument("--host", default="0.0.0.0",
+                         help=TR("监听地址 (默认: 0.0.0.0)", "listen address (default: 0.0.0.0)"))
+    p_serve.add_argument("--port", type=int, default=8080,
+                         help=TR("监听端口 (默认: 8080)", "listen port (default: 8080)"))
+
     # ── venv ──
     p_venv = sub.add_parser(
         "venv",
@@ -659,6 +726,8 @@ def main():
         cmd_benchmark(args)
     elif args.cmd == "venv":
         cmd_venv(args)
+    elif args.cmd == "server":
+        cmd_server(args)
 
 
 if __name__ == "__main__":

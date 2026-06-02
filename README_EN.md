@@ -4,8 +4,7 @@
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License">
   <img src="https://img.shields.io/badge/python-≥3.10-blue" alt="Python">
   <img src="https://img.shields.io/badge/OpenVINO-≥2026.2-purple" alt="OpenVINO">
-  <img src="https://img.shields.io/badge/platform-Linux%20|%20Windows-lightgrey" alt="Platform">
-  <img src="https://img.shields.io/github/stars/PlanteAmigor/ov-cli?style=flat&label=stars" alt="Stars">
+  <img src="https://img.shields.io/badge/platform-Linux-lightgrey" alt="Platform">
 </p>
 
 **[中文](README.md) | English**
@@ -158,10 +157,12 @@ Loads an OpenVINO model and starts an interactive terminal. Auto-detects model f
 |-------|--------|:----:|:-----:|:---------:|-------|
 | **Hy-MT2 1.8B** | GenAI | | | ✅ | `--mode translate`, all 4 precisions |
 | **Gemma-4 E2B** | Optimum | ✅ | ✅ | | INT4, needs `kv_shared_layer` patch |
-| **Qwen3-VL 8B** | GenAI | ✅ | ✅ | | Official pre-converted |
-| **Qwen3.5 0.8B** | GenAI | ✅ | ❌ | | Vision encoder bug |
-| **Qwen3.6 35B-A3B** | GenAI | ✅ | ✅ | | MoE, mixed precision |
-| **Qwen3 2B** | GenAI | ✅ | ❌ | | Self-converted vision bug |
+| **Qwen3-VL 8B** | GenAI | ✅ | ✅ | | ✅ Official pre-converted, one of 3 VLM models supported by OpenVINO |
+| **Qwen3.6 35B-A3B** | GenAI | ✅ | ✅ | | ✅ MoE, pre-converted VLM |
+| **Qwen3.5 0.8B** | GenAI | ✅ | ❌ | | Vision encoder not supported by OpenVINO (small model VLM not implemented) |
+| **Qwen3 2B** | GenAI | ✅ | ❌ | | Text only, self-converted vision reshape bug |
+
+> **VLM note**: OpenVINO GenAI's `VLMPipeline` currently only supports vision for **Qwen3-VL 8B**, **Qwen3.6 35B-A3B**, and **Qwen3.5 35B-A3B** among Qwen models. Smaller Qwen models (0.8B, 2B etc.) have vision encoders that don't work with OpenVINO. Other brands' VLMs (e.g. Gemma-4 in Optimum format confirmed working) are not fully tested.
 
 ### ⚠️ Notes
 
@@ -179,7 +180,6 @@ Loads an OpenVINO model and starts an interactive terminal. Auto-detects model f
 ```
 ov-cli/
 ├── ov-cli                   # Shell entry script
-├── ov-cli.bat               # Windows entry script
 ├── pyproject.toml
 ├── README.md / README_EN.md
 │
@@ -222,21 +222,3 @@ Tested on: Intel Arc Pro 130T/140T (Arrow Lake-P) GPU | openvino-genai 2026.2 | 
 - GPU: Intel integrated / Arc (auto-detect)
 - CPU: Any x86-64
 
-## Windows Support
-
-| Item | Notes |
-|------|-------|
-| **Entry** | Use `ov-cli.bat` or `python -m ov_cli` |
-| **setup** | Auto-detects Windows paths (`Scripts\` vs `bin/`) |
-| **Multi-line input** | Falls back to single-line |
-| **benchmark RSS** | Not collected (only Unix) |
-| **Not supported** | Bash entry script `ov-cli` |
-
-```bash
-# Windows usage
-ov-cli.bat setup
-ov-cli.bat chat --model ./model-ov
-# or
-python -m ov_cli setup
-python -m ov_cli chat --model ./model-ov
-```

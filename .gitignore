@@ -13,9 +13,7 @@ venv/
 model/
 optimum-intel-main/
 # 开发日志
-BENCHMARK.md
-GEMMA4-DEVLOG.md
-KV-CACHE-DEVLOG.md
+report/
 
 # IDE
 .vscode/
@@ -31,3 +29,6 @@ Thumbs.db
 openvino.genai-2026.2.0.0-optimization/build/
 openvino.genai-2026.2.0.0-optimization/CMakeCache.txt
 THINKING-BUDGET-DEVLOG.md
+
+#UI
+ui-src/
