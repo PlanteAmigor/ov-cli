@@ -1,5 +1,7 @@
 # ov-cli
 
+**[中文](README.md) | [English](README_EN.md)**
+
 <p align="center">
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License">
   <img src="https://img.shields.io/badge/python-≥3.10-blue" alt="Python">
@@ -7,19 +9,9 @@
   <img src="https://img.shields.io/badge/platform-Linux-lightgrey" alt="Platform">
 </p>
 
-**[中文](README.md) | English**
+**OpenVINO LLM CLI Tool** — Lightweight, offline LLM inference on CPU & GPU.
 
-**OpenVINO LLM CLI Tool** — Lightweight, offline, runs on CPU & GPU.
-
-*"I found the official OpenVINO tools a bit cumbersome for daily LLM experiments, so I built `ov-cli` as a lightweight alternative. With the help of AI coding tools, I turned my workflow needs into a simple CLI — setup, convert, chat — all in one place."*
-
-> Demo videos (click to play):
-> 
-> [▶ Chat Terminal](https://github.com/PlanteAmigor/ov-cli/raw/master/presentation/ov-cli.mp4) | [▶ Help](https://github.com/PlanteAmigor/ov-cli/raw/master/presentation/ov-cli1.mp4)
-
-Built on Optimum Intel + OpenVINO GenAI. Supports model conversion (FP32/FP16/INT8/INT4), interactive chat (streaming), and translation.
-
-> Get it: `git clone https://github.com/PlanteAmigor/ov-cli.git` or `gh repo clone PlanteAmigor/ov-cli`, or download [ZIP](https://github.com/PlanteAmigor/ov-cli/archive/refs/heads/master.zip) , or GitHub Releases.
+Built on Optimum Intel + OpenVINO GenAI. Features: model conversion (7 quantization formats), interactive chat (streaming, translation, VLM), OpenAI-compatible API server.
 
 ## Quick Start
 
@@ -28,39 +20,36 @@ Built on Optimum Intel + OpenVINO GenAI. Supports model conversion (FP32/FP16/IN
 ./ov-cli setup
 eval "$(./ov-cli venv)"
 
-# 2. Convert model
+# 2. Convert model (HuggingFace → OpenVINO IR)
 ./ov-cli convert --model ./Qwen3/2B --format int8
 
-# 3. Chat
+# 3. Chat terminal
 ./ov-cli chat --model ./Qwen3/2B-ov
+
+# 4. API server
+./ov-cli server --model ./Qwen3/2B-ov
 ```
 
 ## Commands
 
 ### `setup` — Create Environment
 
-Creates a Python venv and installs all dependencies (`openvino-genai`, `optimum-intel`, `transformers 5.9`, `torch`, etc.),
-then applies the Gemma-4 shared KV layer patch.
+Creates a Python venv, installs all dependencies (openvino-genai, optimum-intel, transformers, torch, etc.),
+auto-detects `optimum-intel-main/` source in project root to skip GitHub download,
+applies Gemma-4 shared KV layer patch automatically.
 
 ```bash
 ./ov-cli setup                          # default ./.venv (interactive mode selection)
 ./ov-cli setup --venv ./my-venv         # custom path
 ./ov-cli setup --optimum-dir ./optimum-intel-main
-
-> **Note**: `setup` auto-detects `optimum-intel-main/` in the project root.
-> Extract optimum-intel source there to skip GitHub download.
-
-# Full mode compiles openvino-genai from source to enable reasoning budget
-# (logit-level `</think>` forcing). **Linux only**.
 ```
 
-**Mode selection** (interactive): `setup` prompts to choose:
-1. **Simple mode** — pip install only, for regular use. `--reasoning off` has no effect.
-2. **Full mode** — compiles modified GenAI from source to enable `--reasoning off` for thinking models (Qwen3.6 etc.)
+**Mode selection** (interactive):
+1. **Simple mode** — pip install only. `--reasoning off` has no effect on thinking models.
+2. **Full mode** — compiles modified GenAI from source to enable thinking budget
+   (logit-level `</think>` forcing).
 
 ### `venv` — Enter Virtual Environment
-
-Prints the activate command for the venv created by `setup`:
 
 ```bash
 eval "$(./ov-cli venv)"
@@ -69,27 +58,28 @@ eval "$(./ov-cli venv --venv ./my-venv)"
 
 ### `convert` — Model Conversion
 
-Exports HuggingFace models to OpenVINO IR using Optimum Intel, auto-detecting task type.
+Exports HuggingFace models to OpenVINO IR via Optimum Intel, auto-detecting task type.
 
 ```bash
-./ov-cli convert --model ./Qwen3/2B --format int8
-./ov-cli convert --model ./Qwen3/2B --format int4 -o ./Qwen3/2B-ov-int4
-./ov-cli convert --model ./model --format fp16
+./ov-cli convert --model ./Qwen3/2B --format int8     # output to ./model-ov
+./ov-cli convert --model ./Qwen3/2B --format int4 -o ./custom-path
 ```
 
-**Quantization formats**:
+**Quantization formats** (7):
 
 | Format | Size (vs fp32) | Notes |
-|--------|---------------|-------|
-| `fp32` | 100% | Lossless, largest |
-| `fp16` | ~50% | Half precision, nearly lossless |
-| `int8` | ~25% | 8-bit, nearly lossless |
-| `int4` | ~12.5% | 4-bit, some accuracy loss |
+|--------|:-------------:|-------|
+| `fp32` | 100% | Lossless |
+| `fp16` | ~50% | Half precision |
+| `int8` | ~25% | 8-bit |
+| `int4` | ~12.5% | 4-bit |
+| `mxfp4` | ~12.5% | MX float 4-bit |
+| `nf4` | ~12.5% | Normal float 4-bit |
+| `cb4` | ~12.5% | 4-bit (double) |
 
-**Advanced options**:
+**INT4 mixed precision**:
 
 ```bash
-# INT4 mixed precision (80% INT4 + 20% INT8)
 ./ov-cli convert --model ./Hy-MT2/1.8B --format int4 --ratio 0.8 --group-size 128
 ```
 
@@ -100,26 +90,25 @@ Exports HuggingFace models to OpenVINO IR using Optimum Intel, auto-detecting ta
 
 ### `chat` — Chat Terminal
 
-Loads an OpenVINO model and starts an interactive terminal. Auto-detects model format, supports streaming, multi-turn, images (VLM).
+Interactive terminal. Auto-detects model format (GenAI / Optimum), supports streaming, multi-turn, images.
 
 ```bash
-# Chat mode (auto-detect format)
+# Chat mode
 ./ov-cli chat --model ./Qwen3/2B-ov                               # GenAI format
 ./ov-cli chat --model ./gemma-4-E2B-it-ov                          # Optimum format (Gemma-4)
 ./ov-cli chat --model ./model-ov --temp 0.9 --max-tokens 2048
 
 # Reasoning control (GenAI format only)
-./ov-cli chat --model ./Qwen3/2B-ov --reasoning on                 # thinking on (default)
-./ov-cli chat --model ./Qwen3.5/0.8B-ov --reasoning off            # thinking off (simple mode: ignored, full mode: effective)
-./ov-cli chat --model ./Qwen3.6/35B-A3B-ov --reasoning off         # needs custom GenAI build (full mode only)
+./ov-cli chat --model ./Qwen3.5/0.8B-ov --reasoning off            # filter <think> blocks
+./ov-cli chat --model ./Qwen3.6/35B-A3B-ov --reasoning off         # force </think> (full mode)
 
-# Translate mode (Hy-MT2 etc.)
+# Translate mode
 ./ov-cli chat --model ./Hy-MT2-1.8B-ov --mode translate
 
 # VLM image support
 ./ov-cli chat --model ./model-vlm-ov --image ./photo.jpg
 
-# English UI
+# English UI (default)
 ./ov-cli --lang en chat --model ./model-ov
 ```
 
@@ -128,74 +117,102 @@ Loads an OpenVINO model and starts an interactive terminal. Auto-detects model f
 | Command | Description |
 |---------|-------------|
 | `//img PATH` | Load image (VLM) |
-| `/temp 0.7` | Temperature (0-2) |
-| `/system ...` | System prompt |
+| `/temp 0.7` | Set temperature |
+| `/system ...` | Set system prompt |
 | `/clear` | Clear context |
 | `/help` | Help |
 | `/exit` | Exit |
 
-**Translate mode commands**:
+### `server` — API Server
 
-| Command | Description |
-|---------|-------------|
-| `//en text` | Force translate to English |
-| `//zh text` | Force translate to Chinese |
-| Direct input | Auto-detect language direction |
+Starts an OpenAI-compatible HTTP API server.
 
-> **Note**: Translate mode accepts one line per input. Paste multi-line text in separate chunks.
+```bash
+./ov-cli server --model ./Qwen3/8B-ov                              # default port 8080
+./ov-cli server --model ./model-ov --port 8081 --host 0.0.0.0
+./ov-cli server --model ./model-ov --device CPU                     # force CPU
+```
 
-### ✅ Two Inference Formats
+**API Endpoints**:
 
-| Format | Loader | Models | Feature |
-|--------|--------|--------|---------|
-| **GenAI** | `LLMPipeline` / `VLMPipeline` | Standard optimum-cli exports | `openvino_config.json`, no per-layer models |
-| **Optimum** | `OVModelForVisualCausalLM` | Gemma-4 VLM | Has `openvino_text_embeddings_per_layer_model.xml` |
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/v1/models` | List models + capabilities |
+| `POST` | `/v1/chat/completions` | Chat completion (stream + non-stream) |
+| `POST` | `/v1/chat/completions/control` | Stop generation |
+| `GET` | `/props` | Server properties |
+| `GET` | `/health` | Health check |
+| `POST` | `/token` | Count tokens |
 
-### ✅ Verified
+**curl examples**:
+
+```bash
+# Text chat
+curl -s http://localhost:8080/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"8B-ov","messages":[{"role":"user","content":"Hello"}],"stream":false,"max_tokens":100}' \
+  | python3 -m json.tool
+
+# Streaming
+curl -s -N http://localhost:8080/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"8B-ov","messages":[{"role":"user","content":"Count 1 2 3"}],"stream":true,"max_tokens":50}'
+
+# Image inference
+curl -s http://localhost:8080/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d "$(cat <<EOF
+{"model":"8B-ov","messages":[{"role":"user","content":[
+  {"type":"image_url","image_url":{"url":"data:image/jpeg;base64,$(base64 -w0 /path/to/photo.jpg)"}},
+  {"type":"text","text":"What color?"}
+]}],"stream":false,"max_tokens":50}
+EOF
+)" | python3 -m json.tool
+```
+
+### `benchmark` — Benchmark
+
+```bash
+./ov-cli benchmark --model ./Qwen3.5/0.8B-ov
+./ov-cli benchmark --model ./Qwen3.6/35B-A3B-ov --reasoning off
+```
+
+## Model Support
+
+### Inference Formats
+
+| Format | Loader | Feature |
+|--------|--------|---------|
+| **GenAI** | `LLMPipeline` / `VLMPipeline` | Standard export, `openvino_config.json` |
+| **Optimum** | `OVModelForVisualCausalLM` + `AutoProcessor` | Gemma-4 etc., has `openvino_text_embeddings_per_layer_model.xml` |
+
+### Verified Models
 
 | Model | Format | Text | Image | Translate | Notes |
 |-------|--------|:----:|:-----:|:---------:|-------|
-| **Hy-MT2 1.8B** | GenAI | | | ✅ | `--mode translate`, all 4 precisions |
+| **Hy-MT2 1.8B** | GenAI | | | ✅ | Translation model, all 4 precisions |
 | **Gemma-4 E2B** | Optimum | ✅ | ✅ | | INT4, needs `kv_shared_layer` patch |
-| **Qwen3-VL 8B** | GenAI | ✅ | ✅ | | ✅ Official pre-converted, one of 3 VLM models supported by OpenVINO |
-| **Qwen3.6 35B-A3B** | GenAI | ✅ | ✅ | | ✅ MoE, pre-converted VLM |
-| **Qwen3.5 0.8B** | GenAI | ✅ | ❌ | | Vision encoder not supported by OpenVINO (small model VLM not implemented) |
-| **Qwen3 2B** | GenAI | ✅ | ❌ | | Text only, self-converted vision reshape bug |
+| **Qwen3-VL 8B** | GenAI | ✅ | ✅ | | Pre-converted, 1 of 3 supported VLM |
+| **Qwen3.6 35B-A3B** | GenAI | ✅ | ✅ | | MoE, pre-converted |
+| **Qwen3.5 0.8B** | GenAI | ✅ | ❌ | | Small model VLM unsupported |
+| **Qwen3 2B** | GenAI | ✅ | ❌ | | Vision encoder reshape bug |
 
-> **VLM note**: OpenVINO GenAI's `VLMPipeline` currently only supports vision for **Qwen3-VL 8B**, **Qwen3.6 35B-A3B**, and **Qwen3.5 35B-A3B** among Qwen models. Smaller Qwen models (0.8B, 2B etc.) have vision encoders that don't work with OpenVINO. Other brands' VLMs (e.g. Gemma-4 in Optimum format confirmed working) are not fully tested.
+> **VLM note**: Among Qwen models, GenAI `VLMPipeline` only supports vision for **Qwen3-VL 8B**, **Qwen3.6 35B-A3B**, **Qwen3.5 35B-A3B**. Small models (0.8B, 2B) have vision encoder issues. Optimum format models (Gemma-4) not affected.
 
-### ⚠️ Notes
+### Scope
 
-- **Gemma-4**: Export needs `model_patcher.py` patch (`kv_shared_layer_index` → `layer_type`), `setup` applies it automatically
-- **Ctrl+C latency**: Interrupt may take 20-200ms (one token time). `^C` may appear in output
-- **`--reasoning off` for thinking models (Qwen3.6 etc.)**: Qwen3.6 is inherently a "thinking model" — it always reasons before answering, and no prompt trick (empty `<think>` block, system prompt suppression) can stop it.
-  
-  **How it works**: `ov-cli` patches the OpenVINO GenAI sampling pipeline by inserting a `ThinkingBudgetTransform` into the `LogitProcessor` chain. Before each token generation, it checks a reasoning budget counter. Once the budget is exhausted, it sets every token's logit to `-∞` except the `</think>` token, forcing the model to end its thinking block immediately — similar to llama.cpp's reasoning budget sampler.
-  
-  Enable it via `setup` **full mode** (option 2) to auto-build the patched GenAI. **Linux only. Simple mode (default) ignores `--reasoning off` entirely.**
-- Pre-converted OpenVINO models: [ModelScope OpenVINO](https://www.modelscope.cn/organization/OpenVINO)
+All transformers architectures (Llama, Mistral, DeepSeek, Phi, Gemma, etc.) should work
+as long as `optimum-cli` can export them.
 
-## Project Structure
+### Notes
 
-```
-ov-cli/
-├── ov-cli                   # Shell entry script
-├── pyproject.toml
-├── README.md / README_EN.md
-│
-├── ov_cli/
-│   ├── __init__.py          # Package info + i18n
-│   ├── __main__.py          # python -m ov_cli entry
-│   ├── cli.py               # CLI parser + dispatcher + setup patches
-│   ├── chat.py              # Chat/translate terminal (GenAI + Optimum)
-│   └── convert.py           # Model conversion
-│
-├── openvino.genai-2026.2.0.0-optimization/  # Modified GenAI source (full mode)
-│
-├── model/                   # Model files
-│
-└── optimum-intel-main/      # Optimum Intel source (optional)
-```
+- **Gemma-4**: Export needs `model_patcher.py` patch (`kv_shared_layer_index` → `layer_type`), applied by `setup` automatically.
+- **Ctrl+C**: Interrupt during generation may take 20-200ms (one token time).
+- **`--reasoning off`**: Inherent thinking models (Qwen3.6 etc.) cannot be stopped by prompt tricks.
+  ov-cli inserts a `ThinkingBudgetTransform` into the LogitProcessor chain to force `</think>`.
+  Requires `setup` **full mode** (compiled GenAI).
+  Simple mode `--reasoning off` only filters `<think>` blocks from output.
+- **Pre-converted models**: Available at [ModelScope OpenVINO](https://www.modelscope.cn/organization/OpenVINO).
 
 ## Performance
 
@@ -203,15 +220,39 @@ Tested on: Intel Arc Pro 130T/140T (Arrow Lake-P) GPU | openvino-genai 2026.2 | 
 
 | Model | Quant | 32 1st | 32 2nd | 32 tok/s | 1024 1st | 1024 2nd | 1024 tok/s | RSS |
 |:-----|:----:|:------:|:------:|:--------:|:---------:|:---------:|:----------:|:---:|
-| **Qwen3.5/0.8B-ov** | int8 | 297ms | 19ms | **54.9** | 660ms | 20ms | **51.8** | 826MB |
-| **Hy-MT2/1.8B-ov** | int4 | 267ms | 25ms | 40.6 | 710ms | 24ms | 38.2 | 916MB |
-| **Qwen3/2B-ov** | int8 | 262ms | 33ms | 30.7 | 771ms | 35ms | 27.8 | 1207MB |
-| **Qwen3/8B-ov** | int4 AWQ | 402ms | 79ms | 12.9 | 2161ms | 82ms | 12.1 | 2010MB |
-| **Gemma-4-E2B-ov** | int4 | 342ms | 77ms | 14.2 | 1732ms | 196ms | 10.8 | 8278MB |
-| **Qwen3.6/35B-A3B** (reasoning on) | int4/8 | 1069ms | 88ms | 11.8 | 4518ms | 87ms | 11.6 | 1013MB |
-| **Qwen3.6/35B-A3B** (reasoning off) | int4/8 | 1070ms | 92ms\* | 11.2 | 4571ms | 94ms\* | 10.9 | 1015MB |
+| **Qwen3.5/0.8B** | int8 | 297ms | 19ms | 54.9 | 660ms | 20ms | 51.8 | 826MB |
+| **Hy-MT2/1.8B** | int4 | 267ms | 25ms | 40.6 | 710ms | 24ms | 38.2 | 916MB |
+| **Qwen3/2B** | int8 | 262ms | 33ms | 30.7 | 771ms | 35ms | 27.8 | 1207MB |
+| **Qwen3/8B** | int4 AWQ | 402ms | 79ms | 12.9 | 2161ms | 82ms | 12.1 | 2010MB |
+| **Gemma-4 E2B** | int4 | 342ms | 77ms | 14.2 | 1732ms | 196ms | 10.8 | 8278MB |
+| **Qwen3.6/35B** (reasoning on) | int4/8 | 1069ms | 88ms | 11.8 | 4518ms | 87ms | 11.6 | 1013MB |
+| **Qwen3.6/35B** (reasoning off) | int4/8 | 1070ms | 92ms | 11.2 | 4571ms | 94ms | 10.9 | 1015MB |
 
-> \* reasoning off: 2nd latency includes minimal overhead from forced `</think>` (~1 thinking token). Throughput (tok/s) unaffected.
+> tok/s based on encoded text. Chinese ~1.8 chars/subword.
+
+## Project Structure
+
+```
+ov-cli/
+├── ov-cli                   # Entry script (auto-discovers .venv)
+├── pyproject.toml
+├── README.md / README_EN.md
+│
+├── ov_cli/
+│   ├── __init__.py          # Package info + i18n
+│   ├── __main__.py          # python -m ov_cli entry
+│   ├── cli.py               # CLI parser + dispatcher + setup
+│   ├── chat.py              # Chat/translate terminal (GenAI + Optimum)
+│   ├── convert.py           # Model conversion (7 formats)
+│   ├── server.py            # FastAPI OpenAI-compatible server
+│   └── benchmark.py         # Performance benchmark
+│
+├── openvino.genai-2026.2.0.0-optimization/  # Modified GenAI source (full mode)
+│
+├── model/                   # Model files (user downloaded/converted)
+│
+└── optimum-intel-main/      # Optimum Intel source (optional)
+```
 
 ## Dependencies
 
@@ -219,6 +260,5 @@ Tested on: Intel Arc Pro 130T/140T (Arrow Lake-P) GPU | openvino-genai 2026.2 | 
 - OpenVINO >= 2026.2, openvino-genai
 - Optimum Intel >= 1.27.0 (GitHub source)
 - transformers >= 5.9, torch, torchvision
-- GPU: Intel integrated / Arc (auto-detect)
+- GPU: Intel integrated / Arc (auto-detected)
 - CPU: Any x86-64
-
