@@ -249,11 +249,7 @@ ov-cli/
 │   ├── server.py            # FastAPI OpenAI 兼容服务
 │   └── benchmark.py         # 性能测试
 │
-├── openvino.genai-2026.2.0.0-optimization/  # 修改版 GenAI 源码（setup 完整模式用）
-│
-├── model/                   # 模型文件（用户自行下载/转换）
-│
-└── optimum-intel-main/      # optimum-intel 源码（可选）
+└── openvino.genai-2026.2.0.0-optimization/  # 修改版 GenAI 源码（setup 完整模式用）
 ```
 
 ## 依赖
@@ -264,3 +260,7 @@ ov-cli/
 - transformers >= 5.9, torch, torchvision
 - GPU: Intel 集成显卡 / Arc 独显（自动检测）
 - CPU: 任意 x86-64
+
+---
+
+> 此项目由 AI 辅助完成
