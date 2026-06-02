@@ -12,7 +12,7 @@
 
 **OpenVINO LLM 命令行工具** — 轻量、离线、CPU/GPU 皆可运行。
 
-*"I found the official OpenVINO tools a bit cumbersome for daily LLM experiments, so I built `ov-cli` as a lightweight alternative. With the help of AI coding tools, I turned my workflow needs into a simple CLI — setup, convert, chat — all in one place.*"
+*"官方的 OpenVINO 工具在日常 LLM 实验中略显繁琐，所以我写了 `ov-cli` 作为轻量替代。借助 AI 编程工具，我把工作流需求变成了一个简单的 CLI——setup、convert、chat，一站式搞定。"*
 
 基于 Optimum Intel + OpenVINO GenAI。支持模型转换（FP32/FP16/INT8/INT4）、交互式聊天（流式输出）、翻译。
 
