@@ -6,7 +6,6 @@
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License">
   <img src="https://img.shields.io/badge/python-≥3.10-blue" alt="Python">
   <img src="https://img.shields.io/badge/OpenVINO-≥2026.2-purple" alt="OpenVINO">
-  <img src="https://img.shields.io/badge/platform-Linux-lightgrey" alt="Platform">
 </p>
 
 > 我发现官方的 OpenVINO 工具在日常 LLM 实验中较为繁琐，因此我开发了 ov-cli 作为轻量级的替代方案。借助 AI 编码工具，我将我的工作流需求转化为简单的 CLI 操作——设置、转换、聊天——所有操作都可以在同一个地方完成。
@@ -120,10 +119,13 @@ eval "$(./ov-cli venv --venv ./my-venv)"
 
 | 命令 | 说明 |
 |------|------|
-| `//img PATH` | 加载/切换图片（VLM） |
-| `/temp 0.7` | 设置温度 |
-| `/system ...` | 设置系统提示词 |
-| `/clear` | 清空上下文 |
+| `//img PATH1 [PATH2 ...]` | 加载图片（支持多文件，VLM） |
+| `//pdf PATH` | 加载 PDF（自动转图片，最多 24 页） |
+| `//txt PATH1 [PATH2 ...]` | 加载文本文件（支持多文件） |
+| `/file` | 查看已加载文件列表 |
+| `/temp N` | 设置温度 (0-2) |
+| `/system TEXT` | 设置系统提示词 |
+| `/clear [ids]` | 清空全部上下文或指定文件 ID |
 | `/help` | 帮助 |
 | `/exit` | 退出 |
 
@@ -205,10 +207,25 @@ EOF
 
 > **VLM 说明**：GenAI 格式的 `VLMPipeline` 对 Qwen 系列只支持 **Qwen3-VL 8B**、**Qwen3.6 35B-A3B**、**Qwen3.5 35B-A3B** 三个模型的视觉能力。小模型（0.8B、2B）视觉编码器在 OpenVINO 上无法正常工作。Optimum 格式（Gemma-4）可能不受此限制。
 
-### 适用范围
+### 预转换模型（推荐）
 
-理论上支持所有 transformers 标准架构（Llama、Mistral、DeepSeek、Phi、Gemma 等），
-只需 `optimum-cli` 能成功导出即可推理。
+OpenVINO 官方已在 HuggingFace 和 ModelScope 提供了大量预转换模型，
+**省去自己转换的麻烦**，下载即用：
+
+- [HuggingFace OpenVINO 模型库](https://huggingface.co/OpenVINO)
+- [ModelScope OpenVINO 模型库](https://www.modelscope.cn/organization/OpenVINO?tab=model)
+
+### 自行转换
+
+`./ov-cli convert` 支持以下架构（已验证可成功导出）：
+
+| 架构 | 说明 |
+|------|------|
+| Qwen3 / Qwen3.5 / Qwen3.6 | 含 MoE 变体 |
+| Hy-MT2 | 多语言翻译模型 |
+| Llama / Mistral / DeepSeek / Phi / Gemma | 标准 transformers 架构 |
+
+理论上支持所有 transformers 标准架构，只需 `optimum-cli` 能成功导出即可推理。
 
 ### 注意事项
 

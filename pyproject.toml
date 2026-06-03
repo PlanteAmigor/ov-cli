@@ -24,6 +24,8 @@ dependencies = [
     "safetensors",
     "sentencepiece",
     "wcwidth",
+    "accelerate",
+    "PyMuPDF",
 ]
 
 [project.scripts]

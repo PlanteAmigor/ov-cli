@@ -9,6 +9,8 @@ if [ ! -d "$VENV" ]; then
 fi
 
 if [ -d "$VENV" ]; then
+    # 限定 PATH 只包含本项目虚拟环境，避免 subprocess 找到外部 Python
+    export PATH="$VENV/bin:/usr/bin:/bin"
     exec "$VENV/bin/python" -m ov_cli "$@"
 else
     exec python -m ov_cli "$@"

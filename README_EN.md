@@ -6,7 +6,6 @@
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License">
   <img src="https://img.shields.io/badge/python-≥3.10-blue" alt="Python">
   <img src="https://img.shields.io/badge/OpenVINO-≥2026.2-purple" alt="OpenVINO">
-  <img src="https://img.shields.io/badge/platform-Linux-lightgrey" alt="Platform">
 </p>
 
 > I found the official OpenVINO tools a bit cumbersome for daily LLM experiments, so I built ov-cli as a lightweight alternative. With the help of AI coding tools, I turned my workflow needs into a simple CLI — setup, convert, chat — all in one place.
@@ -120,10 +119,13 @@ Interactive terminal. Auto-detects model format (GenAI / Optimum), supports stre
 
 | Command | Description |
 |---------|-------------|
-| `//img PATH` | Load image (VLM) |
-| `/temp 0.7` | Set temperature |
-| `/system ...` | Set system prompt |
-| `/clear` | Clear context |
+| `//img PATH1 [PATH2 ...]` | Load image(s) (VLM) |
+| `//pdf PATH` | Load PDF (auto-convert to images, max 24 pages) |
+| `//txt PATH1 [PATH2 ...]` | Load text file(s) |
+| `/file` | List loaded files |
+| `/temp N` | Set temperature (0-2) |
+| `/system TEXT` | Set system prompt |
+| `/clear [ids]` | Clear context or specific files by ID |
 | `/help` | Help |
 | `/exit` | Exit |
 
@@ -203,10 +205,25 @@ EOF
 
 > **VLM note**: Among Qwen models, GenAI `VLMPipeline` only supports vision for **Qwen3-VL 8B**, **Qwen3.6 35B-A3B**, **Qwen3.5 35B-A3B**. Small models (0.8B, 2B) have vision encoder issues. Optimum format models (Gemma-4) may not be affected.
 
-### Scope
+### Pre-converted Models (Recommended)
 
-All transformers architectures (Llama, Mistral, DeepSeek, Phi, Gemma, etc.) should work
-as long as `optimum-cli` can export them.
+OpenVINO provides a large collection of pre-converted models on HuggingFace and ModelScope.
+**Skip the conversion step** — download and run directly:
+
+- [HuggingFace OpenVINO Models](https://huggingface.co/OpenVINO)
+- [ModelScope OpenVINO Models](https://www.modelscope.cn/organization/OpenVINO?tab=model)
+
+### Manual Conversion
+
+`./ov-cli convert` supports the following architectures (verified to export successfully):
+
+| Architecture | Notes |
+|------|------|
+| Qwen3 / Qwen3.5 / Qwen3.6 | Includes MoE variants |
+| Hy-MT2 | Multi-language translation model |
+| Llama / Mistral / DeepSeek / Phi / Gemma | Standard transformers architectures |
+
+All standard transformers architectures should work as long as `optimum-cli` can export them.
 
 ### Notes
 
