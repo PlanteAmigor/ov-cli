@@ -6,7 +6,7 @@ ov-cli chat: LLM 聊天/翻译终端。
   Optimum 格式 (optimum-intel OVModelForVisualCausalLM): Gemma-4 等
 """
 
-import os, sys, time, json, signal
+import os, sys, time, json, signal, threading
 import openvino as ov
 import openvino_genai as ov_genai
 from wcwidth import wcwidth, wcswidth
@@ -55,13 +55,20 @@ TRANSLATE_LANGS = {
 }
 
 
-def _make_streamer(reply_parts, stop_flag):
-    """创建 streamer callback（仅处理 Ctrl+C）。"""
+def _make_streamer(reply_parts, stop_flag, on_first_token=None):
+    """创建 streamer callback。
+
+    on_first_token: 首个 token 到达时的回调（用于停止进度指示器）。
+    """
     import select as _sel
+    _first = [True]
 
     def cb(t):
         if stop_flag[0]:
             return True
+        if _first[0] and on_first_token:
+            _first[0] = False
+            on_first_token()
         # 非阻塞检查 stdin 的 Ctrl+C
         if _sel.select([sys.stdin], [], [], 0)[0]:
             c = sys.stdin.read(1)
@@ -455,10 +462,13 @@ def run_chat(ctx, system="You are a helpful AI assistant.",
     print(f"  {TR('设备', 'Device')}: {ctx['device']} | OpenVINO")
     print("=" * 50)
     if ctx.get("is_vlm"):
-        print("  //img PATH " + TR("加载图片", "load image"))
-    print("  /temp 0.7   " + TR("设置温度", "set temperature"))
-    print("  /system ... " + TR("设置系统提示词", "set system prompt"))
-    print("  /clear      " + TR("清空上下文", "clear context"))
+        print("  //img PATH  " + TR("加载图片", "load image"))
+        print("  //pdf PATH  " + TR("加载 PDF（全页转图片）", "load PDF (pages as images)"))
+    print("  //txt PATH  " + TR("加载文本文件", "load text file"))
+    print("  /file       " + TR("查看已加载文件", "list loaded files"))
+    print("  /temp N     " + TR("温度 (0-2)", "temperature"))
+    print("  /system T   " + TR("系统提示词", "system prompt"))
+    print("  /clear [ids]" + TR("清空上下文或指定文件", "clear context or specific files"))
     print("  /help       " + TR("帮助", "help"))
     print("  /exit       " + TR("退出", "quit"))
     print("=" * 50)
@@ -500,33 +510,132 @@ def _build_prompt(messages, tokenizer=None, enable_thinking=True):
     return prompt
 
 
-def _load_image(path):
-    """加载图片为 openvino.Tensor。
-
-    Qwen3.5 视觉编码器要求 H×W 能被 512 整除 (patch_size² × merge_size² = 16² × 2²)。
-    自动缩放使宽高为 32 的倍数，长边不超过 2048。
-    """
+def _load_image(path, max_pixels=448*448):
+    """加载图片为 PIL Image，缩放到像素预算内。"""
     from PIL import Image
-    import numpy as np, openvino as ov
     img = Image.open(path).convert("RGB")
     w, h = img.size
-
-    # 长边不超过 2048
-    max_sz = 2048
-    if w > max_sz or h > max_sz:
-        ratio = max_sz / max(w, h)
+    if w * h > max_pixels:
+        ratio = (max_pixels / (w * h)) ** 0.5
         w, h = int(w * ratio), int(h * ratio)
+    w = max(32, (w // 32) * 32)
+    h = max(32, (h // 32) * 32)
+    return img.resize((w, h))
 
-    # 确保宽高为 32 的倍数 (patch_size=16, spatial_merge=2, 乘积=32)
-    w = (w // 32) * 32
-    h = (h // 32) * 32
-    if w < 32: w = 32
-    if h < 32: h = 32
 
-    img = img.resize((w, h))
-    # 官方方式: [None] 加 batch 维 → [1, H, W, 3]
-    arr = np.array(img).astype(np.uint8)[None]
-    return ov.Tensor(arr)
+# ── 文件加载辅助 ──────────────────────────────────────────
+
+_TEXT_EXTENSIONS = frozenset({
+    ".txt", ".md", ".json", ".py", ".c", ".cpp", ".h", ".hpp",
+    ".yaml", ".yml", ".toml", ".xml", ".csv", ".sh", ".env",
+    ".conf", ".cfg", ".ini", ".log", ".rst", ".tex", ".sql",
+    ".js", ".ts", ".tsx", ".jsx", ".vue", ".css", ".scss",
+    ".go", ".rs", ".java", ".kt", ".swift", ".rb", ".php",
+    ".pl", ".lua", ".r", ".m", ".mm",
+})
+
+
+def _is_text_file(path):
+    """判断文件是否可直接读为文本。"""
+    ext = os.path.splitext(path)[1].lower()
+    return ext in _TEXT_EXTENSIONS
+
+
+def _load_text_file(path):
+    """读取文本文件内容。"""
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        return f.read()
+
+
+def _pdf_to_images(path):
+    """把 PDF 每页转成 PIL Image，返回列表。
+
+    每页独立编码（不拼图），页数多时适当降低分辨率。
+    ≤10 页 → 448px（~196 visual tokens/页）
+    >10 页 → 384px（~144 visual tokens/页）
+    """
+    try:
+        import fitz
+    except ImportError:
+        print("  ⚠ 需要安装 PyMuPDF: pip install PyMuPDF")
+        return None
+
+    import numpy as np
+    from PIL import Image
+
+    # 屏蔽 MuPDF 的 C 层 + Python 层 stderr 警告
+    old_stderr_fd = os.dup(2)
+    old_sys_stderr = sys.stderr
+    devnull_fd = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(devnull_fd, 2)
+    os.close(devnull_fd)
+    sys.stderr = None
+    try:
+        doc = fitz.open(path)
+    except Exception:
+        os.dup2(old_stderr_fd, 2)
+        os.close(old_stderr_fd)
+        sys.stderr = old_sys_stderr
+        raise
+    total = len(doc)
+    if total > 24:
+        print(f"  \u26a0 PDF 超过 24 页上限，仅处理前 24 页")
+        total = 24
+    # 统一使用 384px 保证清晰度
+    max_pixels, dpi = (384 * 384, 120) if total > 10 else (448 * 448, 150)
+    px = int(max_pixels ** 0.5)
+    tok_per_page = max(1, max_pixels // (32 * 32))
+    total_tokens = tok_per_page * total
+    images = []
+    print(f"\r  \U0001f4c4 {os.path.basename(path)}: {total} \u9875 ({px}px, ~{tok_per_page} tok/\u9875, ~{total_tokens} tok \u5408\u8ba1)", end="", flush=True)
+    try:
+        for i in range(total):
+            pix = doc[i].get_pixmap(dpi=dpi)
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            w, h = img.size
+            cur_pixels = w * h
+            if cur_pixels > max_pixels:
+                ratio = (max_pixels / cur_pixels) ** 0.5
+                w, h = int(w * ratio), int(h * ratio)
+            w = max(32, (w // 32) * 32)
+            h = max(32, (h // 32) * 32)
+            img = img.resize((w, h))
+            images.append(img)
+            # \u5355\u884c\u52a8\u6001\u66f4\u65b0
+            print(f"\r  \U0001f4c4 {os.path.basename(path)}: \u6b63\u5728\u8f6c\u6362  {i+1}/{total} \u9875", end="", flush=True)
+    finally:
+        doc.close()
+        os.dup2(old_stderr_fd, 2)
+        os.close(old_stderr_fd)
+        sys.stderr = old_sys_stderr
+    print()
+    return images
+
+    return images
+
+
+def _images_to_ov_tensor(images):
+    """多张图片垂直拼接为一张后转为 openvino.Tensor。"""
+    import numpy as np
+    import openvino as ov
+    # 找出最大宽度，所有图缩放到同宽
+    max_w = max(img.width for img in images)
+    resized = []
+    for img in images:
+        if img.width != max_w:
+            ratio = max_w / img.width
+            new_h = int(img.height * ratio)
+            img = img.resize((max_w, new_h))
+        resized.append(img)
+    total_h = sum(img.height for img in resized)
+    canvas = np.zeros((total_h, max_w, 3), dtype=np.uint8)
+    y = 0
+    for img in resized:
+        arr = np.array(img)
+        h = arr.shape[0]
+        canvas[y:y+h] = arr
+        y += h
+    return ov.Tensor(canvas[None])
 
 
 def _load_optimum(ov_path, device):
@@ -574,6 +683,7 @@ def _count_tokens(ctx, text):
         return 0
 
 
+# 每批最多发送的图片/PDF 页数
 def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_path=None, reasoning=True):
     """Optimum 格式聊天模式（OVModelForVisualCausalLM + AutoProcessor）。"""
     model = ctx["model"]
@@ -581,15 +691,19 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
     is_vlm = ctx.get("is_vlm", False)
     from . import TR
 
+    # 文件管理: {id, path, type, pages:[PIL]}
+    loaded_files = []
+    _next_id = 1
+
     # 预加载初始图片
-    current_image = None
     if image_path and is_vlm:
         if os.path.isfile(image_path):
             from PIL import Image
-            current_image = Image.open(image_path).convert("RGB")
-            print(f"  {TR('已加载图片', 'Image loaded')}: {image_path}")
+            loaded_files.append({"id": _next_id, "path": image_path, "type": "image", "pages": [Image.open(image_path).convert("RGB")]})
+            print(f"  \u2713 {TR('\u5df2\u52a0\u8f7d\u56fe\u7247', 'Image loaded')}: {image_path}")
+            _next_id += 1
         else:
-            print(f"  ⚠ {TR('找不到图片', 'Image not found')}: {image_path}")
+            print(f"  \u26a0 {TR('\u627e\u4e0d\u5230\u56fe\u7247', 'Image not found')}: {image_path}")
 
     conv = []
     while True:
@@ -603,20 +717,53 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
 
         if text in ("/exit", "exit"):
             break
-        if text in ("/clear", "clear"):
+        if text == "/file":
+            if not loaded_files:
+                print(f"  {TR('\u672a\u52a0\u8f7d\u4efb\u4f55\u6587\u4ef6', 'No files loaded')}")
+            else:
+                print(f"  {TR('\u5df2\u52a0\u8f7d\u6587\u4ef6', 'Loaded files')}:")
+                for f in loaded_files:
+                    if f["type"] == "text":
+                        print(f"    #{f['id']} \U0001f4c4 {f['path']}")
+                    else:
+                        tag = "\U0001f4c4" if f["type"] == "pdf" else "\U0001f5bc\ufe0f"
+                        pages = len(f["pages"])
+                        print(f"    #{f['id']} {tag} {f['path']} ({pages} page(s))")
+            print()
+            continue
+        if text == "/clear" or text == "/clear all":
             conv.clear()
-            current_image = None
-            print(f"  ✓ {TR('上下文已清空', 'Context cleared')}")
+            loaded_files.clear()
+            print(f"  \u2713 {TR('\u4e0a\u4e0b\u6587\u5df2\u6e05\u7a7a', 'Context cleared')}")
+            print()
+            continue
+        if text.startswith("/clear "):
+            ids_to_remove = set()
+            for token in text[7:].split():
+                try:
+                    ids_to_remove.add(int(token))
+                except ValueError:
+                    pass
+            if ids_to_remove:
+                loaded_files = [f for f in loaded_files if f["id"] not in ids_to_remove]
+                conv.clear()
+                removed = ", ".join(str(i) for i in sorted(ids_to_remove))
+                print(f"  \u2713 {TR('\u5df2\u6e05\u9664\u6587\u4ef6', 'Removed file(s)')}: #{removed}")
+            else:
+                print(f"  \u26a0 {TR('\u7528\u6cd5', 'Usage')}: /clear 1 3 5 \u6216 /clear all")
             print()
             continue
         if text == "/help":
             if is_vlm:
-                print("  //img PATH " + TR("加载图片", "load image"))
-            print("  /temp N      " + TR("温度 (0-2)", "temperature"))
-            print("  /system T    " + TR("系统提示词", "system prompt"))
-            print("  /clear       " + TR("清空上下文", "clear context"))
-            print("  /help        " + TR("帮助", "help"))
-            print("  /exit        " + TR("退出", "quit"))
+                print("  //img PATH   " + TR("\u52a0\u8f7d\u56fe\u7247", "load image"))
+                print("  //pdf PATH   " + TR("\u52a0\u8f7d PDF\uff08\u5168\u9875\u8f6c\u56fe\u7247\uff09", "load PDF (pages as images)"))
+            print("  //txt PATH   " + TR("\u52a0\u8f7d\u6587\u672c\u6587\u4ef6", "load text file"))
+            print("  /file        " + TR("\u67e5\u770b\u5df2\u52a0\u8f7d\u6587\u4ef6", "list loaded files"))
+            print("  /temp N      " + TR("\u6e29\u5ea6 (0-2)", "temperature"))
+            print("  /system T    " + TR("\u7cfb\u7edf\u63d0\u793a\u8bcd", "system prompt"))
+            print("  /clear [ids] " + TR("\u6e05\u7a7a\u4e0a\u4e0b\u6587\u6216\u6307\u5b9a\u6587\u4ef6", "clear context or specific files"))
+            print("  /help        " + TR("\u5e2e\u52a9", "help"))
+            print("  /exit        " + TR("\u9000\u51fa", "quit"))
             print()
             continue
         if text.startswith("/temp "):
@@ -624,28 +771,89 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
                 temperature = max(0, min(2, float(text[6:])))
                 print(f"  temperature = {temperature}")
             except:
-                print("  ⚠ /temp 0.7")
+                print("  \u26a0 /temp 0.7")
             print()
             continue
         if text.startswith("/system "):
             system = text[8:]
-            print(f"  {TR('系统提示词已更新', 'System prompt updated')}")
+            print(f"  {TR('\u7cfb\u7edf\u63d0\u793a\u8bcd\u5df2\u66f4\u65b0', 'System prompt updated')}")
             print()
             continue
         if text.startswith("//img ") and is_vlm:
-            img_path = text[6:].strip()
-            if os.path.isfile(img_path):
-                from PIL import Image
-                current_image = Image.open(img_path).convert("RGB")
-                print(f"  ✓ {TR('已加载图片', 'Image loaded')}: {img_path}")
-            else:
-                print(f"  ⚠ {TR('找不到图片', 'Image not found')}: {img_path}")
+            import shlex
+            paths = shlex.split(text[6:])
+            if not paths:
+                print(f"  \u26a0 {TR('\u7528\u6cd5', 'Usage')}: //img PATH1 [PATH2 ...]")
+                print()
+                continue
+            loaded_any = 0
+            for img_path in paths:
+                if os.path.isfile(img_path):
+                    loaded_files.append({"id": _next_id, "path": img_path, "type": "image", "pages": [_load_image(img_path)]})
+                    print(f"  #{_next_id} \u2713 {TR('\u5df2\u52a0\u8f7d\u56fe\u7247', 'Image loaded')}: {img_path}")
+                    _next_id += 1
+                    loaded_any += 1
+                else:
+                    print(f"  \u26a0 {TR('\u627e\u4e0d\u5230\u56fe\u7247', 'Image not found')}: {img_path}")
             print()
             continue
 
-        # 带图片 → 消息体引用图片，chat template 才能插入 [IMAGE] token
-        if current_image is not None and is_vlm:
-            conv.append({"role": "user", "content": [{"type": "image", "image": current_image}, {"type": "text", "text": text}]})
+        if text.startswith("//pdf ") and is_vlm:
+            import shlex
+            paths = shlex.split(text[6:])
+            if not paths:
+                print(f"  \u26a0 {TR('\u7528\u6cd5', 'Usage')}: //pdf PATH1 [PATH2 ...]")
+                print()
+                continue
+            loaded_any = 0
+            for pdf_path in paths:
+                if os.path.isfile(pdf_path):
+                    pages = _pdf_to_images(pdf_path)
+                    if pages:
+                        loaded_files.append({"id": _next_id, "path": pdf_path, "type": "pdf", "pages": pages})
+                        print(f"  #{_next_id} \u2713 {TR('\u5df2\u52a0\u8f7d PDF', 'PDF loaded')}: {pdf_path}")
+                        _next_id += 1
+                        loaded_any += 1
+                else:
+                    print(f"  \u26a0 {TR('\u627e\u4e0d\u5230\u6587\u4ef6', 'File not found')}: {pdf_path}")
+            print()
+            continue
+
+        if text.startswith("//txt "):
+            import shlex
+            paths = shlex.split(text[6:])
+            if not paths:
+                print(f"  \u26a0 {TR('\u7528\u6cd5', 'Usage')}: //txt PATH1 [PATH2 ...]")
+                print()
+                continue
+            loaded_any = 0
+            for txt_path in paths:
+                if os.path.isfile(txt_path):
+                    file_content = _load_text_file(txt_path)
+                    loaded_files.append({"id": _next_id, "path": txt_path, "type": "text", "content": file_content})
+                    print(f"  #{_next_id} \u2713 {TR('\u5df2\u52a0\u8f7d\u6587\u4ef6', 'File loaded')}: {txt_path}")
+                    _next_id += 1
+                    loaded_any += 1
+                else:
+                    print(f"  \u26a0 {TR('\u627e\u4e0d\u5230\u6587\u4ef6', 'File not found')}: {txt_path}")
+            print()
+            continue
+
+        # \u6784\u5efa\u6d88\u606f\uff1a\u6240\u6709\u5df2\u52a0\u8f7d\u6587\u4ef6\u7684\u56fe\u7247 + \u6587\u672c
+        all_pages = []
+        txt_prefix = ""
+        for f in loaded_files:
+            if f["type"] == "text":
+                fname = os.path.basename(f["path"])
+                txt_prefix += f"[\u6587\u4ef6 {fname}]\n```\n{f['content']}\n```\n\n"
+            else:
+                all_pages.extend(f["pages"])
+        if txt_prefix:
+            text = txt_prefix + text
+        if all_pages and is_vlm:
+            content = [{"type": "image", "image": img} for img in all_pages]
+            content.append({"type": "text", "text": text})
+            conv.append({"role": "user", "content": content})
         else:
             conv.append({"role": "user", "content": text})
 
@@ -655,13 +863,32 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
         messages.extend(conv)
 
         prompt = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, chat_template_kwargs={"enable_thinking": reasoning})
-        if current_image is not None and is_vlm:
-            inputs = processor(text=[prompt], images=[current_image], return_tensors="pt")
+        # VLM prefill 进度指示器
+        n_vlm_pages = len(all_pages)
+        progress_stop = threading.Event()
+        if is_vlm and n_vlm_pages > 0:
+            n_vis_tokens = n_vlm_pages * (max(img.width * img.height for img in all_pages) // (32 * 32))
+            _t_prefill_start = time.time()
+            def _on_first():
+                progress_stop.set()
+                pt = time.time() - _t_prefill_start
+                print(f"\r  \u2713 {TR('\u89c6\u89c9\u7f16\u7801 + prefill \u5b8c\u6210', 'Vision + prefill done')} ({pt:.1f}s, ~{n_vis_tokens} tok)  ")
+                print(f"  {TR('\u56de\u590d', 'Reply')}:", end=" ", flush=True)
+            def _show_progress():
+                while not progress_stop.is_set():
+                    elapsed = time.time() - _t_prefill_start
+                    print(f"\r  \u23f3 {TR('\u6b63\u5728\u5904\u7406', 'Processing')} {n_vlm_pages} {TR('\u9875', 'pages')}... ({elapsed:.0f}s)", end="", flush=True)
+                    progress_stop.wait(1.0)
+            threading.Thread(target=_show_progress, daemon=True).start()
+
+        if all_pages and is_vlm:
+            inputs = processor(text=[prompt], images=all_pages, return_tensors="pt")
         else:
             inputs = processor(text=[prompt], return_tensors="pt")
 
         t0 = time.time()
-        print(f"  {TR('回复', 'Reply')}:", end=" ", flush=True)
+        if not (is_vlm and n_vlm_pages > 0):
+            print(f"  {TR('\u56de\u590d', 'Reply')}:", end=" ", flush=True)
 
         from transformers import TextIteratorStreamer
         from threading import Thread
@@ -682,15 +909,18 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
         thread = Thread(target=model.generate, kwargs=gen_kwargs)
         thread.start()
 
-        thinking_filter = not reasoning  # True = 需要过滤思考内容
-        in_think = [thinking_filter]  # 过滤时默认已在 think 块内
+        thinking_filter = not reasoning
+        in_think = [thinking_filter]
         reply_parts = []
+        _opt_first = [True]
         try:
             for t in streamer:
+                if _opt_first[0] and n_vlm_pages > 0:
+                    _opt_first[0] = False
+                    _on_first()
                 if stop_flag[0]:
                     break
                 if thinking_filter:
-                    # 过滤 <think>...</think>
                     if in_think[0]:
                         if '</think>' in t:
                             idx = t.index('</think>')
@@ -729,9 +959,11 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
                     reply_parts.append(t)
         finally:
             signal.signal(signal.SIGINT, old_handler)
+            if not progress_stop.is_set():
+                progress_stop.set()
 
         if stop_flag[0]:
-            print(f"\n  ⚠ {TR('已中断', 'Interrupted')}")
+            print(f"\n  \u26a0 {TR('\u5df2\u4e2d\u65ad', 'Interrupted')}")
             print()
             thread.join(timeout=5)
             continue
@@ -740,9 +972,7 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
         reply_text = "".join(reply_parts)
         elapsed = time.time() - t0
         conv.append({"role": "assistant", "content": reply_text})
-        # 图片用完即清，下次需要重新 //img
-        if current_image is not None:
-            current_image = None
+        # \u56fe\u7247/PDF \u4fdd\u7559\u5728\u4e0a\u4e0b\u6587\u4e2d\uff0c\u7528 /clear \u6216\u91cd\u65b0 //img \u6765\u66ff\u6362
         char_count = len(reply_text.replace(" ", ""))
         tok_count = _count_tokens(ctx, reply_text)
         print()
@@ -756,12 +986,16 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
     is_vlm = ctx.get("is_vlm", False)
     from . import TR
 
+    # 文件管理: {id, path, type, pages:[PIL]}
+    loaded_files = []
+    _next_id = 1
+
     # 预加载初始图片
-    current_image = None
     if image_path and is_vlm:
         if os.path.isfile(image_path):
-            current_image = _load_image(image_path)
+            loaded_files.append({"id": _next_id, "path": image_path, "type": "image", "pages": [_load_image(image_path)]})
             print(f"  {TR('已加载图片', 'Image loaded')}: {image_path}")
+            _next_id += 1
         else:
             print(f"  ⚠ {TR('找不到图片', 'Image not found')}: {image_path}")
 
@@ -777,18 +1011,51 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
 
         if text in ("/exit", "exit"):
             break
-        if text in ("/clear", "clear"):
+        if text == "/file":
+            if not loaded_files:
+                print(f"  {TR('未加载任何文件', 'No files loaded')}")
+            else:
+                print(f"  {TR('已加载文件', 'Loaded files')}:")
+                for f in loaded_files:
+                    if f["type"] == "text":
+                        print(f"    #{f['id']} 📄 {f['path']}")
+                    else:
+                        tag = "📄" if f["type"] == "pdf" else "🖼️"
+                        pages = len(f["pages"])
+                        print(f"    #{f['id']} {tag} {f['path']} ({pages} page(s))")
+            print()
+            continue
+        if text == "/clear" or text == "/clear all":
             conv.clear()
-            current_image = None
-            print(f"  ✓ {TR('上下文已清空', 'Context cleared')}")
+            loaded_files.clear()
+            print(f"  {TR('上下文已清空', 'Context cleared')}")
+            print()
+            continue
+        if text.startswith("/clear "):
+            ids_to_remove = set()
+            for token in text[7:].split():
+                try:
+                    ids_to_remove.add(int(token))
+                except ValueError:
+                    pass
+            if ids_to_remove:
+                loaded_files = [f for f in loaded_files if f["id"] not in ids_to_remove]
+                conv.clear()
+                removed = ", ".join(str(i) for i in sorted(ids_to_remove))
+                print(f"  {TR('已清除文件', 'Removed file(s)')}: #{removed}")
+            else:
+                print(f"  ⚠ {TR('用法', 'Usage')}: /clear 1 3 5 或 /clear all")
             print()
             continue
         if text == "/help":
             if is_vlm:
-                print("  //img PATH " + TR("加载图片", "load image"))
+                print("  //img PATH   " + TR("加载图片", "load image"))
+                print("  //pdf PATH   " + TR("加载 PDF（全页转图片）", "load PDF (pages as images)"))
+            print("  //txt PATH   " + TR("加载文本文件", "load text file"))
+            print("  /file        " + TR("查看已加载文件", "list loaded files"))
             print("  /temp N      " + TR("温度 (0-2)", "temperature"))
             print("  /system T    " + TR("系统提示词", "system prompt"))
-            print("  /clear       " + TR("清空上下文", "clear context"))
+            print("  /clear [ids] " + TR("清空上下文或指定文件", "clear context or specific files"))
             print("  /help        " + TR("帮助", "help"))
             print("  /exit        " + TR("退出", "quit"))
             print()
@@ -807,40 +1074,119 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
             print()
             continue
         if text.startswith("//img ") and is_vlm:
-            img_path = text[6:].strip()
-            if os.path.isfile(img_path):
-                current_image = _load_image(img_path)
-                print(f"  ✓ {TR('已加载图片', 'Image loaded')}: {img_path}")
-            else:
-                print(f"  ⚠ {TR('找不到图片', 'Image not found')}: {img_path}")
+            import shlex
+            paths = shlex.split(text[6:])
+            if not paths:
+                print(f"  ⚠ {TR('用法', 'Usage')}: //img PATH1 [PATH2 ...]")
+                print()
+                continue
+            for img_path in paths:
+                if os.path.isfile(img_path):
+                    loaded_files.append({"id": _next_id, "path": img_path, "type": "image", "pages": [_load_image(img_path)]})
+                    print(f"  #{_next_id} {TR('已加载图片', 'Image loaded')}: {img_path}")
+                    _next_id += 1
+                else:
+                    print(f"  ⚠ {TR('找不到图片', 'Image not found')}: {img_path}")
             print()
             continue
 
+        if text.startswith("//pdf ") and is_vlm:
+            import shlex
+            paths = shlex.split(text[6:])
+            if not paths:
+                print(f"  ⚠ {TR('用法', 'Usage')}: //pdf PATH1 [PATH2 ...]")
+                print()
+                continue
+            for pdf_path in paths:
+                if os.path.isfile(pdf_path):
+                    pages = _pdf_to_images(pdf_path)
+                    if pages:
+                        loaded_files.append({"id": _next_id, "path": pdf_path, "type": "pdf", "pages": pages})
+                        print(f"  #{_next_id} {TR('已加载 PDF', 'PDF loaded')}: {pdf_path}")
+                        _next_id += 1
+                else:
+                    print(f"  ⚠ {TR('找不到文件', 'File not found')}: {pdf_path}")
+            print()
+            continue
+
+        if text.startswith("//txt "):
+            import shlex
+            paths = shlex.split(text[6:])
+            if not paths:
+                print(f"  ⚠ {TR('用法', 'Usage')}: //txt PATH1 [PATH2 ...]")
+                print()
+                continue
+            for txt_path in paths:
+                if os.path.isfile(txt_path):
+                    file_content = _load_text_file(txt_path)
+                    loaded_files.append({"id": _next_id, "path": txt_path, "type": "text", "content": file_content})
+                    print(f"  #{_next_id} {TR('已加载文件', 'File loaded')}: {txt_path}")
+                    _next_id += 1
+                else:
+                    print(f"  ⚠ {TR('找不到文件', 'File not found')}: {txt_path}")
+            print()
+            continue
+
+        # 构建消息：合并已加载文件与当前输入
+        all_pages = []
+        txt_prefix = ""
+        for f in loaded_files:
+            if f["type"] == "text":
+                fname = os.path.basename(f["path"])
+                txt_prefix += f"[文件 {fname}]\n```\n{f['content']}\n```\n\n"
+            else:
+                all_pages.extend(f["pages"])
+        # 为每张图片插入模型对应的图片占位符
+        if all_pages:
+            img_tag = "<|vision_start|><|image_pad|><|vision_end|>\n"
+            text = img_tag * len(all_pages) + text
+        if txt_prefix:
+            text = txt_prefix + text
         conv.append({"role": "user", "content": text})
         messages = []
         if system:
             messages.append({"role": "system", "content": system})
         messages.extend(conv)
 
+        # 合并所有文件的页面为多张独立图片
+        import numpy as np
+        image_tensors = [ov.Tensor(np.array(img)[None]) for img in all_pages] if all_pages and is_vlm else None
+
         pp = 1.5 if not reasoning else None
         gen_cfg = _make_genai_config(temperature, top_p, top_k, max_tokens, presence_penalty=pp, reasoning=reasoning, tokenizer=pipe.get_tokenizer())
-        t0 = time.time()
-        print(f"  {TR('回复', 'Reply')}:", end=" ", flush=True)
 
+        # VLM prefill 进度指示器
         reply_parts = []
         stop_flag = [False]
-        streamer_callback = _make_streamer(reply_parts, stop_flag)
+        n_vlm_pages = len(all_pages)
+        progress_stop = threading.Event()
+        on_first_token = None
+        if is_vlm and image_tensors and n_vlm_pages > 0:
+            n_vis_tokens = n_vlm_pages * (max(img.width * img.height for img in all_pages) // (32 * 32))
+            _t_prefill_start = time.time()
+            def _on_first():
+                progress_stop.set()
+                pt = time.time() - _t_prefill_start
+                print(f"\r  \u2713 {TR('视觉编码 + prefill 完成', 'Vision + prefill done')} ({pt:.1f}s, ~{n_vis_tokens} tok)  ")
+                print(f"  {TR('回复', 'Reply')}:", end=" ", flush=True)
+            on_first_token = _on_first
+            def _show_progress():
+                while not progress_stop.is_set():
+                    elapsed = time.time() - _t_prefill_start
+                    print(f"\r  \u23f3 {TR('正在处理', 'Processing')} {n_vlm_pages} {TR('页', 'pages')}... ({elapsed:.0f}s)", end="", flush=True)
+                    progress_stop.wait(1.0)
+            threading.Thread(target=_show_progress, daemon=True).start()
 
+        streamer_callback = _make_streamer(reply_parts, stop_flag, on_first_token)
+
+        t0 = time.time()
         old_handler = signal.signal(signal.SIGINT, lambda s, f: stop_flag.__setitem__(0, True))
         try:
             prompt = _build_prompt(messages, pipe.get_tokenizer(), reasoning)
             kwargs = {"generation_config": gen_cfg, "streamer": streamer_callback}
-            if is_vlm:
-                if current_image is not None:
-                    kwargs["image"] = current_image
-                pipe.generate(prompt, **kwargs)
-            else:
-                pipe.generate(prompt, gen_cfg, streamer_callback)
+            if is_vlm and image_tensors is not None:
+                kwargs["images"] = image_tensors
+            pipe.generate(prompt, **kwargs)
         except RuntimeError as e:
             err = str(e)
             if "reshape" in err:
@@ -857,9 +1203,7 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
             conv.append({"role": "assistant", "content": reply_text + TR(" [已中断]", " [Interrupted]")})
         else:
             conv.append({"role": "assistant", "content": reply_text})
-        # 图片用完即清
-        if current_image is not None:
-            current_image = None
+        # 图片/PDF 保留在上下文中
         char_count = len(reply_text.replace(" ", ""))
         tok_count = _count_tokens(ctx, reply_text)
         print()

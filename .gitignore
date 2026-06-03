@@ -14,6 +14,7 @@ model/
 optimum-intel-main/
 # 开发日志
 report/
+test/
 
 # IDE
 .vscode/
