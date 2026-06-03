@@ -13,6 +13,8 @@
 
 **OpenVINO LLM 命令行工具** — 轻量、离线、CPU/GPU 皆可运行。
 
+> 💡 **切换英文界面**：所有命令前加 `--lang en`，例如 `./ov-cli --lang en chat --model ./model-ov`
+
 基于 Optimum Intel + OpenVINO GenAI 推理引擎。支持模型转换（7 种量化格式）、交互式聊天（流式/翻译/图片）、OpenAI 兼容 API 服务。
 
 ## 快速开始
