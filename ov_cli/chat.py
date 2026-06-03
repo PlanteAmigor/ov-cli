@@ -9,12 +9,50 @@ ov-cli chat: LLM 聊天/翻译终端。
 import os, sys, time, json, signal
 import openvino as ov
 import openvino_genai as ov_genai
+from wcwidth import wcwidth, wcswidth
 
 
-# ── Gemma-4 补丁 ────────────────────────────────────────────
-# model_patcher.py 中 gemma4_text_attention_forward 引用了不存在的
-# self.kv_shared_layer_index，已直接修改库文件将其替换为 self.layer_type。
-# 如果重装 optimum-intel 后需要重新应用此补丁。
+# 翻译语言映射：代码 → (中文名, 英文名)
+TRANSLATE_LANGS = {
+    "zh":   ("中文",     "Chinese"),
+    "en":   ("英语",     "English"),
+    "ja":   ("日语",     "Japanese"),
+    "ko":   ("韩语",     "Korean"),
+    "fr":   ("法语",     "French"),
+    "de":   ("德语",     "German"),
+    "es":   ("西班牙语", "Spanish"),
+    "pt":   ("葡萄牙语", "Portuguese"),
+    "ru":   ("俄语",     "Russian"),
+    "ar":   ("阿拉伯语", "Arabic"),
+    "it":   ("意大利语", "Italian"),
+    "tr":   ("土耳其语", "Turkish"),
+    "th":   ("泰语",     "Thai"),
+    "vi":   ("越南语",   "Vietnamese"),
+    "ms":   ("马来语",   "Malay"),
+    "id":   ("印尼语",   "Indonesian"),
+    "tl":   ("菲律宾语", "Filipino"),
+    "hi":   ("印地语",   "Hindi"),
+    "pl":   ("波兰语",   "Polish"),
+    "cs":   ("捷克语",   "Czech"),
+    "nl":   ("荷兰语",   "Dutch"),
+    "km":   ("高棉语",   "Khmer"),
+    "my":   ("缅甸语",   "Burmese"),
+    "fa":   ("波斯语",   "Persian"),
+    "gu":   ("古吉拉特语", "Gujarati"),
+    "ur":   ("乌尔都语", "Urdu"),
+    "te":   ("泰卢固语", "Telugu"),
+    "mr":   ("马拉地语", "Marathi"),
+    "he":   ("希伯来语", "Hebrew"),
+    "bn":   ("孟加拉语", "Bengali"),
+    "ta":   ("泰米尔语", "Tamil"),
+    "uk":   ("乌克兰语", "Ukrainian"),
+    "bo":   ("藏语",     "Tibetan"),
+    "kk":   ("哈萨克语", "Kazakh"),
+    "mn":   ("蒙古语",   "Mongolian"),
+    "ug":   ("维吾尔语", "Uyghur"),
+    "yue":  ("粤语",     "Cantonese"),
+    "zh-Hant": ("繁体中文", "Traditional Chinese"),
+}
 
 
 def _make_streamer(reply_parts, stop_flag):
@@ -191,18 +229,15 @@ _in_readline = False
 
 
 def _char_width(ch):
-    cp = ord(ch)
-    if cp < 0x80:
-        return 1
-    if 0x4E00 <= cp <= 0x9FFF or 0x3000 <= cp <= 0x303F or 0xFF00 <= cp <= 0xFFEF:
-        return 2
-    return 1
+    return max(wcwidth(ch), 1)
 
 
 def _total_width(chars, start=0, end=None):
     if end is None:
         end = len(chars)
-    return sum(_char_width(c) for c in chars[start:end])
+    if start >= end:
+        return 0
+    return wcswidth("".join(chars[start:end]))
 
 
 def _move_cursor(delta):
@@ -837,7 +872,22 @@ def _run_translate_genai(ctx, max_tokens):
     pipe = ctx["pipe"]
     t_zh = ctx["t_zh"]
     t_en = ctx["t_en"]
+    import ov_cli as _ov
     from ov_cli import TR
+
+    # 构建语言列表（按代码排序，常用语言排前）
+    lang_codes = sorted(TRANSLATE_LANGS.keys(), key=lambda c: (0, c) if c in ("zh","en","ja","ko","fr","de","es","pt","ru","ar","it","tr","th","vi") else (1, c))
+    lang_items = []
+    for c in lang_codes:
+        zh_name, en_name = TRANSLATE_LANGS[c]
+        name = TR(zh_name, en_name)
+        lang_items.append(f"{c}={name}")
+    # 每行 4 列
+    lang_lines = []
+    for i in range(0, len(lang_items), 4):
+        row = lang_items[i:i+4]
+        lang_lines.append("  " + "  ".join(f"{item:16s}" for item in row))
+    lang_display = "\n".join(lang_lines)
 
     print()
     print("        ██████╗ ██╗   ██╗     ██████╗██╗     ██╗")
@@ -851,8 +901,8 @@ def _run_translate_genai(ctx, max_tokens):
     print(f"  {TR('设备', 'Device')}: {ctx['device']} | OpenVINO")
     print("=" * 50)
     print("  " + TR("直接输入文本 → 自动检测翻译方向", "Type text → auto detect language"))
-    print("  //en " + TR("文本 → 强制译英", "text → force English"))
-    print("  //zh " + TR("文本 → 强制译中", "text → force Chinese"))
+    print("  //" + TR("语言代码 文本 → 指定目标语言", "lang_code text → force target language"))
+    print(f"  " + TR("支持语言", "Supported codes") + f":\n{lang_display}")
     print("  /help " + TR("→ 帮助", "→ help"))
     print("  /exit " + TR("→ 退出", "→ quit"))
     print("=" * 50)
@@ -869,29 +919,50 @@ def _run_translate_genai(ctx, max_tokens):
         if text in ("/exit", "exit", TR("退出", "exit")):
             break
         if text in ("/help", "help", TR("帮助", "help")):
-            print("  //en " + TR("文本 → 强制译英", "text → force English"))
-            print("  //zh " + TR("文本 → 强制译中", "text → force Chinese"))
+            print("  //" + TR("语言代码 文本 → 指定目标语言", "lang_code text → force target language"))
+            print("  " + TR("例如", "e.g.") + ": //ja おはよう, //fr Bonjour")
             print("  /exit " + TR("退出", "quit"))
             print()
             continue
 
         force_target = None
-        if text.startswith("//en "):
-            force_target = TR("英语", "English")
-            text = text[5:]
-        elif text.startswith("//zh "):
-            force_target = TR("中文", "Chinese")
-            text = text[5:]
+        if text.startswith("//") and len(text) > 2:
+            # 尝试解析 //语言代码 文本
+            space_pos = text.find(" ", 2)
+            if space_pos > 2:
+                code = text[2:space_pos]
+                rest = text[space_pos+1:]
+            elif text[2:].isalpha() and text[2:].isascii():
+                code = text[2:]
+                rest = ""
+            else:
+                code = None
+                rest = text
+
+            if code and code in TRANSLATE_LANGS:
+                zh_name, en_name = TRANSLATE_LANGS[code]
+                force_target = TR(zh_name, en_name)
+                text = rest
+            elif code and code.isalpha() and code.isascii():
+                # 未知但看起来像语言代码，直接作为目标语言名
+                force_target = code
+                text = rest
+            else:
+                print("  ⚠ " + TR("未知语言代码。可用 /help 查看支持的语言", "Unknown language code. Use /help for supported codes"))
+                continue
         elif text.startswith("//"):
-            print("  ⚠ " + TR("未知指令，可用 //en 或 //zh", "Unknown command, use //en or //zh"))
+            print("  ⚠ " + TR("未知指令", "Unknown command"))
             continue
 
         if force_target:
             target = force_target
-        elif has_chinese(text):
-            target = TR("英语", "English")
+        elif _ov._LANG == "en":
+            # 英文界面：默认目标语言为英语
+            _, en_name = TRANSLATE_LANGS["en"]
+            target = TR(TRANSLATE_LANGS["en"][0], en_name)
         else:
-            target = TR("中文", "Chinese")
+            # 中文界面：默认目标语言为中文
+            target = TR(TRANSLATE_LANGS["zh"][0], TRANSLATE_LANGS["zh"][1])
 
         prompt = t_zh.format(target=target, text=text) if has_chinese(text) else t_en.format(target=target, text=text)
         gen_cfg = _make_genai_config(temperature=0, max_tokens=max_tokens, reasoning=True, tokenizer=pipe.get_tokenizer())
