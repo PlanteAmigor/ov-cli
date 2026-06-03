@@ -13,6 +13,8 @@
 
 **OpenVINO LLM CLI Tool** — Lightweight, offline LLM inference on CPU & GPU.
 
+> 💡 **Switch to Chinese UI**: Prefix any command with `--lang zh`, e.g. `./ov-cli --lang zh chat --model ./model-ov`
+
 Built on Optimum Intel + OpenVINO GenAI. Features: model conversion (7 quantization formats), interactive chat (streaming, translation, VLM), OpenAI-compatible API server.
 
 ## Quick Start
