@@ -23,6 +23,7 @@ dependencies = [
     "huggingface-hub",
     "safetensors",
     "sentencepiece",
+    "wcwidth",
 ]
 
 [project.scripts]
