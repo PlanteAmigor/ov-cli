@@ -60,12 +60,10 @@ def _apply_gemma4_patch():
     """自动修复 optimum-intel 中 Gemma-4 共享 KV 层的属性引用错误。
 
     model_patcher.py 的 gemma4_text_attention_forward 引用了不存在的
-    self.kv_shared_layer_index，应使用 self.layer_type（与 transformers 5.9.0
-    的 Gemma4TextAttention 实际 API 一致）。
+    self.kv_shared_layer_index。需要在运行时根据 layer_type 动态计算
+    对应的非共享层索引（transformers 5.x 的 Gemma4TextAttention 实际 API）。
     """
-    import re
     patcher_path = None
-    # 查找已安装的 model_patcher.py
     try:
         import optimum.exporters.openvino.model_patcher as mp  # type: ignore[reportMissingImports]
         patcher_path = mp.__file__
@@ -73,13 +71,22 @@ def _apply_gemma4_patch():
         pass
 
     if not patcher_path or not os.path.isfile(patcher_path):
-        return  # optimum-intel 未安装，跳过
+        return
 
     with open(patcher_path) as f:
         content = f.read()
 
-    old = "self.kv_shared_layer_index"
-    new = "self.layer_type"
+    old_line = "    if self.is_kv_shared_layer and past_key_values is not None:"
+    new_lines = """    if self.is_kv_shared_layer and past_key_values is not None:
+        # kv_shared_layer_index 需要在运行时计算
+        if not hasattr(self, "kv_shared_layer_index"):
+            first_shared = self.config.num_hidden_layers - getattr(self.config, "num_kv_shared_layers", 0)
+            prev_types = self.config.layer_types[:first_shared]
+            self.kv_shared_layer_index = len(prev_types) - 1 - prev_types[::-1].index(self.layer_type)
+        key_states, value_states = past_key_values.shared_layers[self.kv_shared_layer_index]"""
+
+    old = old_line + "\n        key_states, value_states = past_key_values.shared_layers[self.kv_shared_layer_index]"
+    new = old_line + new_lines
     if old in content:
         content = content.replace(old, new)
         with open(patcher_path, "w") as f:
@@ -87,10 +94,54 @@ def _apply_gemma4_patch():
         print(f"  ✓ {TR('Gemma-4 补丁已应用', 'Gemma-4 patch applied')}: {os.path.basename(patcher_path)}")
     else:
         # 检查是否已经是修复后的版本
-        if "past_key_values.shared_layers[self.layer_type]" in content:
+        if "hasattr(self, \"kv_shared_layer_index\")" in content:
             print(f"  ✓ {TR('Gemma-4 补丁已存在', 'Gemma-4 patch already applied')}")
         else:
             print(f"  - {TR('Gemma-4 补丁不需要或已不适用', 'Gemma-4 patch not needed or N/A')}")
+
+
+def _apply_qwen35_patch():
+    """自动修复 optimum-intel 中 Qwen3.5 的 DynamicCache 导入错误。
+
+    transformers 5.9 将 Qwen3_5DynamicCache 合并到了通用的 DynamicCache
+    （transformers.cache_utils），optimum-intel 仍从旧路径导入。
+    """
+    patcher_path = None
+    try:
+        import optimum.exporters.openvino.model_patcher as mp
+        patcher_path = mp.__file__
+    except (ImportError, AttributeError, ModuleNotFoundError):
+        pass
+
+    if not patcher_path or not os.path.isfile(patcher_path):
+        return
+
+    with open(patcher_path) as f:
+        content = f.read()
+
+    old = "from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5DynamicCache"
+    new = "from transformers.cache_utils import DynamicCache as Qwen3_5DynamicCache"
+    patched = False
+    if old in content:
+        content = content.replace(old, new)
+        patched = True
+
+    # 还要补上 layer_types 属性（DynamicCache 没有这个成员）
+    old2 = "super().__init__(config=config)\n\n                self.conv_states"
+    new2 = "super().__init__(config=config)\n                self.layer_types = config.layer_types\n\n                self.conv_states"
+    if old2 in content:
+        content = content.replace(old2, new2)
+        patched = True
+
+    if patched:
+        with open(patcher_path, "w") as f:
+            f.write(content)
+        print(f"  ✓ {TR('Qwen3.5 补丁已应用', 'Qwen3.5 patch applied')}: {os.path.basename(patcher_path)}")
+    else:
+        if new in content:
+            print(f"  ✓ {TR('Qwen3.5 补丁已存在', 'Qwen3.5 patch already applied')}")
+        else:
+            print(f"  - {TR('Qwen3.5 补丁不需要或已不适用', 'Qwen3.5 patch not needed or N/A')}")
 
 
 def _is_windows():
@@ -247,6 +298,9 @@ def cmd_setup(args):
         "tokenizers",
         "fastapi>=0.100",
         "uvicorn[standard]>=0.20",
+        "accelerate",
+        "wcwidth",
+        "PyMuPDF",
     ]
     cmd = [pip, "install", "-v"] + pkgs
     subprocess.check_call(cmd)
@@ -270,6 +324,9 @@ def cmd_setup(args):
 
     # 应用 Gemma-4 补丁（修改 model_patcher.py 中不存在的属性引用）
     _apply_gemma4_patch()
+
+    # 应用 Qwen3.5 补丁（transformers 5.9 中 Qwen3_5DynamicCache → DynamicCache）
+    _apply_qwen35_patch()
 
     # 自动配置 VS Code 工作区设置
     _ensure_vscode_settings(venv_path)
@@ -589,10 +646,15 @@ def main():
         description=TR(
             "加载 OpenVINO 模型并启动交互终端。支持聊天和翻译两种模式。\n"
             "\n"
-            "聊天模式 (VLM 支持图片):\n"
-            "  • --image PATH  启动时加载图片\n"
-            "  • //img PATH    对话中加载/切换图片\n"
-            "  • 流式输出 + tok/s 性能统计\n"
+            "聊天模式 (VLM 支持图片和 PDF):\n"
+            "  • //img PATH  加载图片（支持多文件）\n"
+            "  • //pdf PATH  加载 PDF（自动转图片，最多 24 页）\n"
+            "  • //txt PATH  加载文本文件（支持多文件）\n"
+            "  • /file       查看已加载文件\n"
+            "  • /clear [ids] 清空上下文或指定文件 ID\n"
+            "  • /temp N     调节温度\n"
+            "  • /system T   设置系统提示词\n"
+            "  • 流式输出 + visual token 统计\n"
             "\n"
             "翻译模式 (仅 Hy-MT2 等翻译模型):\n"
             "  • 自动检测语言方向 (中↔英)\n"
@@ -604,10 +666,15 @@ def main():
             "  top-k        仅从概率最高的 k 个 token 中采样",
             "Load an OpenVINO model and start an interactive terminal.\n"
             "\n"
-            "Chat mode (VLM supports images):\n"
-            "  • --image PATH  load image at startup\n"
-            "  • //img PATH    load/switch image during chat\n"
-            "  • Streaming output + tok/s stats\n"
+            "Chat mode (VLM supports images & PDFs):\n"
+            "  • //img PATH  load image(s)\n"
+            "  • //pdf PATH  load PDF (auto-convert to images, max 24 pages)\n"
+            "  • //txt PATH  load text file(s)\n"
+            "  • /file       list loaded files\n"
+            "  • /clear [ids] clear context or specific files by ID\n"
+            "  • /temp N     set temperature\n"
+            "  • /system T   set system prompt\n"
+            "  • Streaming + visual token stats\n"
             "\n"
             "Translate mode (Hy-MT2 and similar):\n"
             "  • Auto-detect language direction (Chinese↔English)\n"
