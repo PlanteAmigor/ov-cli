@@ -33,6 +33,22 @@ eval "$(./ov-cli venv)"
 ./ov-cli server --model ./Qwen3/2B-ov
 ```
 
+## How to Upgrade
+
+```bash
+# Pull latest code
+git pull
+
+# Running any command will auto-detect version changes:
+# ⚠ Version changed (0.0.0 → 0.1.0), run:
+#    ./ov-cli setup --fix
+
+# Fix mode upgrades deps + reapplies patches in seconds
+./ov-cli setup --fix
+```
+
+Fix mode (`setup --fix`) only upgrades package versions and reapplies patches — no redundant downloads.
+
 ## Commands
 
 ### `setup` — Create Environment
@@ -45,12 +61,19 @@ applies Gemma-4 shared KV layer patch automatically.
 ./ov-cli setup                          # default ./.venv (interactive mode selection)
 ./ov-cli setup --venv ./my-venv         # custom path
 ./ov-cli setup --optimum-dir ./optimum-intel-main
+./ov-cli setup --fix                    # fix mode (no rebuild, upgrade + repatch)
 ```
 
 **Mode selection** (interactive):
 1. **Simple mode** — pip install only. `--reasoning off` has no effect on thinking models.
 2. **Full mode** — compiles modified GenAI from source to enable thinking budget
    (logit-level `</think>` forcing).
+
+**Version detection**: After `git pull`, running any command will auto-detect version
+changes and suggest `./ov-cli setup --fix` for a quick fix.
+
+**Fix mode** (`--fix`): Skips venv recreation, only upgrades dependencies and
+reapplies patches. Takes seconds — ideal for version updates or patch fixes.
 
 ### `venv` — Enter Virtual Environment
 

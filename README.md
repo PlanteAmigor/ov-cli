@@ -33,6 +33,22 @@ eval "$(./ov-cli venv)"
 ./ov-cli server --model ./Qwen3/2B-ov
 ```
 
+## 如何升级
+
+```bash
+# 拉取最新代码
+git pull
+
+# 运行任意命令时会自动检测版本变化并提示：
+# ⚠ 检测到版本变化 (0.0.0 → 0.1.0)，建议运行:
+#    ./ov-cli setup --fix
+
+# 使用修复模式快速升级（不重建 venv，数秒完成）
+./ov-cli setup --fix
+```
+
+升级模式 (`setup --fix`) 仅升级依赖版本和重打补丁，不下重复的包。
+
 ## 命令
 
 ### `setup` — 创建环境
@@ -45,12 +61,19 @@ eval "$(./ov-cli venv)"
 ./ov-cli setup                          # 默认 ./.venv（交互选择安装模式）
 ./ov-cli setup --venv ./my-venv         # 指定路径
 ./ov-cli setup --optimum-dir ./optimum-intel-main  # 指定 optimum 源码
+./ov-cli setup --fix                    # 修复环境（不重建，仅升级+重打补丁）
 ```
 
 **模式选择**（交互式，由 `setup` 提示）：
 1. **简易模式** — pip 安装，日常使用。`--reasoning off` 对思考型模型无效。
 2. **完整模式** — 从源码编译 OpenVINO GenAI 以启用 thinking budget 功能
    （logit 级别的 `</think>` 强制结束思考）。
+
+**版本检测**：`git pull` 更新代码后运行任意命令会自动检测版本变化，
+提示执行 `./ov-cli setup --fix` 快速修复。
+
+**修复模式** (`--fix`)：不重建虚拟环境，仅升级依赖、重打补丁，
+适用于版本更新或补丁修复，数秒完成。
 
 ### `venv` — 进入虚拟环境
 
