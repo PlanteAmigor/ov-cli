@@ -324,7 +324,7 @@ def cmd_setup(args):
             else:
                 subprocess.check_call([pip, "install", "--upgrade",
                                        "optimum-intel@git+https://github.com/huggingface/optimum-intel.git"])
-            subprocess.check_call([pip, "install", "--upgrade", "--no-deps", "transformers>=5.9"])
+            subprocess.check_call([pip, "install", "--upgrade", "--no-deps", "transformers"])
             _apply_gemma4_patch()
             _apply_qwen35_patch()
             _write_version_stamp(venv_path)
@@ -438,7 +438,7 @@ def cmd_setup(args):
 
         # 强制安装最新版 transformers（--no-deps 避免 optimum-intel 的 <5.1 约束降级）
         print(f"  {TR('安装 transformers (no-deps)...', 'Installing transformers (no-deps)...')}")
-        subprocess.check_call([pip, "install", "--no-deps", "--force-reinstall", "transformers>=5.9"])
+        subprocess.check_call([pip, "install", "--no-deps", "--force-reinstall", "transformers"])
     except KeyboardInterrupt:
         print()
         print(f"  {TR('安装已取消', 'Setup cancelled')}")
@@ -711,7 +711,7 @@ def main():
             "  • openvino / openvino-tokenizers   推理引擎\n"
             "  • openvino-genai                  GenAI 管道\n"
             "  • nncf                           模型量化\n"
-            "  • transformers 5.2 / tokenizers   分词与模板\n"
+            "  • transformers (最新) / tokenizers   分词与模板\n"
             "  • optimum-intel                  官方导出工具\n"
             "  • torch                          模型加载 (转换用)\n"
             "  • fastapi / uvicorn              HTTP 服务（预留）",
@@ -719,7 +719,7 @@ def main():
             "  • openvino / openvino-tokenizers  inference engine\n"
             "  • openvino-genai                  GenAI pipeline\n"
             "  • nncf                            model quantization\n"
-            "  • transformers 5.2 / tokenizers   tokenization & templates\n"
+            "  • transformers (latest) / tokenizers   tokenization & templates\n"
             "  • optimum-intel                   official export tool\n"
             "  • torch                           model loading (convert)\n"
             "  • fastapi / uvicorn               HTTP server (reserved)",
