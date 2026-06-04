@@ -26,8 +26,8 @@ from pydantic import BaseModel
 
 # FastAPI / uvicorn 按需安装
 try:
-    from fastapi import FastAPI, HTTPException, Request, Response, StreamingResponse
-    from fastapi.responses import HTMLResponse, JSONResponse
+    from fastapi import FastAPI, HTTPException, Request, Response
+    from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 except ImportError:
     raise ImportError(
         "需要安装 fastapi + uvicorn:\n"
