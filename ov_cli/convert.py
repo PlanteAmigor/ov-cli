@@ -73,7 +73,7 @@ def _ensure_transformers(model_type):
 
 
 def _restore_transformers():
-    """转换完成后恢复 transformers 到 5.9。"""
+    """转换完成后恢复 transformers 到最新版。"""
     try:
         cur_ver = subprocess.check_output(
             [sys.executable, "-c", "import transformers; print(transformers.__version__)"],
@@ -81,12 +81,16 @@ def _restore_transformers():
         ).strip()
     except Exception:
         return
-    if cur_ver.startswith("5.9") or cur_ver.startswith("5.") and int(cur_ver.split(".")[1]) >= 9:
+    # 当前版本已 >= 5.9 则跳过（不需要降级过）
+    parts = cur_ver.split(".")
+    if len(parts) >= 2 and int(parts[0]) >= 6:
         return
-    print(f"  ⚡ 恢复 transformers 5.9...")
+    if len(parts) >= 2 and int(parts[0]) == 5 and int(parts[1]) >= 9:
+        return
+    print(f"  ⚡ 恢复 transformers 到最新版...")
     subprocess.check_call(
         [sys.executable, "-m", "pip", "install", "--no-deps", "--force-reinstall",
-         "transformers>=5.9"],
+         "transformers"],
         timeout=120,
     )
     new_ver = subprocess.check_output(
