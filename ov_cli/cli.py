@@ -263,7 +263,12 @@ def cmd_setup(args):
         sys.exit(1)
 
     genai_src = os.path.join(workspace, "openvino.genai-2026.2.0.0-optimization")
-    mode = _prompt_mode(os.path.isdir(genai_src))
+    try:
+        mode = _prompt_mode(os.path.isdir(genai_src))
+    except KeyboardInterrupt:
+        print()
+        print(f"  {TR('安装已取消', 'Setup cancelled')}")
+        sys.exit(1)
 
     if mode == 2:
         print()
@@ -289,8 +294,10 @@ def cmd_setup(args):
         r = input(f"  {TR('是否继续?', 'Continue?')} [y/N]: ")
         if r.strip().lower() != "y":
             mode = 1
-    except EOFError:
-        mode = 1
+    except (EOFError, KeyboardInterrupt):
+        print()
+        print(f"  {TR('安装已取消', 'Setup cancelled')}")
+        sys.exit(1)
 
     # 检查系统依赖
     import subprocess, sys as _sys
@@ -304,53 +311,58 @@ def cmd_setup(args):
             print(f"  {TR('请执行:', 'Run:')} sudo apt install {_hint}")
             sys.exit(1)
 
-    venv_path = args.venv or os.path.join(workspace, ".venv")
-    print(f"  {TR('创建虚拟环境', 'Creating venv')}: {venv_path}")
-    subprocess.check_call([_sys.executable, "-m", "venv", venv_path, "--clear"])
-    pip = _pip_path(venv_path)
-    print(f"  {TR('安装依赖...', 'Installing dependencies...')}")
-    # 先装 CPU-only torch（避免拉 CUDA 全家桶 ~3.4G）
-    subprocess.check_call([pip, "install", "-v",
-                           "torch", "torchvision",
-                           "--index-url", "https://download.pytorch.org/whl/cpu"])
+    try:
+        venv_path = args.venv or os.path.join(workspace, ".venv")
+        print(f"  {TR('创建虚拟环境', 'Creating venv')}: {venv_path}")
+        subprocess.check_call([_sys.executable, "-m", "venv", venv_path, "--clear"])
+        pip = _pip_path(venv_path)
+        print(f"  {TR('安装依赖...', 'Installing dependencies...')}")
+        # 先装 CPU-only torch（避免拉 CUDA 全家桶 ~3.4G）
+        subprocess.check_call([pip, "install", "-v",
+                               "torch", "torchvision",
+                               "--index-url", "https://download.pytorch.org/whl/cpu"])
 
-    pkgs = [
-        "openvino>=2026.2",
-        "openvino-tokenizers",
-        "openvino-genai",
-        "nncf>=3.0",
-        "pillow",
-        "numpy",
-        "jinja2",
-        "huggingface-hub",
-        "safetensors",
-        "sentencepiece",
-        "tokenizers",
-        "fastapi>=0.100",
-        "uvicorn[standard]>=0.20",
-        "accelerate",
-        "wcwidth",
-        "PyMuPDF",
-    ]
-    cmd = [pip, "install", "-v"] + pkgs
-    subprocess.check_call(cmd)
+        pkgs = [
+            "openvino>=2026.2",
+            "openvino-tokenizers",
+            "openvino-genai",
+            "nncf>=3.0",
+            "pillow",
+            "numpy",
+            "jinja2",
+            "huggingface-hub",
+            "safetensors",
+            "sentencepiece",
+            "tokenizers",
+            "fastapi>=0.100",
+            "uvicorn[standard]>=0.20",
+            "accelerate",
+            "wcwidth",
+            "PyMuPDF",
+        ]
+        cmd = [pip, "install", "-v"] + pkgs
+        subprocess.check_call(cmd)
 
-    # 安装最新版 optimum-intel（必须从 GitHub 源码装，PyPI 版对新架构支持不完善）
-    _optimum_src = args.optimum_dir
-    if _optimum_src:
-        _optimum_src = os.path.abspath(_optimum_src)
-    if not _optimum_src or not os.path.isdir(_optimum_src):
-        _optimum_src = os.path.join(workspace, "optimum-intel-main")
-    if os.path.isdir(_optimum_src):
-        print(f"  {TR('安装 optimum-intel (本地源码)...', 'Installing optimum-intel (local)...')}: {_optimum_src}")
-        subprocess.check_call([pip, "install", _optimum_src])
-    else:
-        print(f"  {TR('安装 optimum-intel (GitHub)...', 'Installing optimum-intel (GitHub)...')}")
-        subprocess.check_call([pip, "install", "optimum-intel@git+https://github.com/huggingface/optimum-intel.git"])
+        # 安装最新版 optimum-intel（必须从 GitHub 源码装，PyPI 版对新架构支持不完善）
+        _optimum_src = args.optimum_dir
+        if _optimum_src:
+            _optimum_src = os.path.abspath(_optimum_src)
+        if not _optimum_src or not os.path.isdir(_optimum_src):
+            _optimum_src = os.path.join(workspace, "optimum-intel-main")
+        if os.path.isdir(_optimum_src):
+            print(f"  {TR('安装 optimum-intel (本地源码)...', 'Installing optimum-intel (local)...')}: {_optimum_src}")
+            subprocess.check_call([pip, "install", _optimum_src])
+        else:
+            print(f"  {TR('安装 optimum-intel (GitHub)...', 'Installing optimum-intel (GitHub)...')}")
+            subprocess.check_call([pip, "install", "optimum-intel@git+https://github.com/huggingface/optimum-intel.git"])
 
-    # 强制安装最新版 transformers（--no-deps 避免 optimum-intel 的 <5.1 约束降级）
-    print(f"  {TR('安装 transformers (no-deps)...', 'Installing transformers (no-deps)...')}")
-    subprocess.check_call([pip, "install", "--no-deps", "--force-reinstall", "transformers>=5.9"])
+        # 强制安装最新版 transformers（--no-deps 避免 optimum-intel 的 <5.1 约束降级）
+        print(f"  {TR('安装 transformers (no-deps)...', 'Installing transformers (no-deps)...')}")
+        subprocess.check_call([pip, "install", "--no-deps", "--force-reinstall", "transformers>=5.9"])
+    except KeyboardInterrupt:
+        print()
+        print(f"  {TR('安装已取消', 'Setup cancelled')}")
+        sys.exit(1)
 
     # 应用 Gemma-4 补丁（修改 model_patcher.py 中不存在的属性引用）
     _apply_gemma4_patch()
