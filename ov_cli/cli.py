@@ -153,49 +153,6 @@ def _apply_gemma4_patch():
             print(f"  - {TR('Gemma-4 补丁不需要或已不适用', 'Gemma-4 patch not needed or N/A')}")
 
 
-def _apply_qwen35_patch():
-    """自动修复 optimum-intel 中 Qwen3.5 的 DynamicCache 导入错误。
-
-    transformers 5.9 将 Qwen3_5DynamicCache 合并到了通用的 DynamicCache
-    （transformers.cache_utils），optimum-intel 仍从旧路径导入。
-    """
-    patcher_path = None
-    try:
-        import optimum.exporters.openvino.model_patcher as mp
-        patcher_path = mp.__file__
-    except (ImportError, AttributeError, ModuleNotFoundError):
-        pass
-
-    if not patcher_path or not os.path.isfile(patcher_path):
-        return
-
-    with open(patcher_path) as f:
-        content = f.read()
-
-    old = "from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5DynamicCache"
-    new = "from transformers.cache_utils import DynamicCache as Qwen3_5DynamicCache"
-    patched = False
-    if old in content:
-        content = content.replace(old, new)
-        patched = True
-
-    # 还要补上 layer_types 属性（DynamicCache 没有这个成员）
-    old2 = "super().__init__(config=config)\n\n                self.conv_states"
-    new2 = "super().__init__(config=config)\n                self.layer_types = config.layer_types\n\n                self.conv_states"
-    if old2 in content:
-        content = content.replace(old2, new2)
-        patched = True
-
-    if patched:
-        with open(patcher_path, "w") as f:
-            f.write(content)
-        print(f"  ✓ {TR('Qwen3.5 补丁已应用', 'Qwen3.5 patch applied')}: {os.path.basename(patcher_path)}")
-    else:
-        if new in content:
-            print(f"  ✓ {TR('Qwen3.5 补丁已存在', 'Qwen3.5 patch already applied')}")
-        else:
-            print(f"  - {TR('Qwen3.5 补丁不需要或已不适用', 'Qwen3.5 patch not needed or N/A')}")
-
 
 def _is_windows():
     return sys.platform == "win32"
@@ -326,7 +283,6 @@ def cmd_setup(args):
                                        "optimum-intel@git+https://github.com/huggingface/optimum-intel.git"])
             subprocess.check_call([pip, "install", "--upgrade", "--no-deps", "transformers"])
             _apply_gemma4_patch()
-            _apply_qwen35_patch()
             _write_version_stamp(venv_path)
             print(f"  {TR('✅ 修复完成', '✅ Fix done')}")
         except KeyboardInterrupt:
@@ -446,9 +402,6 @@ def cmd_setup(args):
 
     # 应用 Gemma-4 补丁（修改 model_patcher.py 中不存在的属性引用）
     _apply_gemma4_patch()
-
-    # 应用 Qwen3.5 补丁（transformers 5.9 中 Qwen3_5DynamicCache → DynamicCache）
-    _apply_qwen35_patch()
 
     # 自动配置 VS Code 工作区设置
     _ensure_vscode_settings(venv_path)
