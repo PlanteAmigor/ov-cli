@@ -345,7 +345,7 @@ async def _stream_chat(request_id: str, model_path: str, device: str,
 
     thread = threading.Thread(target=run_generate, daemon=True)
     with _running_task_lock:
-        _running_tasks[task_id] = thread
+        _running_tasks[task_id] = {"thread": thread, "stop_flag": stop_flag}
     thread.start()
 
     try:
@@ -630,7 +630,7 @@ def create_app(model_path: str, device: str = "", host: str = "0.0.0.0", port: i
     async def stop_generation(req: ControlRequest):
         with _running_task_lock:
             if req.task_id in _running_tasks:
-                pass
+                _running_tasks[req.task_id]["stop_flag"][0] = True
         return {"status": "stopped"}
 
     # ── 根路径 / 前端（未部署 UI 时返回提示） ──
