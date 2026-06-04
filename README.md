@@ -29,7 +29,10 @@ eval "$(./ov-cli venv)"
 # 3. 聊天终端
 ./ov-cli chat --model ./Qwen3/2B-ov
 
-# 4. API 服务
+# 4. 文生图
+./ov-cli generate --model ./FLUX/ov-int4
+
+# 5. API 服务
 ./ov-cli server --model ./Qwen3/2B-ov
 ```
 
@@ -222,6 +225,31 @@ EOF
 ./ov-cli benchmark --model ./Qwen3.6/35B-A3B-ov --reasoning off
 ```
 
+### `generate` — 文生图
+
+使用 OpenVINO GenAI Text2ImagePipeline 生成图片，支持交互式和单次模式。
+
+```bash
+# 交互式（多轮生图）
+./ov-cli generate --model ./FLUX/ov-int4
+
+# 单次（输出完自动退出）
+./ov-cli generate --model ./FLUX/ov-int4 --mode once --prompt "cat" -o cat.png
+```
+
+**终端内命令**（仅交互模式）：
+
+| 命令 | 说明 |
+|------|------|
+| `/size W H` | 设置分辨率 (默认 512x512) |
+| `/steps N` | 推理步数 (默认 4) |
+| `/guidance F` | guidance scale (默认 0.0) |
+| `/seed [N]` | 设置/重置随机种子 |
+| `/save DIR` | 设置输出目录 |
+| `/history` | 查看已生成的图片 |
+| `/help` | 帮助 |
+| `/exit` | 退出 |
+
 ## 模型支持
 
 ### 两种推理格式
@@ -304,6 +332,7 @@ ov-cli/
 │   ├── cli.py               # CLI 参数解析 + 命令分发 + setup
 │   ├── chat.py              # 聊天/翻译终端（GenAI + Optimum）
 │   ├── convert.py           # 模型转换（7 种量化）
+│   ├── generate.py          # 文生图终端
 │   ├── server.py            # FastAPI OpenAI 兼容服务
 │   └── benchmark.py         # 性能测试
 │
