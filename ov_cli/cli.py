@@ -485,6 +485,14 @@ def cmd_chat(args):
     """ov-cli chat"""
     from .chat import load_model, run_chat, run_translate
 
+    if args.reasoning == "off" and args.mode != "translate":
+        print(f"  {TR('💡 提示', '💡 Hint')}: "
+              f"{TR('若当前是简易模式，--reasoning off 仅过滤 <think> 块显示，不阻止模型思考。'
+                   '完整模式编译后可强制关闭。（完整模式可忽略当前警告）',
+                   'In simple mode, --reasoning off only filters <think> blocks, '
+                   'does not prevent reasoning. Full mode build can force it off. '
+                   '(Full mode users can ignore this warning.)')}")
+
     mode = args.mode
     if mode == "once":
         if not args.prompt and not args.file:
@@ -517,10 +525,6 @@ def cmd_chat(args):
                  top_k=args.top_k, max_tokens=args.max_tokens,
                  reasoning=args.reasoning == "on")
     else:
-        if args.reasoning == "off":
-            print(f"  {TR('💡 提示', '💡 Hint')}: --reasoning off "
-                  f"{TR('仅过滤 <think> 块显示，不阻止模型思考。完整模式编译后可强制关闭。',
-                       'only filters <think> blocks, does not prevent reasoning. Full mode build can force it off.')}")
         run_chat(ctx, system=args.system,
                  temperature=args.temp, top_p=args.top_p,
                  top_k=args.top_k, max_tokens=args.max_tokens,
