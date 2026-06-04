@@ -317,6 +317,16 @@ ov-cli/
 - GPU: Intel integrated / Arc (auto-detected)
 - CPU: Any x86-64
 
+### WSL2 Support
+
+To use Intel GPU under WSL2, install the runtime:
+
+```bash
+sudo apt install intel-level-zero-gpu libze1
+```
+
+`./ov-cli` will auto-detect GPU availability and prompt if runtime is missing.
+
 ## Related Links
 
 - [OpenVINO Documentation](https://docs.openvino.ai/)

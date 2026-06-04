@@ -49,6 +49,23 @@ def _check_version_warning(venv_path):
         print(f"     ./ov-cli setup --fix")
 
 
+def _check_wsl2_gpu():
+    """WSL2 下检查 Intel GPU runtime 是否可用，不可用时给提示。"""
+    import subprocess
+    try:
+        subprocess.run(["grep", "-qi", "microsoft", "/proc/version"],
+                       capture_output=True, check=True)
+    except Exception:
+        return  # 不是 WSL2
+    try:
+        import openvino as ov
+        if "GPU" not in ov.Core().available_devices:
+            print(f"  {TR('⚠ WSL2 检测到 Intel GPU 但缺少 runtime，请安装:', '⚠ WSL2: Intel GPU detected but runtime missing, install:')}")
+            print(f"    sudo apt install intel-level-zero-gpu libze1")
+    except Exception:
+        pass
+
+
 def _ensure_vscode_settings(venv_path):
     """创建 VS Code 工作区设置，使终端自动激活虚拟环境"""
     workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -960,6 +977,10 @@ def main():
         _venv = getattr(args, "venv", None) or os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".venv")
         _check_version_warning(_venv)
+
+    # WSL2 GPU 检测（非 setup/venv 命令）
+    if args.cmd not in ("setup", "venv"):
+        _check_wsl2_gpu()
 
     # 分发
     if args.cmd == "setup":
