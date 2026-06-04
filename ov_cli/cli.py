@@ -13,6 +13,42 @@ import ov_cli
 from ov_cli import TR
 
 
+def _get_version():
+    """从 pyproject.toml 读取版本号。"""
+    wp = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    pp = os.path.join(wp, "pyproject.toml")
+    if os.path.isfile(pp):
+        with open(pp) as f:
+            for line in f:
+                if line.startswith("version"):
+                    return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return "0.0.0"
+
+
+def _version_stamp_path(venv_path):
+    return os.path.join(venv_path, ".ov-cli-version")
+
+
+def _write_version_stamp(venv_path):
+    ver = _get_version()
+    sp = _version_stamp_path(venv_path)
+    with open(sp, "w") as f:
+        f.write(ver + "\n")
+
+
+def _check_version_warning(venv_path):
+    """检查版本变化，如有则打印提示。"""
+    sp = _version_stamp_path(venv_path)
+    if not os.path.isfile(sp):
+        return
+    with open(sp) as f:
+        installed = f.read().strip()
+    current = _get_version()
+    if installed != current:
+        print(f"  \u26a0 {TR('检测到版本变化 ({i} \u2192 {c})，建议运行:', 'Version changed ({i} \u2192 {c}), run:').format(i=installed, c=current)}")
+        print(f"     ./ov-cli setup --fix")
+
+
 def _ensure_vscode_settings(venv_path):
     """创建 VS Code 工作区设置，使终端自动激活虚拟环境"""
     workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -251,8 +287,36 @@ def _prompt_mode(has_genai_src):
 
 def cmd_setup(args):
     """ov-cli setup: 创建虚拟环境并安装依赖"""
-    import shutil
+    import shutil, subprocess, sys as _sys
     workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    # ── 修复模式 ──
+    if args.fix:
+        venv_path = args.venv or os.path.join(workspace, ".venv")
+        if not os.path.isdir(venv_path):
+            print(f"  {TR('错误: 未找到虚拟环境', 'Error: venv not found')}: {venv_path}")
+            print(f"  {TR('请先运行', 'Run first')}: ./ov-cli setup")
+            sys.exit(1)
+        pip = _pip_path(venv_path)
+        print(f"  {TR('修复模式: 升级依赖 + 重打补丁', 'Fix mode: upgrade deps + repatch')}")
+        try:
+            subprocess.check_call([pip, "install", "--upgrade", workspace])
+            _optimum_src = args.optimum_dir or os.path.join(workspace, "optimum-intel-main")
+            if os.path.isdir(_optimum_src):
+                subprocess.check_call([pip, "install", "--upgrade", _optimum_src])
+            else:
+                subprocess.check_call([pip, "install", "--upgrade",
+                                       "optimum-intel@git+https://github.com/huggingface/optimum-intel.git"])
+            subprocess.check_call([pip, "install", "--upgrade", "--no-deps", "transformers>=5.9"])
+            _apply_gemma4_patch()
+            _apply_qwen35_patch()
+            _write_version_stamp(venv_path)
+            print(f"  {TR('✅ 修复完成', '✅ Fix done')}")
+        except KeyboardInterrupt:
+            print()
+            print(f"  {TR('修复已取消', 'Fix cancelled')}")
+            sys.exit(1)
+        return
 
     # 检查目录写入权限
     if not os.access(workspace, os.W_OK):
@@ -300,7 +364,6 @@ def cmd_setup(args):
         sys.exit(1)
 
     # 检查系统依赖
-    import subprocess, sys as _sys
     for _pkg, _hint in [("venv", "python3-venv"), ("pip", "python3-pip")]:
         _ok = subprocess.run(
             [sys.executable, "-c", f"import {_pkg}"],
@@ -387,6 +450,9 @@ def cmd_setup(args):
         if not deps_ok:
             sys.exit(1)
         _build_genai_from_source(venv_path, genai_src)
+
+    # 写入版本戳
+    _write_version_stamp(venv_path)
 
     # 清理临时目录
     shutil.rmtree(_build_tmp, ignore_errors=True)
@@ -642,6 +708,9 @@ def main():
     p_setup.add_argument("--optimum-dir",
                          help=TR("optimum-intel 源码目录 (默认自动检测)",
                                  "optimum-intel source dir (default: auto-detect)"))
+    p_setup.add_argument("--fix", action="store_true",
+                         help=TR("修复模式（不重建 venv，仅升级依赖+重打补丁）",
+                                 "Fix mode (no venv recreate, only upgrade + repatch)"))
 
     # ── convert ──
     p_conv = sub.add_parser(
@@ -879,6 +948,12 @@ def main():
     # 语言覆盖
     if args.lang:
         ov_cli._LANG = args.lang
+
+    # 版本检测（非 setup 命令）
+    if args.cmd != "setup":
+        _venv = getattr(args, "venv", None) or os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".venv")
+        _check_version_warning(_venv)
 
     # 分发
     if args.cmd == "setup":
