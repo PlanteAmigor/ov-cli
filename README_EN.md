@@ -290,6 +290,11 @@ OpenVINO provides a large collection of pre-converted models on HuggingFace and 
 
 All standard transformers architectures should work as long as `optimum-cli` can export them.
 
+> **Text-to-image models**: `convert` does not support text-to-image models (FLUX, SD3.5, etc.) yet.
+> Download official pre-converted models:
+> - [HuggingFace Image Generation Collection](https://huggingface.co/collections/OpenVINO/image-generation)
+> - [ModelScope Image Generation Collection](https://www.modelscope.cn/collections/Image-Generation-eb38cde2fa3d46)
+
 ### Notes
 
 - **Gemma-4**: Export needs `model_patcher.py` patch (`kv_shared_layer_index` → `layer_type`), applied by `setup` automatically.
