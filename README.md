@@ -319,6 +319,16 @@ ov-cli/
 - GPU: Intel 集成显卡 / Arc 独显（自动检测）
 - CPU: 任意 x86-64
 
+### WSL2 支持
+
+WSL2 下使用 Intel GPU 需额外安装 runtime：
+
+```bash
+sudo apt install intel-level-zero-gpu libze1
+```
+
+安装后 `./ov-cli` 会自动检测 GPU 可用性，若缺少 runtime 会给出提示。
+
 ## 相关链接
 
 - [OpenVINO 文档](https://docs.openvino.ai/)
