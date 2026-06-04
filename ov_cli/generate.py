@@ -9,6 +9,7 @@ import os, sys, time
 import openvino_genai as ov_genai
 from PIL import Image
 from ov_cli import TR
+from ov_cli.chat import readline
 
 
 # ── 默认参数 ──
@@ -89,11 +90,8 @@ def run_generate(ctx, width=_DEFAULT_WIDTH, height=_DEFAULT_HEIGHT,
 
     while True:
         try:
-            line = input(">>> ").strip()
-        except EOFError:
-            print()
-            break
-        except KeyboardInterrupt:
+            line = readline().strip()
+        except (EOFError, KeyboardInterrupt):
             print()
             break
 
