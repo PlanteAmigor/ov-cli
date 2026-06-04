@@ -492,7 +492,10 @@ def cmd_generate(args):
 
     ctx = load_model(ov_path)
 
-    if args.prompt:
+    if args.mode == "once":
+        if not args.prompt:
+            print(f"  ⚠ {TR('once 模式需要 --prompt 参数', 'once mode requires --prompt')}")
+            sys.exit(1)
         run_once(ctx, prompt=args.prompt, output=args.output,
                  width=args.width, height=args.height,
                  steps=args.steps, guidance=args.guidance)
@@ -946,6 +949,9 @@ def main():
     )
     p_gen.add_argument("--model", "-m", required=True,
                        help=TR("OpenVINO 模型目录 (Text2Image)", "OpenVINO model dir (Text2Image)"))
+    p_gen.add_argument("--mode", choices=["interactive", "once"], default="interactive",
+                       help=TR("运行模式: interactive=交互, once=单次 (默认: interactive)",
+                               "mode: interactive=chat, once=single output (default: interactive)"))
     p_gen.add_argument("--prompt",
                        help=TR("输入描述 (单次模式)", "prompt text (single mode)"))
     p_gen.add_argument("--output", "-o",
