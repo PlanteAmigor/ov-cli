@@ -779,9 +779,9 @@ def main():
     # ── server ──
     p_serve = sub.add_parser(
         "server",
-        help=TR("启动 API 服务 + Web UI", "Start API server + Web UI"),
+        help=TR("启动 API 服务", "Start API server"),
         description=TR(
-            "启动 OpenAI 兼容 API 服务，托管 Web 聊天界面。\n"
+            "启动 OpenAI 兼容 API 服务。\n"
             "支持多图输入（VLM）和流式/非流式输出。\n"
             "\n"
             "端点:\n"
@@ -789,7 +789,7 @@ def main():
             "  GET  /v1/models               模型信息 + 能力\n"
             "  GET  /props                   服务器属性\n"
             "  GET  /health                  健康检查\n"
-            "  GET  /                        聊天界面\n"
+            "  GET  /                        服务状态\n"
             "\n"
             "多图推理:\n"
             "  content 中传入多个 image_url 即可，自动添加占位标记\n"
@@ -797,7 +797,7 @@ def main():
             "示例:\n"
             "  ./ov-cli server --model ./model-ov --port 8080\n"
             "  curl http://localhost:8080/v1/models",
-            "Start OpenAI-compatible API server with Web UI.\n"
+            "Start OpenAI-compatible API server.\n"
             "Supports multi-image input (VLM) and stream/non-stream output.\n"
             "\n"
             "Endpoints:\n"
@@ -805,7 +805,7 @@ def main():
             "  GET  /v1/models               model info + capabilities\n"
             "  GET  /props                   server properties\n"
             "  GET  /health                  health check\n"
-            "  GET  /                        chat UI\n"
+            "  GET  /                        server status\n"
             "\n"
             "Multi-image:\n"
             "  Pass multiple image_url entries in content, image tags auto-added\n"
