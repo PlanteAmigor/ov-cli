@@ -166,14 +166,40 @@ def _build_prompt(messages: list, tokenizer) -> str:
     return _bp(conv, tokenizer, enable_thinking=True)
 
 
-def _extract_image(messages: list) -> Optional[ov.Tensor]:
-    """从消息中提取第一张图片 → 缩放对齐 → openvino.Tensor。
+def _extract_images_pil(messages):
+    """从消息中提取所有图片，返回 list[PIL.Image]。"""
+    from PIL import Image as _PIL
+    import io as _io, base64 as _b64
+    result = []
+    try:
+        for m in messages:
+            for p in (m.get("content", []) if isinstance(m.get("content"), list) else []):
+                if isinstance(p, dict) and p.get("type") == "image_url":
+                    url = p["image_url"]["url"]
+                    if url.startswith("data:image"):
+                        raw = _b64.b64decode(url.split(",", 1)[1])
+                        img = _PIL.open(_io.BytesIO(raw)).convert("RGB")
+                        w, h = img.size
+                        cur = w * h
+                        max_px = 384 * 384
+                        if cur > max_px:
+                            ratio = (max_px / cur) ** 0.5
+                            w, h = int(w * ratio), int(h * ratio)
+                        w = max(32, (w // 32) * 32)
+                        h = max(32, (h // 32) * 32)
+                        result.append(img.resize((w, h)))
+    except Exception:
+        pass
+    return result
 
-    Qwen3.5 视觉编码器要求宽高为 32 的倍数。
+
+def _extract_images(messages: list) -> list:
+    """从消息中提取所有图片，返回 list[ov.Tensor]。
     与 chat.py._load_image 逻辑一致。
     """
     from PIL import Image
     import numpy as np
+    result = []
     try:
         for m in messages:
             content = m.get("content", "")
@@ -186,21 +212,19 @@ def _extract_image(messages: list) -> Optional[ov.Tensor]:
                             raw = base64.b64decode(b64)
                             img = Image.open(io.BytesIO(raw)).convert("RGB")
                             w, h = img.size
-                            max_sz = 2048
-                            if w > max_sz or h > max_sz:
-                                ratio = max_sz / max(w, h)
+                            cur_pixels = w * h
+                            max_pixels = 384 * 384
+                            if cur_pixels > max_pixels:
+                                ratio = (max_pixels / cur_pixels) ** 0.5
                                 w, h = int(w * ratio), int(h * ratio)
-                            w = (w // 32) * 32
-                            h = (h // 32) * 32
-                            if w < 32: w = 32
-                            if h < 32: h = 32
+                            w = max(32, (w // 32) * 32)
+                            h = max(32, (h // 32) * 32)
                             img = img.resize((w, h))
                             arr = np.array(img).astype(np.uint8)[None]
-                            return ov.Tensor(arr)
+                            result.append(ov.Tensor(arr))
     except Exception as e:
         _log(f"  ⚠ 图片解析失败: {e}")
-        return None
-    return None
+    return result
 
 
 # ── Pydantic 请求模型 ──────────────────────────────────────
@@ -227,7 +251,7 @@ class ControlRequest(BaseModel):
 
 async def _stream_chat(request_id: str, model_path: str, device: str,
                        messages: list, gen_cfg: ov_genai.GenerationConfig,
-                       has_image: bool, image: Optional[ov.Tensor]) -> AsyncGenerator[str, None]:
+                       has_image: bool, images: list) -> AsyncGenerator[str, None]:
     """异步生成 SSE 事件流。"""
     state = _load_model(model_path, device)
     is_vlm = state["is_vlm"]
@@ -242,22 +266,21 @@ async def _stream_chat(request_id: str, model_path: str, device: str,
         from threading import Thread
 
         # 图片 → processor（不是 model.generate）
-        pil_image = None
-        if has_image:
-            import io, base64
-            from PIL import Image as PILImage
-            for m in messages:
-                for p in (m.get("content", []) if isinstance(m.get("content"), list) else []):
-                    if isinstance(p, dict) and p.get("type") == "image_url":
-                        url = p["image_url"]["url"]
-                        if url.startswith("data:image"):
-                            raw = base64.b64decode(url.split(",", 1)[1])
-                            pil_image = PILImage.open(io.BytesIO(raw)).convert("RGB")
-                            break
-                if pil_image: break
+        pil_images = _extract_images_pil(messages)
 
-        if pil_image:
-            inputs = processor(text=[prompt], images=[pil_image], return_tensors="pt")
+        # 为每张图插入占位标记
+        img_tag = "<|vision_start|><|image_pad|><|vision_end|>\n"
+        prompt_lines = messages[-1].get("content", "") if messages else ""
+        if isinstance(prompt_lines, list):
+            text = " ".join(p.get("text", "") for p in prompt_lines if isinstance(p, dict) and p.get("type") == "text")
+        else:
+            text = prompt_lines if isinstance(prompt_lines, str) else ""
+        prompt = processor.apply_chat_template(messages, tokenize=False,
+            add_generation_prompt=True, chat_template_kwargs={"enable_thinking": True})
+
+        if pil_images:
+            prompt = img_tag * len(pil_images) + prompt
+            inputs = processor(text=[prompt], images=pil_images, return_tensors="pt")
         else:
             inputs = processor(text=[prompt], return_tensors="pt")
 
@@ -312,8 +335,10 @@ async def _stream_chat(request_id: str, model_path: str, device: str,
     def run_generate():
         try:
             kwargs = {"generation_config": gen_cfg, "streamer": streamer_cb}
-            if is_vlm and has_image and image is not None:
-                kwargs["image"] = image
+            if is_vlm and has_image and images:
+                img_tag = "<|vision_start|><|image_pad|><|vision_end|>\n"
+                prompt = img_tag * len(images) + prompt
+                kwargs["images"] = images
             pipe.generate(prompt, **kwargs)
         except RuntimeError as e:
             err = str(e)
@@ -473,7 +498,7 @@ def create_app(model_path: str, device: str = "", host: str = "0.0.0.0", port: i
             for m in req.messages
         )
         messages_dict = [m.model_dump() for m in req.messages]
-        image = _extract_image(messages_dict) if has_image else None
+        images = _extract_images(messages_dict) if has_image else []
 
         request_id = uuid.uuid4().hex[:12]
 
@@ -481,7 +506,7 @@ def create_app(model_path: str, device: str = "", host: str = "0.0.0.0", port: i
             return StreamingResponse(
                 _stream_chat(request_id, model_path, device,
                             [m.model_dump() for m in req.messages],
-                            gen_cfg, has_image, image),
+                            gen_cfg, has_image, images),
                 media_type="text/event-stream",
                 headers={
                     "Cache-Control": "no-cache",
@@ -506,24 +531,13 @@ def create_app(model_path: str, device: str = "", host: str = "0.0.0.0", port: i
                 from transformers import TextIteratorStreamer
                 from threading import Thread
 
-                # 图片 → processor（不是 model.generate）
-                pil_image = None
-                if has_image:
-                    import io as _io, base64 as _b64
-                    from PIL import Image as _PIL
-                    for m in req.messages:
-                        if isinstance(m.content, list):
-                            for p in m.content:
-                                if isinstance(p, dict) and p.get("type") == "image_url":
-                                    url = p["image_url"]["url"]
-                                    if url.startswith("data:image"):
-                                        raw = _b64.b64decode(url.split(",", 1)[1])
-                                        pil_image = _PIL.open(_io.BytesIO(raw)).convert("RGB")
-                                        break
-                        if pil_image: break
+                # 图片 → processor
+                pil_images = _extract_images_pil([m.model_dump() for m in req.messages]) if has_image else []
 
-                if pil_image:
-                    inputs = processor(text=[prompt], images=[pil_image], return_tensors="pt")
+                img_tag = "<|vision_start|><|image_pad|><|vision_end|>\n"
+                if pil_images:
+                    prompt = img_tag * len(pil_images) + prompt
+                    inputs = processor(text=[prompt], images=pil_images, return_tensors="pt")
                 else:
                     inputs = processor(text=[prompt], return_tensors="pt")
 
@@ -570,8 +584,10 @@ def create_app(model_path: str, device: str = "", host: str = "0.0.0.0", port: i
                 prompt_tokens = 0
 
             kwargs = {"generation_config": gen_cfg, "streamer": cb}
-            if state["is_vlm"] and has_image and image is not None:
-                kwargs["image"] = image
+            if state["is_vlm"] and has_image and images:
+                img_tag = "<|vision_start|><|image_pad|><|vision_end|>\n"
+                prompt = img_tag * len(images) + prompt
+                kwargs["images"] = images
             loop = asyncio.get_event_loop()
             try:
                 await loop.run_in_executor(None, lambda: pipe.generate(prompt, **kwargs))
