@@ -29,7 +29,10 @@ eval "$(./ov-cli venv)"
 # 3. Chat terminal
 ./ov-cli chat --model ./Qwen3/2B-ov
 
-# 4. API server
+# 4. Text-to-image
+./ov-cli generate --model ./FLUX/ov-int4
+
+# 5. API server
 ./ov-cli server --model ./Qwen3/2B-ov
 ```
 
@@ -220,6 +223,31 @@ EOF
 ./ov-cli benchmark --model ./Qwen3.6/35B-A3B-ov --reasoning off
 ```
 
+### `generate` — Text-to-Image
+
+Generate images via OpenVINO GenAI Text2ImagePipeline. Supports interactive and single modes.
+
+```bash
+# Interactive (multi-turn generation)
+./ov-cli generate --model ./FLUX/ov-int4
+
+# Single mode (auto-exit after output)
+./ov-cli generate --model ./FLUX/ov-int4 --mode once --prompt "cat" -o cat.png
+```
+
+**In-chat commands** (interactive mode only):
+
+| Command | Description |
+|---------|-------------|
+| `/size W H` | Set resolution (default 512x512) |
+| `/steps N` | Inference steps (default 4) |
+| `/guidance F` | Guidance scale (default 0.0) |
+| `/seed [N]` | Set/reset random seed |
+| `/save DIR` | Set output directory |
+| `/history` | View generated images |
+| `/help` | Help |
+| `/exit` | Exit |
+
 ## Model Support
 
 ### Inference Formats
@@ -302,6 +330,7 @@ ov-cli/
 │   ├── cli.py               # CLI parser + dispatcher + setup
 │   ├── chat.py              # Chat/translate terminal (GenAI + Optimum)
 │   ├── convert.py           # Model conversion (7 formats)
+│   ├── generate.py          # Text-to-image terminal
 │   ├── server.py            # FastAPI OpenAI-compatible server
 │   └── benchmark.py         # Performance benchmark
 │
