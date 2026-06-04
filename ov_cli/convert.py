@@ -6,6 +6,7 @@ ov-cli convert: 模型转换。
 """
 
 import os, sys, time, json, subprocess
+from ov_cli import TR
 
 # 模型类型 → 转换所需 transformers 版本（None = 使用当前版本）
 # 推理统一用 5.9，转换完成后自动恢复
@@ -97,7 +98,14 @@ def _restore_transformers():
 
 def _infer_task(model_path):
     """根据 config.json 推断 optimum 的 task 参数。"""
-    with open(os.path.join(model_path, "config.json")) as f:
+    cfg_path = os.path.join(model_path, "config.json")
+    if not os.path.isfile(cfg_path):
+        print(f"  {TR('错误: 找不到 config.json', 'Error: config.json not found')}")
+        print(f"  {TR('请确认模型目录存在且包含 config.json:', 'Make sure the model directory has config.json:')}")
+        print(f"    {model_path}")
+        print(f"  {TR('提示:', 'Hint:')} {TR('如果该路径确实指向一个模型目录，请检查参数 --model', 'If the path is correct, check the --model argument')}")
+        sys.exit(1)
+    with open(cfg_path) as f:
         cfg = json.load(f)
     mt = cfg.get("model_type", "")
 
@@ -114,6 +122,13 @@ def _infer_task(model_path):
 def convert_model(model_path, output_path, weight_format,
                   ratio=1.0, group_size=128):
     """用 optimum-cli 导出模型。"""
+    # 检查模型目录
+    if not os.path.isdir(model_path):
+        print(f"  {TR('错误: 模型目录不存在', 'Error: model directory not found')}")
+        print(f"    {model_path}")
+        print(f"  {TR('请检查 --model 参数', 'Please check the --model argument')}")
+        sys.exit(1)
+
     # 检测模型类型并确保 transformers 版本
     model_type = _detect_model_type(model_path)
     needs_restore = _ensure_transformers(model_type)
