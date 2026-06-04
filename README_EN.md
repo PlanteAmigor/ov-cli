@@ -113,9 +113,13 @@ Interactive terminal. Auto-detects model format (GenAI / Optimum), supports stre
 
 # English UI (default)
 ./ov-cli --lang en chat --model ./model-ov
+
+# Once mode (single output, auto-exit)
+./ov-cli chat --model ./model-ov --mode once --prompt "Hello"
+./ov-cli chat --model ./model-ov --mode once --file ./doc.pdf --prompt "summarize" --output ./outputs/
 ```
 
-**In-chat commands**:
+**In-chat commands** (chat mode only):
 
 | Command | Description |
 |---------|-------------|
@@ -128,6 +132,14 @@ Interactive terminal. Auto-detects model format (GenAI / Optimum), supports stre
 | `/clear [ids]` | Clear context or specific files by ID |
 | `/help` | Help |
 | `/exit` | Exit |
+
+**Once mode** (`--mode once`):
+
+| Option | Description |
+|--------|-------------|
+| `--prompt TEXT` | Input text (supports `\n` newlines) |
+| `--file PATH` | Upload file(s), auto-detect type (PDF/image/text) |
+| `--output PATH` | Save result as .md file (auto-name or explicit path) |
 
 ### `server` — API Server
 

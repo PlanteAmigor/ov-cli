@@ -113,9 +113,13 @@ eval "$(./ov-cli venv --venv ./my-venv)"
 
 # 英文界面
 ./ov-cli --lang en chat --model ./model-ov
+
+# 单次输出模式（输出完自动退出）
+./ov-cli chat --model ./model-ov --mode once --prompt "Hello"
+./ov-cli chat --model ./model-ov --mode once --file ./doc.pdf --prompt "总结" --output ./outputs/
 ```
 
-**终端内命令**：
+**终端内命令**（仅 chat 模式）：
 
 | 命令 | 说明 |
 |------|------|
@@ -128,6 +132,14 @@ eval "$(./ov-cli venv --venv ./my-venv)"
 | `/clear [ids]` | 清空全部上下文或指定文件 ID |
 | `/help` | 帮助 |
 | `/exit` | 退出 |
+
+**单次输出模式**（`--mode once`）：
+
+| 参数 | 说明 |
+|------|------|
+| `--prompt TEXT` | 文字输入（支持 `\n` 换行） |
+| `--file PATH` | 上传文件（可多次，支持 PDF/图片/文本） |
+| `--output PATH` | 保存结果为 .md 文件（自动命名或指定路径） |
 
 **翻译模式**：自动检测语言方向；`//en 文本` 强制译英，`//zh 文本` 强制译中。
 
