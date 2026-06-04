@@ -204,7 +204,12 @@ def read_multiline(prompt=">>> "):
     lines = [line.rstrip("\n")]
     try:
         while True:
-            r, _, _ = select.select([sys.stdin], [], [], 0.1)
+            try:
+                r, _, _ = select.select([sys.stdin], [], [], 0.1)
+            except (ValueError, TypeError):
+                from . import TR
+                print(f"  {TR('交互式输入不支持管道，请使用 --mode once', 'Interactive input does not support pipe, use --mode once')}")
+                break
             if not r:
                 break
             more = sys.stdin.readline()
