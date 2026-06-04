@@ -59,11 +59,16 @@ def _ensure_transformers(model_type):
         return False
 
     print(f"  ⚡ {model_type} 需要 transformers {needed}（当前 {cur_ver}），临时切换...")
-    subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "--no-deps", "--force-reinstall",
-         f"transformers{needed}"],
-        timeout=120,
-    )
+    try:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "--no-deps", "--force-reinstall",
+             f"transformers{needed}"],
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired:
+        print(f"  \u274c {TR('pip 下载超时 (120s)，请检查网络或手动执行:', 'pip timed out (120s), check network or run:')}")
+        print(f"    pip install transformers{needed}")
+        sys.exit(1)
     new_ver = subprocess.check_output(
         [sys.executable, "-c", "import transformers; print(transformers.__version__)"],
         timeout=10, text=True,
@@ -88,11 +93,16 @@ def _restore_transformers():
     if len(parts) >= 2 and int(parts[0]) == 5 and int(parts[1]) >= 9:
         return
     print(f"  ⚡ 恢复 transformers 到最新版...")
-    subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "--no-deps", "--force-reinstall",
-         "transformers"],
-        timeout=120,
-    )
+    try:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "--no-deps", "--force-reinstall",
+             "transformers"],
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired:
+        print(f"  \u274c {TR('pip 下载超时 (120s)，请检查网络或手动执行:', 'pip timed out (120s), check network or run:')}")
+        print(f"    pip install transformers")
+        sys.exit(1)
     new_ver = subprocess.check_output(
         [sys.executable, "-c", "import transformers; print(transformers.__version__)"],
         timeout=10, text=True,
