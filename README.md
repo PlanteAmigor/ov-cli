@@ -158,7 +158,7 @@ eval "$(./ov-cli venv --venv ./my-venv)"
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | `GET` | `/v1/models` | 模型列表 + 能力（视觉/文字） |
-| `POST` | `/v1/chat/completions` | 聊天补全（流式 + 非流式） |
+| `POST` | `/v1/chat/completions` | 聊天补全（流式 + 非流式，支持多图） |
 | `POST` | `/v1/chat/completions/control` | 停止生成 |
 | `GET` | `/props` | 服务器属性 |
 | `GET` | `/health` | 健康检查 |
