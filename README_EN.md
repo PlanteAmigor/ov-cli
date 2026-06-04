@@ -156,7 +156,7 @@ Starts an OpenAI-compatible HTTP API server.
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/v1/models` | List models + capabilities |
-| `POST` | `/v1/chat/completions` | Chat completion (stream + non-stream) |
+| `POST` | `/v1/chat/completions` | Chat completion (stream + non-stream, multi-image) |
 | `POST` | `/v1/chat/completions/control` | Stop generation |
 | `GET` | `/props` | Server properties |
 | `GET` | `/health` | Health check |
