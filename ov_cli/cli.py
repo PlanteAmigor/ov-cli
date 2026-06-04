@@ -486,10 +486,7 @@ def cmd_chat(args):
     from .chat import load_model, run_chat, run_translate
 
     mode = args.mode
-    if mode == "auto":
-        # auto 模式下先加载模型再判断（需要 model_type）
-        pass
-    elif mode == "once":
+    if mode == "once":
         if not args.prompt and not args.file:
             print(f"  ⚠ {TR('once 模式需要 --prompt 和/或 --file 参数',
                            'once mode requires --prompt and/or --file')}")
@@ -508,15 +505,6 @@ def cmd_chat(args):
         sys.exit(1)
 
     ctx = load_model(ov_path)
-
-    mode = args.mode
-    if mode == "auto":
-        # 根据 model_type 自动判断
-        mt = ctx.get("model_type", "")
-        if mt == "hunyuan_dense":
-            mode = "translate"
-        else:
-            mode = "chat"
 
     if mode == "translate":
         run_translate(ctx, max_tokens=args.max_tokens)
@@ -813,9 +801,9 @@ def main():
     p_chat.add_argument("--model", "-m", required=True,
                         help=TR("OpenVINO 模型目录 (须包含 openvino_model.xml)",
                                 "OpenVINO model dir (must contain openvino_model.xml)"))
-    p_chat.add_argument("--mode", choices=["chat", "translate", "once", "auto"], default="auto",
-                        help=TR("运行模式: chat=交互, translate=翻译, once=单次输出 (默认: auto)",
-                                "mode: chat=interactive, translate=translation, once=single output (default: auto)"))
+    p_chat.add_argument("--mode", choices=["chat", "translate", "once"], default="chat",
+                        help=TR("运行模式: chat=交互, translate=翻译, once=单次输出 (默认: chat)",
+                                "mode: chat=interactive, translate=translation, once=single output (default: chat)"))
     p_chat.add_argument("--prompt",
                         help=TR("输入文字 (支持 \\n 换行，仅 once 模式)", "input text (supports \\n, once mode only)"))
     p_chat.add_argument("--file", action="append", default=None,
