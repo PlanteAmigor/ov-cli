@@ -8,7 +8,7 @@ ov-cli: OpenVINO LLM 命令行工具
   ov-cli setup [--venv path]                  创建环境
 """
 
-import os, sys, argparse, json
+import os, sys, argparse, json, shutil, tempfile
 import ov_cli
 from ov_cli import TR
 
@@ -268,13 +268,19 @@ def cmd_setup(args):
         print(f"  • cmake, gcc/g++, make, patchelf")
         print(f"  • {TR('首次编译需联网下载依赖 (~100MB)', 'First build downloads deps (~100MB)')}")
         print(f"  • {TR('编译耗时约 2-5 分钟', 'Build takes ~2-5 minutes')}")
-        print("=" * 54)
-        try:
-            r = input(f"  {TR('是否继续?', 'Continue?')} [y/N]: ")
-            if r.strip().lower() != "y":
-                mode = 1
-        except EOFError:
+
+    # 设置专属临时目录，避免残留
+    import tempfile
+    _build_tmp = tempfile.mkdtemp(prefix="ov-cli-setup-")
+    _old_tmpdir = os.environ.get("TMPDIR")
+    os.environ["TMPDIR"] = _build_tmp
+    print("=" * 54)
+    try:
+        r = input(f"  {TR('是否继续?', 'Continue?')} [y/N]: ")
+        if r.strip().lower() != "y":
             mode = 1
+    except EOFError:
+        mode = 1
 
     venv_path = args.venv or os.path.join(workspace, ".venv")
     print(f"  {TR('创建虚拟环境', 'Creating venv')}: {venv_path}")
@@ -346,6 +352,13 @@ def cmd_setup(args):
         if not deps_ok:
             sys.exit(1)
         _build_genai_from_source(venv_path, genai_src)
+
+    # 清理临时目录
+    shutil.rmtree(_build_tmp, ignore_errors=True)
+    if _old_tmpdir:
+        os.environ["TMPDIR"] = _old_tmpdir
+    else:
+        os.environ.pop("TMPDIR", None)
 
     print()
     print(f"  {TR('✅ 完成!', '✅ Done!')}")
