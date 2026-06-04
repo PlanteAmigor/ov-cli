@@ -136,13 +136,6 @@ def _infer_task(model_path):
 def convert_model(model_path, output_path, weight_format,
                   ratio=1.0, group_size=128):
     """用 optimum-cli 导出模型。"""
-    # 检查模型目录
-    if not os.path.isdir(model_path):
-        print(f"  {TR('错误: 模型目录不存在', 'Error: model directory not found')}")
-        print(f"    {model_path}")
-        print(f"  {TR('请检查 --model 参数', 'Please check the --model argument')}")
-        sys.exit(1)
-
     # 检测模型类型并确保 transformers 版本
     model_type = _detect_model_type(model_path)
     needs_restore = _ensure_transformers(model_type)
