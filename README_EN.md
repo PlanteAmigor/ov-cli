@@ -49,6 +49,8 @@ git pull
 
 Fix mode (`setup --fix`) only upgrades package versions and reapplies patches — no redundant downloads.
 
+**ZIP users**: Download the latest source, extract and overwrite your old directory, then run `./ov-cli setup --fix`.
+
 ## Commands
 
 ### `setup` — Create Environment
