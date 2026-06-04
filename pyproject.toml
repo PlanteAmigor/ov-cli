@@ -28,5 +28,8 @@ dependencies = [
     "PyMuPDF",
 ]
 
+[tool.setuptools.packages.find]
+include = ["ov_cli", "ov_cli.*"]
+
 [project.scripts]
 ov-cli = "ov_cli.cli:main"
