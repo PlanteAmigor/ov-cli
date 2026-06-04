@@ -444,6 +444,169 @@ _hist = []
 _hist_idx = -1
 _in_readline = False
 _hist_buf = ""
+
+def run_once(ctx, prompt="", files=None, output=None,
+             temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024,
+             reasoning=True):
+    """单次输出模式：读取文件 + 文字，一次生成，输出后退出。"""
+    import numpy as np
+    from . import TR
+
+    is_vlm = ctx.get("is_vlm", False)
+    pipe = ctx.get("pipe")
+    processor = ctx.get("processor")
+
+    # 收集所有输入
+    all_pages = []
+    text_parts = []
+
+    if files:
+        for fpath in files:
+            fpath = os.path.abspath(fpath)
+            if not os.path.isfile(fpath):
+                print(f"  ⚠ {TR('找不到文件', 'File not found')}: {fpath}")
+                continue
+            ext = os.path.splitext(fpath)[1].lower()
+            if ext == ".pdf" and is_vlm:
+                pages = _pdf_to_images(fpath)
+                if pages:
+                    all_pages.extend(pages)
+                    print(f"  ✓ {TR('已加载 PDF', 'PDF loaded')}: {fpath} ({len(pages)} 页)")
+            elif ext in (".jpg", ".jpeg", ".png", ".bmp", ".webp") and is_vlm:
+                from PIL import Image
+                all_pages.append(_load_image(fpath))
+                print(f"  ✓ {TR('已加载图片', 'Image loaded')}: {fpath}")
+            elif ext in _TEXT_EXTENSIONS:
+                text_parts.append(f"[{os.path.basename(fpath)}]\n```\n{_load_text_file(fpath)}\n```")
+                print(f"  ✓ {TR('已加载文件', 'File loaded')}: {fpath}")
+            else:
+                print(f"  ⚠ {TR('不支持的文件类型', 'Unsupported file type')}: {fpath}")
+
+    # 合并 prompt
+    user_text = prompt
+    if text_parts:
+        prefix = "\n\n".join(text_parts)
+        user_text = prefix + "\n\n" + user_text if user_text else prefix
+
+    messages = [{"role": "user", "content": user_text}]
+
+    # 构建 prompt
+    if ctx.get("optimum"):
+        # Optimum 路径
+        chat_prompt = processor.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True,
+            chat_template_kwargs={"enable_thinking": reasoning})
+        if all_pages and is_vlm:
+            inputs = processor(text=[chat_prompt], images=all_pages, return_tensors="pt")
+        else:
+            inputs = processor(text=[chat_prompt], return_tensors="pt")
+
+        from transformers import TextIteratorStreamer
+        from threading import Thread
+
+        streamer = TextIteratorStreamer(processor.tokenizer, skip_prompt=True, skip_special_tokens=True)
+        gen_kwargs = dict(
+            **inputs, max_new_tokens=max_tokens,
+            do_sample=temperature >= 0.01,
+            temperature=temperature if temperature >= 0.01 else None,
+            top_p=top_p, top_k=top_k,
+            streamer=streamer,
+        )
+
+        reply_parts = []
+        thread = Thread(target=ctx["model"].generate, kwargs=gen_kwargs)
+        thread.start()
+        for t in streamer:
+            sys.stdout.write(t)
+            sys.stdout.flush()
+            reply_parts.append(t)
+        thread.join()
+        reply_text = "".join(reply_parts)
+    else:
+        # GenAI 路径
+        img_tag = "<|vision_start|><|image_pad|><|vision_end|>\n"
+        if all_pages:
+            user_text = img_tag * len(all_pages) + user_text
+            messages[0]["content"] = user_text
+
+        tokenizer = pipe.get_tokenizer()
+        try:
+            prompt_text = tokenizer.apply_chat_template(
+                messages, add_generation_prompt=True,
+                extra_context={"enable_thinking": reasoning})
+        except Exception:
+            prompt_text = f"<|im_start|>user\n{user_text}\n<|im_end|>\n<|im_start|>assistant\n"
+
+        gen_cfg = _make_genai_config(temperature, top_p, top_k, max_tokens,
+                                     presence_penalty=None, reasoning=reasoning,
+                                     tokenizer=tokenizer)
+
+        # VLM 预编码进度
+        n_vis = len(all_pages)
+        progress_stop = threading.Event()
+        if is_vlm and all_pages:
+            _t_prefill = time.time()
+            def _on_first():
+                progress_stop.set()
+                pt = time.time() - _t_prefill
+                print(f"\r  ✓ {TR('视觉编码 + prefill 完成', 'Vision + prefill done')} ({pt:.1f}s, ~{n_vis})  ")
+                print(f"  {TR('回复', 'Reply')}:", end=" ", flush=True)
+            on_first = _on_first
+            def _prog():
+                while not progress_stop.is_set():
+                    el = time.time() - _t_prefill
+                    print(f"\r  ⏳ {TR('正在处理', 'Processing')} {n_vis} {TR('张图', 'images')}... ({el:.0f}s)", end="", flush=True)
+                    progress_stop.wait(1.0)
+            threading.Thread(target=_prog, daemon=True).start()
+        else:
+            on_first = None
+
+        # 构建 tensors
+        image_tensors = [ov.Tensor(np.array(img)[None]) for img in all_pages] if is_vlm and all_pages else None
+
+        reply_parts = []
+        stop_flag = [False]
+        streamer_cb = _make_streamer(reply_parts, stop_flag, on_first)
+
+        kwargs = {"generation_config": gen_cfg, "streamer": streamer_cb}
+        if image_tensors is not None:
+            kwargs["images"] = image_tensors
+
+        t0 = time.time()
+        try:
+            pipe.generate(prompt_text, **kwargs)
+        except RuntimeError as e:
+            print(f"\n  ⚠ {TR('生成失败', 'Generation failed')}: {str(e)[:200]}")
+            sys.exit(1)
+        finally:
+            if not progress_stop.is_set():
+                progress_stop.set()
+
+        reply_text = "".join(reply_parts)
+
+    # 输出统计
+    elapsed = time.time() - t0
+    char_count = len(reply_text.replace(" ", ""))
+    print(f"\n  [{elapsed:.1f}s | {char_count} chars | {char_count/elapsed:.1f} ch/s]")
+
+    # 保存到文件
+    if output:
+        out_path = output
+        if os.path.isdir(out_path) or out_path.endswith(os.sep):
+            ts = time.strftime("%Y%m%d_%H%M%S")
+            out_path = os.path.join(out_path, f"{ts}.md")
+        # 生成元信息头
+        meta_parts = [f"mode: once | {time.strftime('%Y-%m-%d %H:%M:%S')}"]
+        if prompt:
+            meta_parts.append(f"prompt: {prompt}")
+        if files:
+            meta_parts.append(f"files: {', '.join(files)}")
+        meta = f"<!-- ov-cli | {' | '.join(meta_parts)} -->\n\n"
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.write(meta + reply_text)
+        print(f"  💾 {TR('已保存', 'Saved')}: {out_path}")
+
+
 def run_chat(ctx, system="You are a helpful AI assistant.",
              temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024,
              image_path=None, reasoning=True):
