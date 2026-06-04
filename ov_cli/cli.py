@@ -472,13 +472,33 @@ def cmd_benchmark(args):
     run_benchmark(ov_path, args.reasoning == "on")
 
 def cmd_server(args):
-    """ov-cli server: 启动 API 服务 + Web UI"""
+    """ov-cli server: 启动 API 服务"""
     from .server import run_server
     model_path = os.path.abspath(args.model)
     if not os.path.isdir(model_path):
         print(f"  ⚠ 模型路径不存在: {model_path}")
         sys.exit(1)
     run_server(model_path, args.device, args.host, args.port)
+
+
+def cmd_generate(args):
+    """ov-cli generate: 文生图"""
+    from .generate import load_model, run_once, run_generate
+
+    ov_path = os.path.abspath(args.model)
+    if not os.path.isdir(ov_path):
+        print(f"{TR('错误: 找不到模型目录', 'Error: model directory not found')}: {ov_path}")
+        sys.exit(1)
+
+    ctx = load_model(ov_path)
+
+    if args.prompt:
+        run_once(ctx, prompt=args.prompt, output=args.output,
+                 width=args.width, height=args.height,
+                 steps=args.steps, guidance=args.guidance)
+    else:
+        run_generate(ctx, width=args.width, height=args.height,
+                     steps=args.steps, guidance=args.guidance)
 
 
 def cmd_chat(args):
@@ -546,7 +566,7 @@ def _build_help():
             "  1. ./ov-cli setup             创建环境\n"
             "  2. ./ov-cli convert            转换模型 → OpenVINO IR\n"
           "  3. ./ov-cli chat / translate   推理\n"
-          "  4. ./ov-cli benchmark          基准测试"
+          "  4. ./ov-cli generate / benchmark  文生图 / 基准测试"
         )
         epilog = (
             "📖 使用示例:\n"
@@ -591,7 +611,7 @@ def _build_help():
             "  1. ./ov-cli setup             create environment\n"
             "  2. ./ov-cli convert            convert model → OpenVINO IR\n"
             "  3. ./ov-cli chat / translate   inference\n"
-            "  4. ./ov-cli benchmark          benchmark"
+            "  4. ./ov-cli generate / benchmark   text-to-image / benchmark"
         )
         epilog = (
             "📖 Examples:\n"
@@ -901,6 +921,44 @@ def main():
     p_serve.add_argument("--port", type=int, default=8080,
                          help=TR("监听端口 (默认: 8080)", "listen port (default: 8080)"))
 
+    # ── generate ──
+    p_gen = sub.add_parser(
+        "generate",
+        help=TR("文生图 (Text2Image)", "Generate images (Text2Image)"),
+        description=TR(
+            "使用 Text2ImagePipeline 生成图片，支持交互式和单次模式。\n"
+            "\n"
+            "交互式: 直接运行，输入描述后生成图片\n"
+            "单次:   --prompt \"描述\" [-o output.png]\n"
+            "\n"
+            "示例:\n"
+            "  ./ov-cli generate --model ./FLUX/ov-int4\n"
+            "  ./ov-cli generate --model ./FLUX/ov-int4 --prompt \"cat\" -o cat.png --steps 8",
+            "Generate images via Text2ImagePipeline.\n"
+            "Interactive mode: run without --prompt\n"
+            "Single mode: --prompt \"description\" [-o output.png]\n"
+            "\n"
+            "Examples:\n"
+            "  ./ov-cli generate --model ./FLUX/ov-int4\n"
+            "  ./ov-cli generate --model ./FLUX/ov-int4 --prompt \"cat\" -o cat.png --steps 8",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_gen.add_argument("--model", "-m", required=True,
+                       help=TR("OpenVINO 模型目录 (Text2Image)", "OpenVINO model dir (Text2Image)"))
+    p_gen.add_argument("--prompt",
+                       help=TR("输入描述 (单次模式)", "prompt text (single mode)"))
+    p_gen.add_argument("--output", "-o",
+                       help=TR("输出图片路径 (单次模式)", "output image path (single mode)"))
+    p_gen.add_argument("--width", type=int, default=512,
+                       help=TR("图片宽度 (默认: 512)", "image width (default: 512)"))
+    p_gen.add_argument("--height", type=int, default=512,
+                       help=TR("图片高度 (默认: 512)", "image height (default: 512)"))
+    p_gen.add_argument("--steps", type=int, default=4,
+                       help=TR("推理步数 (默认: 4)", "inference steps (default: 4)"))
+    p_gen.add_argument("--guidance", type=float, default=0.0,
+                       help=TR("guidance scale (默认: 0.0)", "guidance scale (default: 0.0)"))
+
     # ── venv ──
     p_venv = sub.add_parser(
         "venv",
@@ -944,6 +1002,8 @@ def main():
         cmd_venv(args)
     elif args.cmd == "server":
         cmd_server(args)
+    elif args.cmd == "generate":
+        cmd_generate(args)
 
 
 if __name__ == "__main__":
