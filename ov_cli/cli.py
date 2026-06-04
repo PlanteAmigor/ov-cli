@@ -288,13 +288,16 @@ def cmd_setup(args):
     subprocess.check_call([_sys.executable, "-m", "venv", venv_path, "--clear"])
     pip = _pip_path(venv_path)
     print(f"  {TR('安装依赖...', 'Installing dependencies...')}")
+    # 先装 CPU-only torch（避免拉 CUDA 全家桶 ~3.4G）
+    subprocess.check_call([pip, "install", "-v",
+                           "torch", "torchvision",
+                           "--index-url", "https://download.pytorch.org/whl/cpu"])
+
     pkgs = [
         "openvino>=2026.2",
         "openvino-tokenizers",
         "openvino-genai",
         "nncf>=3.0",
-        "torch",
-        "torchvision",
         "pillow",
         "numpy",
         "jinja2",
