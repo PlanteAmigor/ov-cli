@@ -86,7 +86,7 @@ def _apply_gemma4_patch():
         key_states, value_states = past_key_values.shared_layers[self.kv_shared_layer_index]"""
 
     old = old_line + "\n        key_states, value_states = past_key_values.shared_layers[self.kv_shared_layer_index]"
-    new = old_line + new_lines
+    new = new_lines
     if old in content:
         content = content.replace(old, new)
         with open(patcher_path, "w") as f:
@@ -251,7 +251,17 @@ def _prompt_mode(has_genai_src):
 
 def cmd_setup(args):
     """ov-cli setup: 创建虚拟环境并安装依赖"""
+    import shutil
     workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    # 检查目录写入权限
+    if not os.access(workspace, os.W_OK):
+        _user = os.environ.get("USER", "")
+        print(f"  {TR('错误: 当前目录没有写入权限', 'Error: no write permission')}")
+        print(f"  {TR('请执行以下命令后重试:', 'Run the following command and retry:')}")
+        print(f"    sudo chown -R {_user}:{_user} {workspace}")
+        sys.exit(1)
+
     genai_src = os.path.join(workspace, "openvino.genai-2026.2.0.0-optimization")
     mode = _prompt_mode(os.path.isdir(genai_src))
 
@@ -282,9 +292,20 @@ def cmd_setup(args):
     except EOFError:
         mode = 1
 
+    # 检查系统依赖
+    import subprocess, sys as _sys
+    for _pkg, _hint in [("venv", "python3-venv"), ("pip", "python3-pip")]:
+        _ok = subprocess.run(
+            [sys.executable, "-c", f"import {_pkg}"],
+            capture_output=True, text=True
+        ).returncode == 0
+        if not _ok:
+            print(f"  {TR('错误: 缺少 {_hint}', 'Error: missing {_hint}').format(_hint=_hint)}")
+            print(f"  {TR('请执行:', 'Run:')} sudo apt install {_hint}")
+            sys.exit(1)
+
     venv_path = args.venv or os.path.join(workspace, ".venv")
     print(f"  {TR('创建虚拟环境', 'Creating venv')}: {venv_path}")
-    import subprocess, sys as _sys
     subprocess.check_call([_sys.executable, "-m", "venv", venv_path, "--clear"])
     pip = _pip_path(venv_path)
     print(f"  {TR('安装依赖...', 'Installing dependencies...')}")
@@ -342,7 +363,6 @@ def cmd_setup(args):
 
     # 编译 GenAI 源码（模式2）
     if mode == 2:
-        import shutil
         deps_ok = True
         for dep, hint in [("cmake", "sudo apt install cmake"),
                           ("gcc", "sudo apt install gcc"),
