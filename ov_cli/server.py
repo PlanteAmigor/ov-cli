@@ -26,8 +26,8 @@ from pydantic import BaseModel
 
 # FastAPI / uvicorn 按需安装
 try:
-    from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-    from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
+    from fastapi import FastAPI, HTTPException, Request, Response, StreamingResponse
+    from fastapi.responses import HTMLResponse, JSONResponse
 except ImportError:
     raise ImportError(
         "需要安装 fastapi + uvicorn:\n"
@@ -260,21 +260,13 @@ async def _stream_chat(request_id: str, model_path: str, device: str,
         # ── Optimum 格式流式 ──
         model = state["model"]
         processor = state["processor"]
-        prompt = processor.apply_chat_template(messages, tokenize=False,
-            add_generation_prompt=True, chat_template_kwargs={"enable_thinking": True})
         from transformers import TextIteratorStreamer
         from threading import Thread
 
-        # 图片 → processor（不是 model.generate）
+        # 图片 → processor
         pil_images = _extract_images_pil(messages)
 
-        # 为每张图插入占位标记
         img_tag = "<|vision_start|><|image_pad|><|vision_end|>\n"
-        prompt_lines = messages[-1].get("content", "") if messages else ""
-        if isinstance(prompt_lines, list):
-            text = " ".join(p.get("text", "") for p in prompt_lines if isinstance(p, dict) and p.get("type") == "text")
-        else:
-            text = prompt_lines if isinstance(prompt_lines, str) else ""
         prompt = processor.apply_chat_template(messages, tokenize=False,
             add_generation_prompt=True, chat_template_kwargs={"enable_thinking": True})
 
@@ -632,18 +624,6 @@ def create_app(model_path: str, device: str = "", host: str = "0.0.0.0", port: i
         except Exception:
             count = 0
         return {"tokens": [count]}
-
-    # ── WebSocket（用于 tokenizer 等实时通信） ──
-    @app.websocket("/ws")
-    async def websocket_endpoint(ws: WebSocket):
-        await ws.accept()
-        try:
-            while True:
-                data = await ws.receive_text()
-                # 简单回显
-                await ws.send_text(json.dumps({"echo": data}))
-        except WebSocketDisconnect:
-            pass
 
     # ── 停止生成 ──
     @app.post("/v1/chat/completions/control")
