@@ -401,6 +401,16 @@ def cmd_chat(args):
     """ov-cli chat"""
     from .chat import load_model, run_chat, run_translate
 
+    mode = args.mode
+    if mode == "auto":
+        # auto 模式下先加载模型再判断（需要 model_type）
+        pass
+    elif mode == "once":
+        if not args.prompt and not args.file:
+            print(f"  ⚠ {TR('once 模式需要 --prompt 和/或 --file 参数',
+                           'once mode requires --prompt and/or --file')}")
+            sys.exit(1)
+
     ov_path = os.path.abspath(args.model)
     if not os.path.isdir(ov_path):
         print(f"{TR('错误: 找不到模型目录', 'Error: model directory not found')}: {ov_path}")
@@ -426,6 +436,14 @@ def cmd_chat(args):
 
     if mode == "translate":
         run_translate(ctx, max_tokens=args.max_tokens)
+    elif mode == "once":
+        from .chat import run_once
+        prompt = args.prompt.replace("\\n", "\n") if args.prompt else ""
+        run_once(ctx, prompt=prompt, files=args.file or [],
+                 output=args.output,
+                 temperature=args.temp, top_p=args.top_p,
+                 top_k=args.top_k, max_tokens=args.max_tokens,
+                 reasoning=args.reasoning == "on")
     else:
         run_chat(ctx, system=args.system,
                  temperature=args.temp, top_p=args.top_p,
@@ -690,8 +708,16 @@ def main():
     p_chat.add_argument("--model", "-m", required=True,
                         help=TR("OpenVINO 模型目录 (须包含 openvino_model.xml)",
                                 "OpenVINO model dir (must contain openvino_model.xml)"))
-    p_chat.add_argument("--mode", choices=["chat", "translate", "auto"], default="auto",
-                        help=TR("运行模式 (默认: auto 自动检测)", "mode (default: auto-detect)"))
+    p_chat.add_argument("--mode", choices=["chat", "translate", "once", "auto"], default="auto",
+                        help=TR("运行模式: chat=交互, translate=翻译, once=单次输出 (默认: auto)",
+                                "mode: chat=interactive, translate=translation, once=single output (default: auto)"))
+    p_chat.add_argument("--prompt",
+                        help=TR("输入文字 (支持 \\n 换行，仅 once 模式)", "input text (supports \\n, once mode only)"))
+    p_chat.add_argument("--file", action="append", default=None,
+                        help=TR("上传文件 (可多次使用，仅 once 模式)", "file path (can be used multiple times, once mode only)"))
+    p_chat.add_argument("--output",
+                        help=TR("输出目录或文件路径 (自动生成 .md，仅 once 模式)",
+                                "output dir or file path (auto .md, once mode only)"))
     p_chat.add_argument("--system", default="You are a helpful AI assistant.",
                         help=TR("系统提示词 (仅 chat 模式)", "system prompt (chat mode only)"))
     p_chat.add_argument("--temp", type=float, default=0.7,
