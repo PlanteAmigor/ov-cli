@@ -96,12 +96,39 @@ def cmd_server(args):
 
 
 def cmd_generate(args):
-    """ov-cli generate: 文生图"""
-    from .generate import load_model, run_once, run_generate
+    """ov-cli generate: 文生图 / TTS 语音合成（自动识别）"""
+    from .generate import _detect_model_type, load_model, load_tts_model, run_once, run_tts_once, run_generate
     ov_path = os.path.abspath(args.model)
     if not os.path.isdir(ov_path):
         print(f"{TR('错误: 找不到模型目录', 'Error: model directory not found')}: {ov_path}")
         sys.exit(1)
+
+    mtype = _detect_model_type(ov_path)
+
+    # ── TTS 路径 ──
+    if mtype in ("tts_cv", "tts_base"):
+        ctx = load_tts_model(ov_path, device=args.device)
+        if mtype == "tts_cv":
+            print(f"  {TR('类型: TTS CustomVoice', 'Type: TTS CustomVoice')}", file=sys.stderr)
+            speakers = ctx["model"].get_supported_speakers()
+            print(f"  {TR('预设声音:', 'Preset voices:')} {', '.join(speakers)}", file=sys.stderr)
+        else:
+            print(f"  {TR('类型: TTS Base (声音克隆)', 'Type: TTS Base (Voice Clone)')}", file=sys.stderr)
+        print(file=sys.stderr)
+        if args.mode == "once":
+            if not args.prompt:
+                print(f"  ⚠ {TR('once 模式需要 --prompt 参数', 'once mode requires --prompt')}")
+                sys.exit(1)
+            run_tts_once(ctx, text=args.prompt, output=args.output,
+                         speaker=args.speaker, language=args.lang,
+                         instruct=args.instruct, ref_audio=args.ref_audio,
+                         warmup=not args.no_warmup, json_output=args.json)
+        else:
+            print(f"  ⚠ {TR('TTS 仅支持 once 模式', 'TTS only supports once mode')}")
+            sys.exit(1)
+        return
+
+    # ── 文生图路径（原有逻辑） ──
     ctx = load_model(ov_path)
     if args.mode == "once":
         if not args.prompt:
@@ -180,6 +207,7 @@ def _build_help():
             "  ./ov-cli chat --model ./gemma-4-E2B-it-ov-int4\n"
             "  ./ov-cli whisper --model ./whisper/ov-large\n"
             "  ./ov-cli generate --model ./FLUX/ov-int4\n"
+            "  ./ov-cli generate --model ./0.6B-CV-ov --prompt 你好 --speaker Vivian\n"
             "  ./ov-cli server --model ./model-ov --port 8080\n"
             "  ./ov-cli setup --fix\n"
         )
@@ -191,6 +219,7 @@ def _build_help():
             "  ./ov-cli chat --model ./gemma-4-E2B-it-ov-int4\n"
             "  ./ov-cli whisper --model ./whisper/ov-large\n"
             "  ./ov-cli generate --model ./FLUX/ov-int4\n"
+            "  ./ov-cli generate --model ./0.6B-CV-ov --prompt hello --speaker vivian\n"
             "  ./ov-cli server --model ./model-ov --port 8080\n"
             "  ./ov-cli setup --fix\n"
         )
@@ -255,7 +284,16 @@ def main():
     p.add_argument("--port", type=int, default=8080)
 
     # generate
-    p = sub.add_parser("generate", help=TR("文生图", "Generate"))
+    p = sub.add_parser("generate", help=TR("文生图 / TTS 语音合成", "Generate / TTS"),
+        description=TR(
+            "文生图 (Text2Image) 或 TTS 语音合成。自动识别模型类型。\n\n"
+            "CustomVoice 示例:\n"
+            "  ov-cli generate --model ./0.6B-CV-ov --prompt 你好 --speaker Vivian --output voice.wav\n\n"
+            "Base 声音克隆示例:\n"
+            "  ov-cli generate --model ./0.6B-ov --prompt 你好 --ref-audio ref.mp3 --output voice.wav\n\n"
+            "文生图示例:\n"
+            "  ov-cli generate --model ./FLUX-ov --prompt 'a cat' --width 1024 --height 768",
+            "Image generation or TTS. Auto-detects model type."))
     p.add_argument("--model", "-m", required=True)
     p.add_argument("--mode", choices=["interactive","once"], default="interactive")
     p.add_argument("--prompt"), p.add_argument("--output", "-o")
@@ -264,6 +302,13 @@ def main():
     p.add_argument("--steps", type=int, default=4)
     p.add_argument("--guidance", type=float, default=0.0)
     p.add_argument("--json", action="store_true", help=TR("JSON 格式输出", "JSON output"))
+    # TTS 参数
+    p.add_argument("--speaker", help=TR("预设声音 (CustomVoice)", "Speaker (CustomVoice)"))
+    p.add_argument("--lang", help=TR("语言 (auto/chinese/english...)", "Language"))
+    p.add_argument("--instruct", help=TR("语气指令", "Voice instruction"))
+    p.add_argument("--ref-audio", help=TR("参考音频路径 (Base 模型)", "Reference audio (Base model)"))
+    p.add_argument("--device", default=None, help=TR("推理设备 (auto/CPU/GPU)", "Device"))
+    p.add_argument("--no-warmup", action="store_true", help=TR("跳过预热", "Skip warmup"))
 
     # whisper
     p = sub.add_parser("whisper", help=TR("语音转文字", "Whisper"))
