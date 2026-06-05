@@ -27,20 +27,21 @@ def load_model(ov_path):
     """加载 Text2ImagePipeline。"""
     import openvino as ov
     device = "GPU" if "GPU" in ov.Core().available_devices else "CPU"
-    print(f"  {TR('加载 Text2ImagePipeline ({})...', 'Loading Text2ImagePipeline ({})...').format(device)}", end=" ", flush=True)
+    print(f"  {TR('加载 Text2ImagePipeline ({})...', 'Loading Text2ImagePipeline ({})...').format(device)}", end=" ", flush=True, file=sys.stderr)
     t0 = time.time()
     pipe = ov_genai.Text2ImagePipeline(ov_path, device)
-    print(f"✓ ({time.time()-t0:.1f}s)")
+    print(f"✓ ({time.time()-t0:.1f}s)", file=sys.stderr)
     return {"pipe": pipe, "device": device}
 
 
 # ── 单次生图 ──
 
 def run_once(ctx, prompt, output=None, width=_DEFAULT_WIDTH, height=_DEFAULT_HEIGHT,
-             steps=_DEFAULT_STEPS, guidance=_DEFAULT_GUIDANCE, seed=None):
+             steps=_DEFAULT_STEPS, guidance=_DEFAULT_GUIDANCE, seed=None, json_output=False):
     """单次生图，输出完自动退出。"""
+    import json as _json
     pipe = ctx["pipe"]
-    print(f"  {TR('⏳ 生成中...', '⏳ Generating...')}", end=" ", flush=True)
+    print(f"  {TR('⏳ 生成中...', '⏳ Generating...')}", end=" ", flush=True, file=sys.stderr)
     t0 = time.time()
 
     kwargs = {"width": width, "height": height, "num_inference_steps": steps,
@@ -51,8 +52,8 @@ def run_once(ctx, prompt, output=None, width=_DEFAULT_WIDTH, height=_DEFAULT_HEI
     try:
         result = pipe.generate(prompt, **kwargs)
     except Exception as e:
-        print(f"✗")
-        print(f"  {TR('生图失败', 'Generation failed')}: {str(e)[:200]}")
+        print(f"✗", file=sys.stderr)
+        print(f"  {TR('生图失败', 'Generation failed')}: {str(e)[:200]}", file=sys.stderr)
         sys.exit(1)
 
     img = Image.fromarray(result.data[0])
@@ -61,16 +62,22 @@ def run_once(ctx, prompt, output=None, width=_DEFAULT_WIDTH, height=_DEFAULT_HEI
     if output:
         os.makedirs(os.path.dirname(output) or ".", exist_ok=True)
         img.save(output)
-        print(f"✓ ({elapsed:.1f}s)")
-        print(f"  {TR('💾 已保存', '💾 Saved')}: {output}")
+        path = output
     else:
         safe = "".join(c if c.isalnum() or c in " _-" else "_" for c in prompt)[:40]
         fname = f"{time.strftime('%Y%m%d_%H%M%S')}_{safe}.png"
         os.makedirs("outputs", exist_ok=True)
         path = os.path.join("outputs", fname)
         img.save(path)
-        print(f"✓ ({elapsed:.1f}s)")
-        print(f"  {TR('💾 已保存', '💾 Saved')}: {path}")
+
+    print(f"✓ ({elapsed:.1f}s)", file=sys.stderr)
+    print(f"  {TR('💾 已保存', '💾 Saved')}: {path}", file=sys.stderr)
+
+    # stdout: 路径 / JSON
+    if json_output:
+        print(_json.dumps({"path": path, "time": round(elapsed, 1)}, ensure_ascii=False))
+    else:
+        print(path)
 
     return img
 
