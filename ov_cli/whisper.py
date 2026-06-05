@@ -45,26 +45,27 @@ def _print_help():
 def load_model(ov_path):
     """加载 WhisperPipeline。"""
     device = "GPU" if "GPU" in ov.Core().available_devices else "CPU"
-    print(f"  {TR('加载 WhisperPipeline ({})...', 'Loading WhisperPipeline ({})...').format(device)}", end=" ", flush=True)
+    print(f"  {TR('加载 WhisperPipeline ({})...', 'Loading WhisperPipeline ({})...').format(device)}", end=" ", flush=True, file=sys.stderr)
     t0 = time.time()
     pipe = ov_genai.WhisperPipeline(ov_path, device)
-    print(f"✓ ({time.time()-t0:.1f}s)")
+    print(f"✓ ({time.time()-t0:.1f}s)", file=sys.stderr)
     return {"pipe": pipe, "device": device}
 
 
 # ── 单次转录 ──
 
-def run_once(ctx, file_path, lang=None, output=None):
+def run_once(ctx, file_path, lang=None, output=None, json_output=False):
     """单次转录，输出完自动退出。"""
+    import json as _json
     pipe = ctx["pipe"]
 
     ok, ext = _is_audio_file(file_path)
     if not ok:
-        print(f"  ❌ {TR('不支持的文件格式: {}', 'Unsupported format: {}').format(ext)}")
-        print(f"     {TR('支持的格式:', 'Supported formats:')} {FORMAT_HINT}")
+        print(f"  ❌ {TR('不支持的文件格式: {}', 'Unsupported format: {}').format(ext)}", file=sys.stderr)
+        print(f"     {TR('支持的格式:', 'Supported formats:')} {FORMAT_HINT}", file=sys.stderr)
         return
 
-    print(f"  {TR('⏳ 转录中...', '⏳ Transcribing...')}", end=" ", flush=True)
+    print(f"  {TR('⏳ 转录中...', '⏳ Transcribing...')}", end=" ", flush=True, file=sys.stderr)
     t0 = time.time()
 
     data = _load_audio(file_path)
@@ -76,18 +77,20 @@ def run_once(ctx, file_path, lang=None, output=None):
     text = result.texts[0] if result.texts else ""
     elapsed = time.time() - t0
     audio_sec = len(data) / 16000
-    print(f"✓ ({elapsed:.1f}s, {audio_sec:.0f}s {TR('音频', 'audio')})")
-    print()
-    print("─" * 50)
-    print(text)
-    print("─" * 50)
+    print(f"✓ ({elapsed:.1f}s, {audio_sec:.0f}s {TR('音频', 'audio')})", file=sys.stderr)
+
+    # stdout: 纯结果
+    if json_output:
+        print(_json.dumps({"text": text, "time": round(elapsed, 1), "duration": round(audio_sec, 0)}, ensure_ascii=False))
+    else:
+        print(text)
 
     # 保存
     if output:
         with open(output, "w", encoding="utf-8") as f:
             f.write(text)
             f.write(f"\n\n<!-- ov-cli whisper | {time.strftime('%Y-%m-%d %H:%M:%S')} | {file_path} -->\n")
-        print(f"  {TR('已保存', 'Saved')}: {output}")
+        print(f"  {TR('已保存', 'Saved')}: {output}", file=sys.stderr)
 
 
 # ── 交互模式 ──
