@@ -152,7 +152,7 @@ Interactive terminal. Auto-detects model format (GenAI / Optimum), supports stre
 | Command | Description |
 |---------|-------------|
 | `//img PATH1 [PATH2 ...]` | Load image(s) (VLM) |
-| `//pdf PATH` | Load PDF (auto-convert to images, max 24 pages) |
+| `//pdf PATH` | Load PDF (auto-convert to images, max 24 pages, [why?](https://github.com/openvinotoolkit/openvino/issues/36260)) |
 | `//txt PATH1 [PATH2 ...]` | Load text file(s) |
 | `/file` | List loaded files |
 | `/temp N` | Set temperature (0-2) |

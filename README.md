@@ -152,7 +152,7 @@ eval "$(./ov-cli venv --venv ./my-venv)"
 | 命令 | 说明 |
 |------|------|
 | `//img PATH1 [PATH2 ...]` | 加载图片（支持多文件，VLM） |
-| `//pdf PATH` | 加载 PDF（自动转图片，最多 24 页） |
+| `//pdf PATH` | 加载 PDF（自动转图片，最多 24 页，[限页原因](https://github.com/openvinotoolkit/openvino/issues/36260)） |
 | `//txt PATH1 [PATH2 ...]` | 加载文本文件（支持多文件） |
 | `/file` | 查看已加载文件列表 |
 | `/temp N` | 设置温度 (0-2) |
