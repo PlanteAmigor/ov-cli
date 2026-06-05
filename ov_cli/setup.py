@@ -297,6 +297,8 @@ def cmd_setup(args, workspace):
             "accelerate",
             "wcwidth",
             "PyMuPDF",
+            "soundfile",
+            "scipy",
         ]
         subprocess.check_call([pip, "install", "-v"] + pkgs)
 
