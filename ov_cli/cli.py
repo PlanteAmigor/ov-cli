@@ -965,6 +965,45 @@ def main():
     p_gen.add_argument("--guidance", type=float, default=0.0,
                        help=TR("guidance scale (默认: 0.0)", "guidance scale (default: 0.0)"))
 
+    # ── whisper ──
+    p_whisper = sub.add_parser(
+        "whisper",
+        help=TR("语音转文字 (Whisper)", "Speech to text (Whisper)"),
+        description=TR(
+            "使用 WhisperPipeline 转录音频，支持交互式和单次模式。\n"
+            "\n"
+            "交互式: 直接运行，输入音频路径后转录\n"
+            "单次:   --mode once --file audio.mp3\n"
+            "\n"
+            "支持格式: .wav .mp3 .flac .ogg .aiff\n"
+            "\n"
+            "示例:\n"
+            "  ./ov-cli whisper --model ./whisper/ov-large\n"
+            "  ./ov-cli whisper --model ./whisper/ov-large --mode once --file speech.mp3",
+            "Transcribe audio via WhisperPipeline.\n"
+            "Interactive mode: run without --mode once\n"
+            "Single mode: --mode once --file audio.mp3\n"
+            "\n"
+            "Supported formats: .wav .mp3 .flac .ogg .aiff\n"
+            "\n"
+            "Examples:\n"
+            "  ./ov-cli whisper --model ./whisper/ov-large\n"
+            "  ./ov-cli whisper --model ./whisper/ov-large --mode once --file speech.mp3",
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_whisper.add_argument("--model", "-m", required=True,
+                           help=TR("OpenVINO Whisper 模型目录", "OpenVINO Whisper model dir"))
+    p_whisper.add_argument("--mode", choices=["interactive", "once"], default="interactive",
+                           help=TR("运行模式: interactive=交互, once=单次 (默认: interactive)",
+                                   "mode: interactive=chat, once=single (default: interactive)"))
+    p_whisper.add_argument("--file",
+                           help=TR("音频文件路径 (单次模式)", "audio file path (once mode)"))
+    p_whisper.add_argument("--output", "-o",
+                           help=TR("输出文本路径 (单次模式)", "output text path (once mode)"))
+    p_whisper.add_argument("--lang",
+                           help=TR("语言代码 (默认: 自动检测)", "language code (default: auto-detect)"))
+
     # ── venv ──
     p_venv = sub.add_parser(
         "venv",
@@ -1010,6 +1049,28 @@ def main():
         cmd_server(args)
     elif args.cmd == "generate":
         cmd_generate(args)
+    elif args.cmd == "whisper":
+        cmd_whisper(args)
+
+
+def cmd_whisper(args):
+    """ov-cli whisper: 语音转文字"""
+    from .whisper import load_model, run_once, run_whisper
+
+    ov_path = os.path.abspath(args.model)
+    if not os.path.isdir(ov_path):
+        print(f"{TR('错误: 找不到模型目录', 'Error: model directory not found')}: {ov_path}")
+        sys.exit(1)
+
+    ctx = load_model(ov_path)
+
+    if args.mode == "once":
+        if not args.file:
+            print(f"  ⚠ {TR('once 模式需要 --file 参数', 'once mode requires --file')}")
+            sys.exit(1)
+        run_once(ctx, file_path=args.file, lang=args.lang, output=args.output)
+    else:
+        run_whisper(ctx, lang=args.lang)
 
 
 if __name__ == "__main__":
