@@ -121,13 +121,13 @@ def load_model(ov_path):
         # === GenAI 格式（optimum-cli 导出，openvino-genai 推理） ===
         is_vlm = _is_multimodal(ov_path)
         tag = "VLM" if is_vlm else "LLM"
-        print(f"  加载 {tag}Pipeline ({device})...", end=" ", flush=True)
+        print(f"  加载 {tag}Pipeline ({device})...", end=" ", flush=True, file=sys.stderr)
         t0 = time.time()
         if is_vlm:
             pipe = ov_genai.VLMPipeline(ov_path, device)
         else:
             pipe = ov_genai.LLMPipeline(ov_path, device)
-        print(f"✓ ({time.time()-t0:.1f}s)")
+        print(f"✓ ({time.time()-t0:.1f}s)", file=sys.stderr)
 
         # 从 config.json 读 model_type
         model_type = None
@@ -452,9 +452,10 @@ _hist_buf = ""
 
 def run_once(ctx, prompt="", files=None, output=None,
              temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024,
-             reasoning=True):
+             reasoning=True, json_output=False):
     """单次输出模式：读取文件 + 文字，一次生成，输出后退出。"""
     import numpy as np
+    import json as _json
     from . import TR
 
     is_vlm = ctx.get("is_vlm", False)
@@ -592,7 +593,7 @@ def run_once(ctx, prompt="", files=None, output=None,
     # 输出统计
     elapsed = time.time() - t0
     char_count = len(reply_text.replace(" ", ""))
-    print(f"\n  [{elapsed:.1f}s | {char_count} chars | {char_count/elapsed:.1f} ch/s]")
+    print(f"\n  [{elapsed:.1f}s | {char_count} chars | {char_count/elapsed:.1f} ch/s]", file=sys.stderr)
 
     # 保存到文件
     if output:
@@ -600,7 +601,6 @@ def run_once(ctx, prompt="", files=None, output=None,
         if os.path.isdir(out_path) or out_path.endswith(os.sep):
             ts = time.strftime("%Y%m%d_%H%M%S")
             out_path = os.path.join(out_path, f"{ts}.md")
-        # 生成元信息头
         meta_parts = [f"mode: once | {time.strftime('%Y-%m-%d %H:%M:%S')}"]
         if prompt:
             meta_parts.append(f"prompt: {prompt}")
@@ -609,7 +609,13 @@ def run_once(ctx, prompt="", files=None, output=None,
         meta = f"<!-- ov-cli | {' | '.join(meta_parts)} -->\n\n"
         with open(out_path, "w", encoding="utf-8") as f:
             f.write(meta + reply_text)
-        print(f"  💾 {TR('已保存', 'Saved')}: {out_path}")
+        print(f"  💾 {TR('已保存', 'Saved')}: {out_path}", file=sys.stderr)
+
+    # stdout: 纯结果 / JSON
+    if json_output:
+        print(_json.dumps({"text": reply_text, "tokens": 0, "time": round(elapsed, 1)}, ensure_ascii=False))
+    else:
+        print(reply_text)
 
 
 def run_chat(ctx, system="You are a helpful AI assistant.",
@@ -813,7 +819,7 @@ def _load_optimum(ov_path, device):
     from optimum.intel import OVModelForVisualCausalLM
     from transformers import AutoProcessor
 
-    print(f"  加载 OVModelForVisualCausalLM ({device})...", end=" ", flush=True)
+    print(f"  加载 OVModelForVisualCausalLM ({device})...", end=" ", flush=True, file=sys.stderr)
     t0 = time.time()
     model = OVModelForVisualCausalLM.from_pretrained(ov_path, device=device)
     processor = AutoProcessor.from_pretrained(ov_path, trust_remote_code=True)

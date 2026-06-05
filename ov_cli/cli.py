@@ -109,7 +109,8 @@ def cmd_generate(args):
             sys.exit(1)
         run_once(ctx, prompt=args.prompt, output=args.output,
                  width=args.width, height=args.height,
-                 steps=args.steps, guidance=args.guidance)
+                 steps=args.steps, guidance=args.guidance,
+                 json_output=args.json)
     else:
         run_generate(ctx, width=args.width, height=args.height,
                      steps=args.steps, guidance=args.guidance)
@@ -143,7 +144,7 @@ def cmd_chat(args):
         run_once(ctx, prompt=prompt, files=args.file or [],
                  output=args.output, temperature=args.temp, top_p=args.top_p,
                  top_k=args.top_k, max_tokens=args.max_tokens,
-                 reasoning=args.reasoning == "on")
+                 reasoning=args.reasoning == "on", json_output=args.json)
     else:
         run_chat(ctx, system=args.system, temperature=args.temp, top_p=args.top_p,
                  top_k=args.top_k, max_tokens=args.max_tokens, image_path=args.image,
@@ -162,7 +163,7 @@ def cmd_whisper(args):
         if not args.file:
             print(f"  ⚠ {TR('once 模式需要 --file 参数', 'once mode requires --file')}")
             sys.exit(1)
-        run_once(ctx, file_path=args.file, lang=args.lang, output=args.output)
+        run_once(ctx, file_path=args.file, lang=args.lang, output=args.output, json_output=args.json)
     else:
         run_whisper(ctx, lang=args.lang)
 
@@ -234,6 +235,7 @@ def main():
     p.add_argument("--mode", choices=["chat","translate","once"], default="chat")
     p.add_argument("--prompt"), p.add_argument("--file", action="append", default=None)
     p.add_argument("--output"), p.add_argument("--system", default="You are a helpful AI assistant.")
+    p.add_argument("--json", action="store_true", help=TR("JSON 格式输出", "JSON output"))
     p.add_argument("--temp", type=float, default=0.7)
     p.add_argument("--top-p", type=float, default=0.9, dest="top_p")
     p.add_argument("--top-k", type=int, default=40, dest="top_k")
@@ -261,6 +263,7 @@ def main():
     p.add_argument("--height", type=int, default=512)
     p.add_argument("--steps", type=int, default=4)
     p.add_argument("--guidance", type=float, default=0.0)
+    p.add_argument("--json", action="store_true", help=TR("JSON 格式输出", "JSON output"))
 
     # whisper
     p = sub.add_parser("whisper", help=TR("语音转文字", "Whisper"))
@@ -268,6 +271,7 @@ def main():
     p.add_argument("--mode", choices=["interactive","once"], default="interactive")
     p.add_argument("--file"), p.add_argument("--output", "-o")
     p.add_argument("--lang")
+    p.add_argument("--json", action="store_true", help=TR("JSON 格式输出", "JSON output"))
 
     # venv
     p = sub.add_parser("venv", help=TR("进入环境", "Venv"))
