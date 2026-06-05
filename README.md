@@ -368,5 +368,3 @@ sudo apt install intel-level-zero-gpu libze1
 - [OpenVINO 文档](https://docs.openvino.ai/)
 - [OpenVINO GitHub](https://github.com/openvinotoolkit/openvino)
 - [OpenVINO Toolkit 仓库](https://github.com/orgs/openvinotoolkit/repositories?type=all)
-
-
