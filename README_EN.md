@@ -145,6 +145,7 @@ Interactive terminal. Auto-detects model format (GenAI / Optimum), supports stre
 # Once mode (single output, auto-exit)
 ./ov-cli chat --model ./model-ov --mode once --prompt "Hello"
 ./ov-cli chat --model ./model-ov --mode once --file ./doc.pdf --prompt "summarize" --output ./outputs/
+./ov-cli chat --model ./model-ov --mode once --prompt "Hello" --json            # JSON output
 ```
 
 **In-chat commands** (chat mode only):
@@ -233,6 +234,7 @@ Generate images via OpenVINO GenAI Text2ImagePipeline. Supports interactive and 
 
 # Single mode (auto-exit after output)
 ./ov-cli generate --model ./FLUX/ov-int4 --mode once --prompt "cat" -o cat.png
+./ov-cli generate --model ./FLUX/ov-int4 --mode once --prompt "cat" --json       # JSON output
 ```
 
 **In-chat commands** (interactive mode only):
@@ -247,6 +249,63 @@ Generate images via OpenVINO GenAI Text2ImagePipeline. Supports interactive and 
 | `/history` | View generated images |
 | `/help` | Help |
 | `/exit` | Exit |
+
+### `whisper` — Speech-to-Text
+
+Transcribe audio via OpenVINO GenAI WhisperPipeline. Supports interactive and single modes.
+
+```bash
+# Interactive
+./ov-cli whisper --model ./whisper/ov-large
+
+# Single mode (auto-exit after output)
+./ov-cli whisper --model ./whisper/ov-large --mode once --file speech.mp3 -o output.txt
+./ov-cli whisper --model ./whisper/ov-large --mode once --file speech.mp3 --json   # JSON output
+```
+
+**Note:** Whisper adds punctuation based on audio pauses and intonation.
+TTS-generated audio has even pacing without natural pauses, so transcriptions may lack punctuation — this is expected behavior.
+
+## External Integration
+
+ov-cli can be called from other projects via `--mode once` and `--json`. Logs go to stderr, stdout contains only the clean result.
+
+### Commands Supporting External Calls
+
+| Command | once mode | `--json` | stdout output |
+|:--------|:---------:|:--------:|:--------------|
+| `chat` | `--mode once --prompt TEXT [--file ...]` | ✅ | reply text / `{"text":"...","time":n}` |
+| `whisper` | `--mode once --file audio.mp3` | ✅ | transcription / `{"text":"...","time":n,"duration":n}` |
+| `generate` | `--mode once --prompt "cat" [-o output.png]` | ✅ | image path / `{"path":"...","time":n}` |
+
+### Recommended Usage
+
+```bash
+# Shell: capture plain text
+text=$(/path/to/ov-cli whisper -m ./model --mode once -f speech.mp3 2>/dev/null)
+
+# Shell: capture JSON
+json=$(/path/to/ov-cli whisper -m ./model --mode once -f speech.mp3 --json 2>/dev/null)
+```
+
+```python
+# Python subprocess
+import subprocess, json
+
+result = subprocess.run([
+    "/path/to/ov-cli", "whisper",
+    "--model", "./model",
+    "--mode", "once",
+    "--file", "speech.mp3",
+    "--json"
+], capture_output=True, text=True)
+
+if result.returncode == 0:
+    data = json.loads(result.stdout)
+    print(data["text"])  # transcription result
+```
+
+> 💡 Use `2>/dev/null` to suppress logs and keep only stdout. Without it, both logs and results show in terminal.
 
 ## Model Support
 
