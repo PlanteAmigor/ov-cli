@@ -237,6 +237,10 @@ EOF
 ./ov-cli whisper --model ./whisper/ov-large --mode once --file speech.mp3 -o output.txt
 ```
 
+> ⚠ **暂不支持模型转换**：当前 `convert` 命令不支持导出 Whisper 模型。请下载官方预转换模型：
+> - [HuggingFace Speech-to-Text 合集](https://huggingface.co/collections/OpenVINO/speech-to-text)
+> - [ModelScope Speech-to-Text 合集](https://www.modelscope.cn/collections/Speech-to-Text-b9ab5c24c32649)
+
 **注意：** Whisper 根据音频中的停顿和语调添加标点符号。
 TTS（文字转语音）生成的音频语速均匀、缺少自然停顿，转录结果可能不含句号逗号等标点，属正常现象。
 
