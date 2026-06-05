@@ -3,17 +3,20 @@ ov-cli convert: 模型转换。
 
 使用 Optimum Intel 官方工具将 HuggingFace 模型导出为 OpenVINO IR 格式。
 支持 INT8/INT4/NF4/MXFP4/CB4 等多种量化，自动推断 task 类型。
+也支持自定义 pipeline 转换（如 Qwen3-TTS）。
 """
 
 import os, sys, time, json, subprocess
+from pathlib import Path
 from ov_cli import TR
 
 # 模型类型 → 转换所需 transformers 版本（None = 使用当前版本）
 # 推理统一用 5.9，转换完成后自动恢复
 _MODEL_TF_VERSION = {
-    "gemma4":   ">=5.9",        # Gemma-4 需要高版本 transformers + 补丁
-    "qwen3_5":  "==5.2",        # Qwen3.5 必须 5.2（否则 DynamicCache 兼容问题）
-    "qwen3_6":  "==5.2",        # Qwen3.6 MoE 同 Qwen3.5
+    "gemma4":     ">=5.9",        # Gemma-4 需要高版本 transformers + 补丁
+    "qwen3_5":    "==5.2",        # Qwen3.5 必须 5.2（否则 DynamicCache 兼容问题）
+    "qwen3_6":    "==5.2",        # Qwen3.6 MoE 同 Qwen3.5
+    "qwen3_tts":  None,           # Qwen3-TTS 用自定义 helper，不依赖 transformers 版本
 }
 
 
@@ -23,6 +26,10 @@ def _detect_model_type(model_path):
     if os.path.isfile(cfg_path):
         with open(cfg_path) as f:
             cfg = json.load(f)
+        # 优先检查 architectures（Qwen3-TTS 等自定义模型）
+        archs = cfg.get("architectures", [])
+        if any("Qwen3TTS" in a for a in archs):
+            return "qwen3_tts"
         # 多模态模型 model_type 在 text_config 里
         mt = cfg.get("model_type", "")
         if mt in ("gemma4", "qwen3_5", "qwen3_6"):
@@ -53,7 +60,7 @@ def _ensure_transformers(model_type):
     elif needed.startswith(">="):
         needed_ver = tuple(int(x) for x in needed[2:].split("."))
         cur_ver_t = tuple(int(x) for x in cur_ver.split("."))
-        need_switch = cur_ver_t < needed_ver_t
+        need_switch = cur_ver_t < needed_ver
 
     if not need_switch:
         return False
@@ -75,6 +82,97 @@ def _ensure_transformers(model_type):
     ).strip()
     print(f"  ✓ 已切换至 transformers {new_ver}")
     return True
+
+
+def _get_pkg_version(pkg):
+    """获取已安装包的版本，不存在返回 None。"""
+    try:
+        return subprocess.check_output(
+            [sys.executable, "-c", f"import {pkg}; print({pkg}.__version__)"],
+            timeout=10, text=True,
+        ).strip()
+    except Exception:
+        return None
+
+
+def _ensure_qwen_tts():
+    """转换 Qwen3-TTS 前安装 qwen-tts，并修复 torchaudio CPU 兼容性。
+    返回 (old_transformers, old_hf_hub) 用于恢复。"""
+    old_tf = _get_pkg_version("transformers")
+    old_hf = _get_pkg_version("huggingface_hub")
+    print(f"  ⚡ 安装 qwen-tts（转换 Qwen3-TTS 所需）...")
+    try:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "--quiet", "qwen-tts"],
+            timeout=180,
+        )
+    except subprocess.TimeoutExpired:
+        print(f"  \u274c pip 下载超时 (180s)，请检查网络或手动执行: pip install qwen-tts")
+        sys.exit(1)
+    # 修复 torchaudio：qwen-tts 可能带了 CUDA 版，强制换 CPU 版
+    try:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "--force-reinstall", "--no-deps",
+             "torchaudio", "--extra-index-url", "https://download.pytorch.org/whl/cpu"],
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired:
+        pass  # torchaudio 非必需，超时无所谓
+    new_tf = _get_pkg_version("transformers")
+    if new_tf != old_tf:
+        print(f"  ⚡ transformers 已从 {old_tf} 变为 {new_tf}，转换后恢复")
+    return old_tf, old_hf
+
+
+def _restore_qwen_transformers(old_tf, old_hf):
+    """Qwen3-TTS 转换后恢复 transformers 和 huggingface_hub 到之前版本。"""
+    # 先恢复 transformers（当前 huggingface_hub 还兼容当前 transformers）
+    if old_tf:
+        cur_tf = _pip_get_version("transformers")
+        if cur_tf != old_tf:
+            print(f"  ⚡ 恢复 transformers {old_tf}...")
+            try:
+                subprocess.check_call(
+                    [sys.executable, "-m", "pip", "install", "--no-deps", "--force-reinstall",
+                     f"transformers=={old_tf}"],
+                    timeout=120,
+                )
+            except subprocess.TimeoutExpired:
+                print(f"  \u274c pip 下载超时，请手动执行: pip install transformers=={old_tf}")
+                sys.exit(1)
+    # 再恢复 huggingface_hub（此时 transformers 已恢复，版本兼容没问题）
+    if old_hf:
+        cur_hf = _pip_get_version("huggingface_hub")
+        if cur_hf != old_hf:
+            print(f"  ⚡ 恢复 huggingface_hub {old_hf}...")
+            try:
+                subprocess.check_call(
+                    [sys.executable, "-m", "pip", "install", "--no-deps", "--force-reinstall",
+                     f"huggingface_hub=={old_hf}"],
+                    timeout=120,
+                )
+            except subprocess.TimeoutExpired:
+                print(f"  \u274c pip 下载超时")
+    # 用 pip list 查版本，避免 import 冲突
+    tf_ver = _pip_get_version("transformers")
+    hf_ver = _pip_get_version("huggingface_hub")
+    print(f"  ✓ 已恢复: transformers={tf_ver}, huggingface_hub={hf_ver}")
+
+
+def _pip_get_version(pkg):
+    """用 pip list 查已安装包版本，不触发 import。"""
+    try:
+        out = subprocess.check_output(
+            [sys.executable, "-m", "pip", "list", "--format=columns"],
+            timeout=10, text=True,
+        )
+        for line in out.splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[0].lower().replace("-", "_") == pkg.lower().replace("-", "_"):
+                return parts[1]
+        return None
+    except Exception:
+        return None
 
 
 def _restore_transformers():
@@ -133,11 +231,91 @@ def _infer_task(model_path):
     return "text-generation-with-past"
 
 
+def _convert_qwen3_tts(model_path, output_path, weight_format):
+    """用自定义 helper 转换 Qwen3-TTS 模型。"""
+    import sys as _sys
+    # 找 helper：优先 dlc/，再找 notebook 目录
+    helper_dirs = [
+        Path(__file__).parent.parent / "dlc",
+        Path(__file__).parent.parent / "model/openvino_notebooks-latest/notebooks/qwen3-tts",
+    ]
+    helper = None
+    for d in helper_dirs:
+        p = d / "qwen_tts_helper.py"
+        if p.exists():
+            helper = p
+            break
+    if helper is None:
+        print(f"  \u274c 找不到 qwen_tts_helper.py，请确认 dlc/ 或 notebooks 目录存在")
+        sys.exit(1)
+
+    _sys.path.insert(0, str(helper.parent))
+    # 安装/确保 qwen-tts 依赖
+    saved_tf, saved_hf = _ensure_qwen_tts()
+
+    # 量化配置（Qwen3-TTS 只支持 fp32/fp16/int8/int4）
+    _QWEN_TTS_QUANT = {
+        "fp32": None,
+        "fp16": None,
+        "int8": '{"mode": "int8"}',
+        "int4": '{"mode": "int4_sym", "ratio": 0.8, "group_size": 128}',
+    }
+    if weight_format not in _QWEN_TTS_QUANT:
+        supported = ", ".join(_QWEN_TTS_QUANT.keys())
+        print(f"  ⚠ Qwen3-TTS 不支持 {weight_format} 量化，支持: {supported}")
+        print(f"  将使用 fp32（不量化）继续...")
+        quant_config = "None"
+    else:
+        quant_config = _QWEN_TTS_QUANT[weight_format]
+
+    # 执行转换
+    helper_mod = helper.stem  # "qwen_tts_helper"
+    print(f"  使用 helper: {helper}")
+    print(f"  模型: {model_path}")
+    print(f"  量化: {weight_format}")
+    print(f"  输出: {output_path}")
+    print()
+    t0 = time.time()
+    try:
+        subprocess.check_call([
+            sys.executable, "-c", f"""
+import sys
+sys.path.insert(0, '{helper.parent}')
+from {helper_mod} import convert_qwen3_tts_model
+convert_qwen3_tts_model(
+    model_id=r'{model_path}',
+    output_dir=r'{output_path}',
+    quantization_config={quant_config},
+    use_local_dir=False,
+)
+"""], timeout=3600)
+        print(f"\n  ✓ ({time.time()-t0:.1f}s)")
+        # 统计
+        total_mb = 0
+        for f in Path(output_path).rglob("*.bin"):
+            total_mb += f.stat().st_size
+        print(f"  保存到: {output_path}  ({total_mb / 1024 / 1024:.0f} MB)")
+    except subprocess.CalledProcessError:
+        print(f"\n  ✗ 导出失败")
+        sys.exit(1)
+    except subprocess.TimeoutExpired:
+        print(f"\n  ✗ 导出超时 (60分钟)")
+        sys.exit(1)
+    finally:
+        # 恢复 transformers 和 huggingface_hub
+        _restore_qwen_transformers(saved_tf, saved_hf)
+
+
 def convert_model(model_path, output_path, weight_format,
                   ratio=1.0, group_size=128):
     """用 optimum-cli 导出模型。"""
     # 检测模型类型并确保 transformers 版本
     model_type = _detect_model_type(model_path)
+
+    # Qwen3-TTS 走自定义转换路径
+    if model_type == "qwen3_tts":
+        return _convert_qwen3_tts(model_path, output_path, weight_format)
+
     needs_restore = _ensure_transformers(model_type)
 
     task = _infer_task(model_path)

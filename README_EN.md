@@ -29,8 +29,9 @@ eval "$(./ov-cli venv)"
 # 3. Chat terminal
 ./ov-cli chat --model ./Qwen3/2B-ov
 
-# 4. Text-to-image
+# 4. Generate (Image / TTS)
 ./ov-cli generate --model ./FLUX/ov-int4
+./ov-cli generate --model ./0.6B-CV-ov --prompt Hello --speaker vivian
 
 # 5. API server
 ./ov-cli server --model ./Qwen3/2B-ov
@@ -224,20 +225,35 @@ EOF
 ./ov-cli benchmark --model ./Qwen3.6/35B-A3B-ov --reasoning off
 ```
 
-### `generate` — Text-to-Image
+### `generate` — Text-to-Image / TTS
 
-Generate images via OpenVINO GenAI Text2ImagePipeline. Supports interactive and single modes.
+Auto-detects model type (Text2Image / TTS CustomVoice / TTS Base).
+
+**Text-to-Image** (via OpenVINO GenAI Text2ImagePipeline, supports interactive/single):
 
 ```bash
-# Interactive (multi-turn generation)
+# Interactive (multi-turn)
 ./ov-cli generate --model ./FLUX/ov-int4
 
-# Single mode (auto-exit after output)
+# Single mode (auto-exit)
 ./ov-cli generate --model ./FLUX/ov-int4 --mode once --prompt "cat" -o cat.png
-./ov-cli generate --model ./FLUX/ov-int4 --mode once --prompt "cat" --json       # JSON output
+./ov-cli generate --model ./FLUX/ov-int4 --mode once --prompt "cat" --json
 ```
 
-**In-chat commands** (interactive mode only):
+**TTS CustomVoice** (preset speakers, no reference audio needed, once mode only):
+
+```bash
+./ov-cli generate --model ./0.6B-CV-ov --prompt "Hello" --speaker vivian
+./ov-cli generate --model ./0.6B-CV-ov --prompt "你好" --speaker Vivian --instruct "gently" -o voice.wav
+```
+
+**TTS Base (Voice Clone)** (requires reference audio, once mode only):
+
+```bash
+./ov-cli generate --model ./0.6B-ov --prompt "Hello" --ref-audio ref.mp3
+```
+
+**In-chat commands** (interactive mode only, Text2Image):
 
 | Command | Description |
 |---------|-------------|
@@ -276,7 +292,8 @@ ov-cli can be called from other projects via `--mode once` and `--json`. Logs go
 |:--------|:---------:|:--------:|:--------------|
 | `chat` | `--mode once --prompt TEXT [--file ...]` | ✅ | reply text / `{"text":"...","time":n}` |
 | `whisper` | `--mode once --file audio.mp3` | ✅ | transcription / `{"text":"...","time":n,"duration":n}` |
-| `generate` | `--mode once --prompt "cat" [-o output.png]` | ✅ | image path / `{"path":"...","time":n}` |
+| `generate (img)` | `--mode once --prompt "cat" [-o output.png]` | ✅ | image path / `{"path":"...","time":n}` |
+| `generate (tts)` | `--prompt TEXT (--mode once optional)` | ✅ | audio path / `{"path":"...","time":n,"duration":n}` |
 
 ### Recommended Usage
 
@@ -316,30 +333,24 @@ if result.returncode == 0:
 | **GenAI** | `LLMPipeline` / `VLMPipeline` | Standard export, `openvino_config.json` |
 | **Optimum** | `OVModelForVisualCausalLM` + `AutoProcessor` | Gemma-4 etc., has `openvino_text_embeddings_per_layer_model.xml` |
 
-### Verified Models
+### LLM
+
+#### Verified Models
 
 | Model | Format | Text | Image | Translate | Notes |
 |-------|--------|:----:|:-----:|:---------:|-------|
 | **Hy-MT2 1.8B** | GenAI | | | ✅ | Translation model, all 4 precisions |
 | **Gemma-4 E2B** | Optimum | ✅ | ✅ | | INT4, needs `kv_shared_layer` patch |
-| **Qwen3-VL 8B** | GenAI | ✅ | ✅ | | Pre-converted, 1 of 3 supported VLM |
+| **Qwen3-VL 8B** | GenAI | ✅ | ✅ | | Pre-converted |
 | **Qwen3.6 35B-A3B** | GenAI | ✅ | ✅ | | MoE, pre-converted |
 | **Qwen3.5 0.8B** | GenAI | ✅ | ❌ | | Small model VLM unsupported |
 | **Qwen3 2B** | GenAI | ✅ | ❌ | | Vision encoder reshape bug |
 
-> **VLM note**: Among Qwen models, GenAI `VLMPipeline` only supports vision for **Qwen3-VL 8B**, **Qwen3.6 35B-A3B**, **Qwen3.5 35B-A3B**. Small models (0.8B, 2B) have vision encoder issues. Optimum format models (Gemma-4) may not be affected.
+> **VLM note**: Among Qwen models, GenAI `VLMPipeline` only supports vision for **Qwen3-VL 8B**, **Qwen3.6 35B-A3B**, **Qwen3.5 35B-A3B**. Small models (0.8B, 2B) have vision encoder issues.
 
-### Pre-converted Models (Recommended)
+#### Manual Conversion
 
-OpenVINO provides a large collection of pre-converted models on HuggingFace and ModelScope.
-**Skip the conversion step** — download and run directly:
-
-- [HuggingFace OpenVINO Models](https://huggingface.co/OpenVINO)
-- [ModelScope OpenVINO Models](https://www.modelscope.cn/organization/OpenVINO?tab=model)
-
-### Manual Conversion
-
-`./ov-cli convert` supports the following architectures (verified to export successfully):
+`./ov-cli convert` supports:
 
 | Architecture | Notes |
 |------|------|
@@ -347,11 +358,46 @@ OpenVINO provides a large collection of pre-converted models on HuggingFace and 
 | Hy-MT2 | Multi-language translation model |
 | Llama / Mistral / DeepSeek / Phi / Gemma | Standard transformers architectures |
 
-All standard transformers architectures should work as long as `optimum-cli` can export them.
+### Speech Models
 
-> **Text-to-image models**: `convert` does not support text-to-image models (FLUX, SD3.5, etc.) yet.
-> Download official pre-converted models:
-> - [HuggingFace Image Generation Collection](https://huggingface.co/collections/OpenVINO/image-generation)
+#### TTS (Text-to-Speech)
+
+**Qwen3-TTS recommended** (best quality, most features):
+
+| Option | Type | Features | Command |
+|:------|:----|:---------|:--------|
+| **Qwen3-TTS** ⭐ | Custom OV | Preset voices / Voice clone / 10 languages / Emotion control | `ov-cli convert --model ./Qwen3-TTS-0.6B-CV --output ./0.6B-CV-ov` |
+| **SpeechT5** | GenAI Pipeline | Lightweight (600M), CPU real-time, English | Download pre-converted |
+
+**Qwen3-TTS** (recommended):
+
+Two model types, auto-detected:
+
+| Type | Feature | Convert |
+|:----|:--------|:--------|
+| **CustomVoice** | 9 preset speakers, no ref audio needed | `ov-cli convert --model ./Qwen3-TTS-0.6B-CV --output ./0.6B-CV-ov` |
+| **Base** | Voice clone, needs reference audio | `ov-cli convert --model ./Qwen3-TTS-0.6B --output ./0.6B-ov` |
+
+```bash
+# CustomVoice
+ov-cli generate --model ./0.6B-CV-ov --prompt "Hello" --speaker vivian
+
+# Base (voice clone)
+ov-cli generate --model ./0.6B-ov --prompt "Hello" --ref-audio ref.mp3
+```
+
+#### ASR — Whisper (Speech-to-Text)
+
+Download official pre-converted models:
+- [HuggingFace Speech-to-Text Collection](https://huggingface.co/collections/OpenVINO/speech-to-text)
+- [ModelScope Speech-to-Text Collection](https://www.modelscope.cn/collections/Speech-to-Text-b9ab5c24c32649)
+
+### Image Models
+
+#### Text-to-Image
+
+`convert` does not support text-to-image models (FLUX, SD3.5, etc.). Download official pre-converted models:
+- [HuggingFace Image Generation Collection](https://huggingface.co/collections/OpenVINO/image-generation)
 > - [ModelScope Image Generation Collection](https://www.modelscope.cn/collections/Image-Generation-eb38cde2fa3d46)
 
 ### Notes
@@ -394,7 +440,7 @@ ov-cli/
 │   ├── cli.py               # CLI parser + dispatcher + setup
 │   ├── chat.py              # Chat/translate terminal (GenAI + Optimum)
 │   ├── convert.py           # Model conversion (7 formats)
-│   ├── generate.py          # Text-to-image terminal
+│   ├── generate.py          # Text-to-image / TTS terminal
 │   ├── server.py            # FastAPI OpenAI-compatible server
 │   └── benchmark.py         # Performance benchmark
 │
