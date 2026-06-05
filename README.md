@@ -225,6 +225,21 @@ EOF
 ./ov-cli benchmark --model ./Qwen3.6/35B-A3B-ov --reasoning off
 ```
 
+### `whisper` — 语音转文字
+
+使用 OpenVINO GenAI WhisperPipeline 转录音频，支持交互式和单次模式。
+
+```bash
+# 交互式
+./ov-cli whisper --model ./whisper/ov-large
+
+# 单次（输出完自动退出）
+./ov-cli whisper --model ./whisper/ov-large --mode once --file speech.mp3 -o output.txt
+```
+
+**注意：** Whisper 根据音频中的停顿和语调添加标点符号。
+TTS（文字转语音）生成的音频语速均匀、缺少自然停顿，转录结果可能不含句号逗号等标点，属正常现象。
+
 ### `generate` — 文生图
 
 使用 OpenVINO GenAI Text2ImagePipeline 生成图片，支持交互式和单次模式。
