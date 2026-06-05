@@ -316,8 +316,8 @@ Tested on: Intel Arc Pro 130T/140T (Arrow Lake-P) GPU | openvino-genai 2026.2 | 
 | **Qwen3/2B** | int8 | 262ms | 33ms | 30.7 | 771ms | 35ms | 27.8 |
 | **Qwen3/8B** | int4 AWQ | 402ms | 79ms | 12.9 | 2161ms | 82ms | 12.1 |
 | **Gemma-4 E2B** | int4 | 342ms | 77ms | 14.2 | 1732ms | 196ms | 10.8 |
-| **Qwen3.6/35B** (reasoning on) | int4/8 | 1069ms | 88ms | 11.8 | 4518ms | 87ms | 11.6 |
-| **Qwen3.6/35B** (reasoning off) | int4/8 | 1070ms | 92ms | 11.2 | 4571ms | 94ms | 10.9 |
+| **Qwen3.6/35B** (reasoning on) | int4 | 1069ms | 88ms | 11.8 | 4518ms | 87ms | 11.6 |
+| **Qwen3.6/35B** (reasoning off) | int4 | 1070ms | 92ms | 11.2 | 4571ms | 94ms | 10.9 |
 
 > tok/s based on encoded text. Chinese ~1.8 chars/subword.
 
