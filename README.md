@@ -1,16 +1,8 @@
-# ov-cli
-
-**[中文](README.md) | [English](README_EN.md)**
-
-<p align="center">
-  <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License">
-  <img src="https://img.shields.io/badge/python-≥3.10-blue" alt="Python">
-  <img src="https://img.shields.io/badge/OpenVINO-≥2026.2-purple" alt="OpenVINO">
-</p>
-
 <p align="center">
   <img src="ov-cli.png" alt="ov-cli logo" width="600">
 </p>
+
+<p align="center"><b><a href="README.md">中文</a> | <a href="README_EN.md">English</a></b></p>
 
 > 我发现官方的 OpenVINO 工具在日常 LLM 实验中较为繁琐，因此我开发了 ov-cli 作为轻量级的替代方案。借助 AI 编码工具，我将我的工作流需求转化为简单的 CLI 操作——设置、转换、聊天——所有操作都可以在同一个地方完成。
 
