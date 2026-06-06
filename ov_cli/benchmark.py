@@ -231,7 +231,6 @@ def run_benchmark(model_path, reasoning=True):
         print(f"    1st latency:    {res['first_latency']:>8.1f} ms")
         print(f"    2nd latency:    {res['second_latency']:>8.1f} ms")
         print(f"    2nd token/s:    {res['second_tps']:>8.1f}")
-        print(f"    max RSS:        {res['max_rss']:>8} MB")
         print(f"    total tokens:   {res['total_tokens']:>8}")
         print(f"    total time:     {res['total_time']:>8.3f}s")
         print()
@@ -240,9 +239,9 @@ def run_benchmark(model_path, reasoning=True):
     print(f"{'='*60}")
     print(f"  汇总")
     print(f"{'='*60}")
-    print(f"  {'Input':>8} | {'1st lat':>8} | {'2nd lat':>8} | {'tok/s':>8} | {'RSS':>8}")
-    print(f"  {'-'*8}-+-{'-'*8}-+-{'-'*8}-+-{'-'*8}-+-{'-'*8}")
+    print(f"  {'Input':>8} | {'1st lat':>8} | {'2nd lat':>8} | {'tok/s':>8}")
+    print(f"  {'-'*8}-+-{'-'*8}-+-{'-'*8}-+-{'-'*8}")
     for size in input_sizes:
         r = results[size]
-        print(f"  {size:>8} | {r['first_latency']:>7.0f}ms | {r['second_latency']:>7.0f}ms | {r['second_tps']:>7.1f} | {r['max_rss']:>7}MB")
+        print(f"  {size:>8} | {r['first_latency']:>7.0f}ms | {r['second_latency']:>7.0f}ms | {r['second_tps']:>7.1f}")
     print()
