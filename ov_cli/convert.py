@@ -88,14 +88,8 @@ def _ensure_transformers(model_type):
 
 
 def _get_pkg_version(pkg):
-    """获取已安装包的版本，不存在返回 None。"""
-    try:
-        return subprocess.check_output(
-            [sys.executable, "-c", f"import {pkg}; print({pkg}.__version__)"],
-            timeout=10, text=True,
-        ).strip()
-    except Exception:
-        return None
+    """获取已安装包的版本，不存在返回 None。（用 pip list，避免 import 副作用）"""
+    return _pip_get_version(pkg)
 
 
 def _ensure_qwen_tts():

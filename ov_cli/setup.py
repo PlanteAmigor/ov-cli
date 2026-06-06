@@ -317,6 +317,7 @@ def cmd_setup(args, workspace):
             "PyMuPDF",
             "soundfile",
             "scipy",
+            "gradio",
         ]
         subprocess.check_call([pip, "install", "-v"] + pkgs)
 
@@ -358,8 +359,6 @@ def cmd_setup(args, workspace):
     with open(_mode_file, "w") as f:
         f.write(str(mode))
 
-    _write_version_stamp(venv_path, workspace)
-
     shutil.rmtree(_build_tmp, ignore_errors=True)
     if _old_tmpdir:
         os.environ["TMPDIR"] = _old_tmpdir
@@ -374,20 +373,6 @@ def cmd_setup(args, workspace):
 
 
 def _write_version_stamp(venv_path, workspace):
-    """写入版本戳到虚拟环境。"""
-    ver = _get_version(workspace)
-    sp = os.path.join(venv_path, ".ov-cli-version")
-    os.makedirs(os.path.dirname(sp), exist_ok=True)
-    with open(sp, "w") as f:
-        f.write(ver + "\n")
+    """（已废弃）保留桩函数避免引用错误。"""
+    pass
 
-
-def _get_version(workspace):
-    """从 pyproject.toml 读取版本号。"""
-    pp = os.path.join(workspace, "pyproject.toml")
-    if os.path.isfile(pp):
-        with open(pp) as f:
-            for line in f:
-                if line.startswith("version"):
-                    return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return "0.0.0"
