@@ -227,6 +227,29 @@ EOF
 ./ov-cli benchmark --model ./Qwen3.6/35B-A3B-ov --reasoning off
 ```
 
+### `ui` — Web UI
+
+Launch a Gradio Web UI that auto-detects the model type (chat/tts/asr/image) and provides a visual interface.
+
+```bash
+# Chat UI
+./ov-cli ui --model ./Qwen3/2B-ov
+./ov-cli ui --model ./Qwen3/8B-ov --port 7861                      # Custom port
+./ov-cli ui --model ./model-vlm-ov --share                          # Public link
+./ov-cli ui --model ./deepseek/7B-ov --reasoning off                # Disable thinking
+
+# TTS / ASR / Text-to-Image UI
+./ov-cli ui --model ./0.6B-CV-ov                                    # TTS
+./ov-cli ui --model ./Qwen3-ASR-0.6B-ov                             # ASR
+./ov-cli ui --model ./FLUX/ov-int4                                  # Text-to-Image
+```
+
+**Chat UI features**:
+- Streaming output, multi-turn conversation
+- Image upload (VLM models)
+- Chat history save / load / delete
+- `Ctrl+C` safe exit
+
 ### `image` — Text-to-Image
 
 Text-to-image via OpenVINO GenAI Text2ImagePipeline. Supports interactive and single modes.

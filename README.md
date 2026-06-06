@@ -36,9 +36,10 @@ eval "$(./ov-cli venv)"
 ./ov-cli tts --model ./0.6B-CV-ov --prompt 你好 --speaker Vivian
 
 # 6. API 服务
-
-# 5. API 服务
 ./ov-cli server --model ./Qwen3/2B-ov
+
+# 7. Web 界面
+./ov-cli ui --model ./Qwen3/2B-ov
 ```
 
 ## 如何升级
@@ -230,6 +231,29 @@ EOF
 ./ov-cli benchmark --model ./Qwen3.5/0.8B-ov
 ./ov-cli benchmark --model ./Qwen3.6/35B-A3B-ov --reasoning off
 ```
+
+### `ui` — Web 界面
+
+启动 Gradio Web UI，自动检测模型类型（chat/tts/asr/image），提供对应的可视化界面。
+
+```bash
+# 聊天界面
+./ov-cli ui --model ./Qwen3/2B-ov
+./ov-cli ui --model ./Qwen3/8B-ov --port 7861                      # 指定端口
+./ov-cli ui --model ./model-vlm-ov --share                          # 公开链接
+./ov-cli ui --model ./deepseek/7B-ov --reasoning off                # 关闭思考
+
+# TTS / ASR / 文生图界面
+./ov-cli ui --model ./0.6B-CV-ov                                    # TTS
+./ov-cli ui --model ./Qwen3-ASR-0.6B-ov                             # ASR
+./ov-cli ui --model ./FLUX/ov-int4                                  # 文生图
+```
+
+**聊天界面功能**：
+- 流式输出、多轮对话
+- 图片上传（VLM 模型）
+- 对话历史保存 / 加载 / 删除
+- `Ctrl+C` 安全退出
 
 ### `tts` — 语音合成
 
