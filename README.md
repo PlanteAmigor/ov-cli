@@ -8,6 +8,10 @@
   <img src="https://img.shields.io/badge/OpenVINO-≥2026.2-purple" alt="OpenVINO">
 </p>
 
+<p align="center">
+  <img src="ov-cli.png" alt="ov-cli logo" width="600">
+</p>
+
 > 我发现官方的 OpenVINO 工具在日常 LLM 实验中较为繁琐，因此我开发了 ov-cli 作为轻量级的替代方案。借助 AI 编码工具，我将我的工作流需求转化为简单的 CLI 操作——设置、转换、聊天——所有操作都可以在同一个地方完成。
 
 **OpenVINO LLM 命令行工具** — 轻量、离线、CPU/GPU 皆可运行。
