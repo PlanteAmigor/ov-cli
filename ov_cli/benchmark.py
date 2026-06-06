@@ -21,25 +21,6 @@ def _measure_rss():
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024
 
 
-def _run_genai_bench(pipe, input_size, model_path):
-    """GenAI 格式基准测试。"""
-    prompt = _make_prompt(input_size)
-    test_prompt = prompt + "请详细解释这段话的含义。"
-
-    # 预热
-    pipe.generate("你好", max_new_tokens=10)
-
-    # 正式测试
-    t0 = time.perf_counter()
-    out = pipe.generate(test_prompt, max_new_tokens=128)
-    total = time.perf_counter() - t0
-
-    # 从 output 提取指标
-    # GenAI 的 generate 返回完整文本，无法直接分离首 token 延迟
-    # 改用 streamer 方式测量
-    return _run_genai_bench_detailed(pipe, test_prompt)
-
-
 def _run_genai_bench_detailed(pipe, prompt, reasoning=True):
     """用 streamer 精确测量各指标。"""
     import openvino_genai as ov_genai

@@ -8,33 +8,9 @@ from ov_cli import TR
 from ov_cli.setup import cmd_setup, _activate_path
 
 
-def _get_version():
-    """从 pyproject.toml 读取版本号。"""
-    wp = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    pp = os.path.join(wp, "pyproject.toml")
-    if os.path.isfile(pp):
-        with open(pp) as f:
-            for line in f:
-                if line.startswith("version"):
-                    return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return "0.0.0"
-
-
-def _version_stamp_path(venv_path):
-    return os.path.join(venv_path, ".ov-cli-version")
-
-
 def _check_version_warning(venv_path):
-    """检查版本变化，如有则打印提示。"""
-    sp = _version_stamp_path(venv_path)
-    if not os.path.isfile(sp):
-        return
-    with open(sp) as f:
-        installed = f.read().strip()
-    current = _get_version()
-    if installed != current:
-        print(f"  \u26a0 {TR('检测到版本变化 ({i} \u2192 {c})，建议运行:', 'Version changed ({i} \u2192 {c}), run:').format(i=installed, c=current)}")
-        print(f"     ./ov-cli setup --fix")
+    """每次运行都提示 --fix，确保用户及时升级依赖。"""
+    print(f"  \u26a0 {TR('建议运行 ./ov-cli setup --fix 更新依赖', 'Run ./ov-cli setup --fix to update deps')}")
 
 
 def _check_wsl2_gpu():
@@ -110,7 +86,7 @@ def cmd_image(args):
         run_once(ctx, prompt=args.prompt, output=args.output,
                  width=args.width, height=args.height,
                  steps=args.steps, guidance=args.guidance,
-                 json_output=args.json)
+                 seed=args.seed, json_output=args.json)
     else:
         run_generate(ctx, width=args.width, height=args.height,
                      steps=args.steps, guidance=args.guidance)

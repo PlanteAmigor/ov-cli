@@ -137,7 +137,8 @@ def _load_whisper(ov_path):
 
 def _load_qwen3_asr(ov_path):
     """加载 Qwen3-ASR OpenVINO 模型（自动切 transformers 版本）。"""
-    need_restore = _ensure_qwen_asr_tf()
+    _ensure_qwen_asr_tf()  # 只管切换，不管返回值
+    need_restore = True    # 只要加载了 Qwen3-ASR，退出就得恢复
     import sys as _sys
     _sys.path.insert(0, str(Path(__file__).parent.parent / "dlc"))
     from qwen_3_asr_helper import OVQwen3ASRModel
@@ -232,7 +233,6 @@ def run_whisper(ctx, lang=None):
     pipe = ctx.get("pipe")  # Whisper only
     model = ctx.get("model")  # Qwen3-ASR only
     asr_type = ctx.get("asr_type", "whisper")
-    current_lang = lang
     current_lang = lang
 
     print()
