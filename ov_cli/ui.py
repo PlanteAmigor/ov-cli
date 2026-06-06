@@ -16,20 +16,26 @@ for key in ["all_proxy", "ALL_PROXY", "http_proxy", "HTTP_PROXY",
 import gradio as gr
 from ov_cli import TR
 
+# 用于标记是否需要恢复 transformers 版本
+_need_restore_tf = False
+
 
 # ── 模型类型检测 ──
 
 def _detect_model_type(ov_path):
     cfg_path = os.path.join(ov_path, "config.json")
-    if not os.path.isfile(cfg_path):
-        return "chat"
-    with open(cfg_path) as f:
-        cfg = json.load(f)
-    archs = cfg.get("architectures", [])
-    if any("Qwen3TTS" in a for a in archs):
-        return "tts"
-    if any("Qwen3ASR" in a for a in archs):
-        return "asr"
+    if os.path.isfile(cfg_path):
+        with open(cfg_path) as f:
+            cfg = json.load(f)
+        archs = cfg.get("architectures", [])
+        if any("Qwen3TTS" in a for a in archs):
+            return "tts"
+        if any("Qwen3ASR" in a for a in archs):
+            return "asr"
+    # Diffusers 格式（FLUX/SD 等）
+    model_idx = os.path.join(ov_path, "model_index.json")
+    if os.path.isfile(model_idx):
+        return "image"
     # 有 openvino_model.xml 或 openvino_config.json → LLM/VLM
     if os.path.isfile(os.path.join(ov_path, "openvino_model.xml")) or \
        os.path.isfile(os.path.join(ov_path, "openvino_config.json")):
@@ -243,9 +249,11 @@ def _build_chat_ui(model_path, device, reasoning=True):
 
 def _build_tts_ui(model_path, device):
     """TTS 语音合成界面。"""
+    global _need_restore_tf
     from .asr import _pip_version, _ensure_qwen_asr_tf as _ensure_tf, _restore_tf
 
-    need_restore = _ensure_tf()
+    _ensure_tf()
+    _need_restore_tf = True  # TTS 需要 4.x，退出后必须恢复
     import sys as _sys
     _sys.path.insert(0, str(Path(__file__).parent.parent / "dlc"))
     from qwen_tts_helper import OVQwen3TTSModel
@@ -306,11 +314,13 @@ def _build_tts_ui(model_path, device):
 
 def _build_asr_ui(model_path, device):
     """ASR 语音识别界面。"""
+    global _need_restore_tf
     mtype = "qwen3_asr" if "Qwen3ASR" in open(os.path.join(model_path, "config.json")).read() else "whisper"
 
     if mtype == "qwen3_asr":
-        from .asr import _ensure_qwen_asr_tf, _restore_tf
-        need_restore = _ensure_qwen_asr_tf()
+        from .asr import _ensure_qwen_asr_tf
+        _ensure_qwen_asr_tf()
+        _need_restore_tf = True  # Qwen3-ASR 需要 4.x，退出后必须恢复
         import sys as _sys
         _sys.path.insert(0, str(Path(__file__).parent.parent / "dlc"))
         from qwen_3_asr_helper import OVQwen3ASRModel
@@ -346,7 +356,14 @@ def _build_asr_ui(model_path, device):
             with gr.Column():
                 audio_input = gr.Audio(sources=["upload", "microphone"], type="filepath", label="音频")
                 lang = gr.Dropdown(
-                    choices=["", "zh", "en", "ja", "ko", "fr", "de", "es"],
+                    choices=["", "Chinese", "English", "Japanese", "Korean",
+                             "French", "German", "Spanish", "Portuguese",
+                             "Italian", "Russian", "Vietnamese", "Thai",
+                             "Arabic", "Indonesian", "Turkish", "Hindi",
+                             "Malay", "Dutch", "Swedish", "Danish",
+                             "Finnish", "Polish", "Czech", "Filipino",
+                             "Persian", "Greek", "Romanian", "Hungarian",
+                             "Macedonian", "Cantonese"],
                     value="", label="语言 (可选)"
                 )
                 btn = gr.Button("转录", variant="primary")
@@ -406,6 +423,7 @@ def _build_image_ui(model_path, device):
 def launch_ui(model_path, device=None, port=7860, share=False, reasoning=True):
     """启动 Gradio 网页界面。"""
     import openvino as ov
+    import signal as _signal
     if device is None:
         device = "GPU" if "GPU" in ov.Core().available_devices else "CPU"
 
@@ -438,5 +456,10 @@ def launch_ui(model_path, device=None, port=7860, share=False, reasoning=True):
         demo.launch(server_port=port, share=share)
     except KeyboardInterrupt:
         print("  ⏹️ 正在关闭...", file=sys.stderr)
+        _signal.signal(_signal.SIGINT, _signal.SIG_IGN)
+    finally:
         demo.close()
+        if _need_restore_tf:
+            from .asr import _restore_tf
+            _restore_tf(True)
         print("  ✅ 已退出", file=sys.stderr)
