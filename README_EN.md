@@ -29,11 +29,13 @@ eval "$(./ov-cli venv)"
 # 3. Chat terminal
 ./ov-cli chat --model ./Qwen3/2B-ov
 
-# 4. Generate (Image / TTS)
-./ov-cli generate --model ./FLUX/ov-int4
-./ov-cli generate --model ./0.6B-CV-ov --prompt Hello --speaker vivian
+# 4. Image Generation
+./ov-cli image --model ./FLUX/ov-int4
 
-# 5. API server
+# 5. TTS
+./ov-cli tts --model ./0.6B-CV-ov --prompt Hello --speaker vivian
+
+# 6. API server
 ./ov-cli server --model ./Qwen3/2B-ov
 ```
 
@@ -225,32 +227,17 @@ EOF
 ./ov-cli benchmark --model ./Qwen3.6/35B-A3B-ov --reasoning off
 ```
 
-### `generate` — Text-to-Image / TTS
+### `image` — Text-to-Image
 
-Auto-detects model type (Text2Image / TTS CustomVoice / TTS Base).
-
-**Text-to-Image** (via OpenVINO GenAI Text2ImagePipeline, supports interactive/single):
+Text-to-image via OpenVINO GenAI Text2ImagePipeline. Supports interactive and single modes.
 
 ```bash
 # Interactive (multi-turn)
-./ov-cli generate --model ./FLUX/ov-int4
+./ov-cli image --model ./FLUX/ov-int4
 
 # Single mode (auto-exit)
-./ov-cli generate --model ./FLUX/ov-int4 --mode once --prompt "cat" -o cat.png
-./ov-cli generate --model ./FLUX/ov-int4 --mode once --prompt "cat" --json
-```
-
-**TTS CustomVoice** (preset speakers, no reference audio needed, once mode only):
-
-```bash
-./ov-cli generate --model ./0.6B-CV-ov --prompt "Hello" --speaker vivian
-./ov-cli generate --model ./0.6B-CV-ov --prompt "你好" --speaker Vivian --instruct "gently" -o voice.wav
-```
-
-**TTS Base (Voice Clone)** (requires reference audio, once mode only):
-
-```bash
-./ov-cli generate --model ./0.6B-ov --prompt "Hello" --ref-audio ref.mp3
+./ov-cli image --model ./FLUX/ov-int4 --mode once --prompt "cat" -o cat.png
+./ov-cli image --model ./FLUX/ov-int4 --mode once --prompt "cat" --json
 ```
 
 **In-chat commands** (interactive mode only, Text2Image):
@@ -266,20 +253,29 @@ Auto-detects model type (Text2Image / TTS CustomVoice / TTS Base).
 | `/help` | Help |
 | `/exit` | Exit |
 
-### `whisper` — Speech-to-Text
+### `asr` — Speech-to-Text
 
-Transcribe audio via OpenVINO GenAI WhisperPipeline. Supports interactive and single modes.
+Auto-detects Whisper / Qwen3-ASR. **Qwen3-ASR recommended** (automatic punctuation, language identification, 52 languages/dialects).
+
+**Qwen3-ASR** (recommended):
 
 ```bash
 # Interactive
-./ov-cli whisper --model ./whisper/ov-large
+./ov-cli asr --model ./Qwen3-ASR-0.6B-ov
 
-# Single mode (auto-exit after output)
-./ov-cli whisper --model ./whisper/ov-large --mode once --file speech.mp3 -o output.txt
-./ov-cli whisper --model ./whisper/ov-large --mode once --file speech.mp3 --json   # JSON output
+# Single mode
+./ov-cli asr --model ./Qwen3-ASR-0.6B-ov --mode once --file speech.mp3
+./ov-cli asr --model ./Qwen3-ASR-0.6B-ov --mode once --file speech.mp3 --json
 ```
 
-**Note:** Whisper adds punctuation based on audio pauses and intonation.
+**Whisper**:
+
+```bash
+./ov-cli asr --model ./whisper/ov-large
+./ov-cli asr --model ./whisper/ov-large --mode once --file speech.mp3
+```
+
+> Qwen3-ASR adds punctuation based on semantic understanding. Whisper relies on audio pauses. TTS-generated audio may lack punctuation with Whisper.
 TTS-generated audio has even pacing without natural pauses, so transcriptions may lack punctuation — this is expected behavior.
 
 ## External Integration
@@ -291,18 +287,18 @@ ov-cli can be called from other projects via `--mode once` and `--json`. Logs go
 | Command | once mode | `--json` | stdout output |
 |:--------|:---------:|:--------:|:--------------|
 | `chat` | `--mode once --prompt TEXT [--file ...]` | ✅ | reply text / `{"text":"...","time":n}` |
-| `whisper` | `--mode once --file audio.mp3` | ✅ | transcription / `{"text":"...","time":n,"duration":n}` |
-| `generate (img)` | `--mode once --prompt "cat" [-o output.png]` | ✅ | image path / `{"path":"...","time":n}` |
-| `generate (tts)` | `--prompt TEXT (--mode once optional)` | ✅ | audio path / `{"path":"...","time":n,"duration":n}` |
+| `asr` | `--mode once --file audio.mp3` | ✅ | transcription / `{"text":"...","time":n,"duration":n}` |
+| `image` | `--mode once --prompt "cat" [-o output.png]` | ✅ | image path / `{"path":"...","time":n}` |
+| `tts` | `--prompt TEXT` | ✅ | audio path / `{"path":"...","time":n,"duration":n}` |
 
 ### Recommended Usage
 
 ```bash
 # Shell: capture plain text
-text=$(/path/to/ov-cli whisper -m ./model --mode once -f speech.mp3 2>/dev/null)
+text=$(/path/to/ov-cli asr -m ./model --mode once -f speech.mp3 2>/dev/null)
 
 # Shell: capture JSON
-json=$(/path/to/ov-cli whisper -m ./model --mode once -f speech.mp3 --json 2>/dev/null)
+json=$(/path/to/ov-cli asr -m ./model --mode once -f speech.mp3 --json 2>/dev/null)
 ```
 
 ```python
@@ -310,7 +306,7 @@ json=$(/path/to/ov-cli whisper -m ./model --mode once -f speech.mp3 --json 2>/de
 import subprocess, json
 
 result = subprocess.run([
-    "/path/to/ov-cli", "whisper",
+    "/path/to/ov-cli", "asr",
     "--model", "./model",
     "--mode", "once",
     "--file", "speech.mp3",
@@ -386,9 +382,21 @@ ov-cli generate --model ./0.6B-CV-ov --prompt "Hello" --speaker vivian
 ov-cli generate --model ./0.6B-ov --prompt "Hello" --ref-audio ref.mp3
 ```
 
-#### ASR — Whisper (Speech-to-Text)
+#### ASR (Speech-to-Text)
 
-Download official pre-converted models:
+Two options. **Qwen3-ASR recommended** (automatic punctuation, language identification).
+
+| Option | Type | Features |
+|:------|:----|:---------|
+| **Qwen3-ASR** ⭐ | Custom OV | Semantic punctuation / 52 languages / LID |
+| **Whisper** | GenAI Pipeline | Lightweight, smooth interactive |
+
+**Qwen3-ASR** conversion:
+```bash
+ov-cli convert --model ./Qwen3-ASR-0.6B --output ./Qwen3-ASR-0.6B-ov
+```
+
+**Whisper**: Download official pre-converted models:
 - [HuggingFace Speech-to-Text Collection](https://huggingface.co/collections/OpenVINO/speech-to-text)
 - [ModelScope Speech-to-Text Collection](https://www.modelscope.cn/collections/Speech-to-Text-b9ab5c24c32649)
 
