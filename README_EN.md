@@ -1,16 +1,8 @@
-# ov-cli
-
-**[中文](README.md) | [English](README_EN.md)**
-
-<p align="center">
-  <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License">
-  <img src="https://img.shields.io/badge/python-≥3.10-blue" alt="Python">
-  <img src="https://img.shields.io/badge/OpenVINO-≥2026.2-purple" alt="OpenVINO">
-</p>
-
 <p align="center">
   <img src="ov-cli.png" alt="ov-cli logo" width="600">
 </p>
+
+<p align="center"><b><a href="README.md">中文</a> | <a href="README_EN.md">English</a></b></p>
 
 > I found the official OpenVINO tools a bit cumbersome for daily LLM experiments, so I built ov-cli as a lightweight alternative. With the help of AI coding tools, I turned my workflow needs into a simple CLI — setup, convert, chat — all in one place.
 
