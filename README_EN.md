@@ -8,6 +8,10 @@
   <img src="https://img.shields.io/badge/OpenVINO-≥2026.2-purple" alt="OpenVINO">
 </p>
 
+<p align="center">
+  <img src="ov-cli.png" alt="ov-cli logo" width="600">
+</p>
+
 > I found the official OpenVINO tools a bit cumbersome for daily LLM experiments, so I built ov-cli as a lightweight alternative. With the help of AI coding tools, I turned my workflow needs into a simple CLI — setup, convert, chat — all in one place.
 
 **OpenVINO LLM CLI Tool** — Lightweight, offline LLM inference on CPU & GPU.
