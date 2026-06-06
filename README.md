@@ -29,9 +29,13 @@ eval "$(./ov-cli venv)"
 # 3. 聊天终端
 ./ov-cli chat --model ./Qwen3/2B-ov
 
-# 4. 文生图 / TTS
-./ov-cli generate --model ./FLUX/ov-int4
-./ov-cli generate --model ./0.6B-CV-ov --prompt 你好 --speaker Vivian
+# 4. 文生图
+./ov-cli image --model ./FLUX/ov-int4
+
+# 5. TTS 语音合成
+./ov-cli tts --model ./0.6B-CV-ov --prompt 你好 --speaker Vivian
+
+# 6. API 服务
 
 # 5. API 服务
 ./ov-cli server --model ./Qwen3/2B-ov
@@ -227,52 +231,61 @@ EOF
 ./ov-cli benchmark --model ./Qwen3.6/35B-A3B-ov --reasoning off
 ```
 
-### `whisper` — 语音转文字
+### `tts` — 语音合成
 
-使用 OpenVINO GenAI WhisperPipeline 转录音频，支持交互式和单次模式。
+使用 OpenVINO Qwen3-TTS 生成语音，仅支持单次。
+
+**CustomVoice**（预设声音）：
+
+```bash
+./ov-cli tts --model ./0.6B-CV-ov --prompt "今天天气真好" --speaker Vivian
+./ov-cli tts --model ./0.6B-CV-ov --prompt "Hello" --speaker vivian --lang english
+./ov-cli tts --model ./0.6B-CV-ov --prompt "你好" --speaker Vivian --instruct "温柔地" -o voice.wav
+```
+
+**Base（声音克隆）**（需参考音频）：
+
+```bash
+./ov-cli tts --model ./0.6B-ov --prompt "你好" --ref-audio ref.mp3 -o voice.wav
+./ov-cli tts --model ./0.6B-ov --prompt "Hello" --ref-audio ref.mp3 --lang english
+```
+
+### `asr` — 语音转文字
+
+自动识别 Whisper / Qwen3-ASR。**推荐 Qwen3-ASR**（自动加标点、语种识别、支持 52 种语言和方言）。
+
+**Qwen3-ASR**（推荐）：
 
 ```bash
 # 交互式
-./ov-cli whisper --model ./whisper/ov-large
+./ov-cli asr --model ./Qwen3-ASR-0.6B-ov
 
 # 单次（输出完自动退出）
-./ov-cli whisper --model ./whisper/ov-large --mode once --file speech.mp3 -o output.txt
-./ov-cli whisper --model ./whisper/ov-large --mode once --file speech.mp3 --json   # JSON 格式输出
+./ov-cli asr --model ./Qwen3-ASR-0.6B-ov --mode once --file speech.mp3
+./ov-cli asr --model ./Qwen3-ASR-0.6B-ov --mode once --file speech.mp3 --json
 ```
 
-**注意：** Whisper 根据音频中的停顿和语调添加标点符号。
+**Whisper**：
+
+```bash
+./ov-cli asr --model ./whisper/ov-large
+./ov-cli asr --model ./whisper/ov-large --mode once --file speech.mp3
+```
+
+> Qwen3-ASR 基于语义理解自动添加标点，Whisper 依赖音频停顿加标点。TTS 生成的匀速音频在 Whisper 下可能缺少标点。
 TTS（文字转语音）生成的音频语速均匀、缺少自然停顿，转录结果可能不含句号逗号等标点，属正常现象。
 
-### `generate` — 文生图 / TTS 语音合成
+### `image` — 文生图
 
-自动识别模型类型（文生图 / TTS CustomVoice / TTS Base），无需手动指定。
-TTS 仅支持单次模式（once），文生图支持交互式和单次。
-
-**文生图**（使用 OpenVINO GenAI Text2ImagePipeline，支持交互式/单次）：
+使用 OpenVINO GenAI Text2ImagePipeline 生成图片，支持交互式和单次。
 
 ```bash
 # 交互式（多轮生图）
-./ov-cli generate --model ./FLUX/ov-int4
+./ov-cli image --model ./FLUX/ov-int4
 
 # 单次（输出完自动退出）
-./ov-cli generate --model ./FLUX/ov-int4 --mode once --prompt "cat" -o cat.png
-./ov-cli generate --model ./FLUX/ov-int4 --mode once --prompt "cat" --json       # JSON 格式输出
-```
-
-**TTS CustomVoice**（预设声音，无需参考音频，仅支持单次）：
-
-```bash
-# 列出可用声音 → 用 --speaker 指定
-./ov-cli generate --model ./0.6B-CV-ov --prompt "今天天气真好" --speaker Vivian
-./ov-cli generate --model ./0.6B-CV-ov --prompt "Hello" --speaker vivian --lang english
-./ov-cli generate --model ./0.6B-CV-ov --prompt "你好" --speaker Vivian --instruct "温柔地" -o voice.wav
-```
-
-**TTS Base（声音克隆）**（需要参考音频，仅支持单次）：
-
-```bash
-./ov-cli generate --model ./0.6B-ov --prompt "你好" --ref-audio ref.mp3 -o voice.wav
-./ov-cli generate --model ./0.6B-ov --prompt "Hello" --ref-audio ref.mp3 --lang english
+./ov-cli image --model ./FLUX/ov-int4 --mode once --prompt "cat" -o cat.png
+./ov-cli image --model ./FLUX/ov-int4 --mode once --prompt "cat" --json       # JSON 格式输出
 ```
 
 **终端内命令**（仅文生图交互模式）：
@@ -297,18 +310,18 @@ ov-cli 支持通过 `--mode once` 和 `--json` 被其他项目调用，日志走
 | 命令 | once 模式 | `--json` | stdout 输出 |
 |:----|:---------:|:--------:|:------------|
 | `chat` | `--mode once --prompt TEXT [--file ...]` | ✅ | 回复文本 / `{"text":"...","time":n}` |
-| `whisper` | `--mode once --file audio.mp3` | ✅ | 转录文本 / `{"text":"...","time":n,"duration":n}` |
-| `generate (img)` | `--mode once --prompt "cat" [-o output.png]` | ✅ | 图片路径 / `{"path":"...","time":n}` |
-| `generate (tts)` | `--prompt TEXT (--mode once 可省略)` | ✅ | 音频路径 / `{"path":"...","time":n,"duration":n}` |
+| `asr` | `--mode once --file audio.mp3` | ✅ | 转录文本 / `{"text":"...","time":n,"duration":n}` |
+| `image` | `--mode once --prompt "cat" [-o output.png]` | ✅ | 图片路径 / `{"path":"...","time":n}` |
+| `tts` | `--prompt TEXT` | ✅ | 音频路径 / `{"path":"...","time":n,"duration":n}` |
 
 ### 推荐方式
 
 ```bash
 # Shell 脚本：捕获纯文本结果
-text=$(/path/to/ov-cli whisper -m ./model --mode once -f speech.mp3 2>/dev/null)
+text=$(/path/to/ov-cli asr -m ./model --mode once -f speech.mp3 2>/dev/null)
 
 # Shell 脚本：捕获 JSON
-json=$(/path/to/ov-cli whisper -m ./model --mode once -f speech.mp3 --json 2>/dev/null)
+json=$(/path/to/ov-cli asr -m ./model --mode once -f speech.mp3 --json 2>/dev/null)
 ```
 
 ```python
@@ -316,7 +329,7 @@ json=$(/path/to/ov-cli whisper -m ./model --mode once -f speech.mp3 --json 2>/de
 import subprocess, json
 
 result = subprocess.run([
-    "/path/to/ov-cli", "whisper",
+    "/path/to/ov-cli", "asr",
     "--model", "./model",
     "--mode", "once",
     "--file", "speech.mp3",
@@ -388,15 +401,27 @@ if result.returncode == 0:
 
 ```bash
 # CustomVoice — 预设声音
-ov-cli generate --model ./0.6B-CV-ov --prompt "你好" --speaker Vivian
+ov-cli tts --model ./0.6B-CV-ov --prompt "你好" --speaker Vivian
 
 # Base — 声音克隆（需参考音频）
-ov-cli generate --model ./0.6B-ov --prompt "你好" --ref-audio ref.mp3
+ov-cli tts --model ./0.6B-ov --prompt "你好" --ref-audio ref.mp3
 ```
 
-#### ASR — Whisper（语音转文字）
+#### ASR（语音转文字）
 
-Whisper 请下载官方预转换模型：
+支持两种方案，**推荐 Qwen3-ASR**（自动加标点、语种识别）。
+
+| 方案 | 类型 | 特点 |
+|:----|:----|:-----|
+| **Qwen3-ASR** ⭐ | 自定义 OV | 语义加标点 / 52 种语言方言 / 语种识别 |
+| **Whisper** | GenAI Pipeline | 轻量，交互式流畅 |
+
+**Qwen3-ASR** 转换：
+```bash
+ov-cli convert --model ./Qwen3-ASR-0.6B --output ./Qwen3-ASR-0.6B-ov
+```
+
+**Whisper** 请下载官方预转换模型：
 - [HuggingFace Speech-to-Text 合集](https://huggingface.co/collections/OpenVINO/speech-to-text)
 - [ModelScope Speech-to-Text 合集](https://www.modelscope.cn/collections/Speech-to-Text-b9ab5c24c32649)
 
@@ -455,7 +480,9 @@ ov-cli/
 │   ├── cli.py               # CLI 参数解析 + 命令分发 + setup
 │   ├── chat.py              # 聊天/翻译终端（GenAI + Optimum）
 │   ├── convert.py           # 模型转换（7 种量化）
-│   ├── generate.py          # 文生图 / TTS 语音合成终端
+│   ├── image.py             # 文生图终端
+│   ├── tts.py               # TTS 语音合成终端
+│   ├── asr.py               # 语音转文字终端
 │   ├── server.py            # FastAPI OpenAI 兼容服务
 │   └── benchmark.py         # 性能测试
 │
