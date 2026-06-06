@@ -143,6 +143,10 @@ def cmd_tts(args):
              instruct=args.instruct, ref_audio=args.ref_audio,
              warmup=not args.no_warmup, json_output=args.json)
 
+def cmd_ui(args):
+    """ov-cli ui: 网页界面"""
+    from .ui import launch_ui
+    launch_ui(model_path=args.model, device=args.device, port=args.port, share=args.share, reasoning=args.reasoning == "on")
 
 def cmd_chat(args):
     """ov-cli chat"""
@@ -209,6 +213,7 @@ def _build_help():
             "  ./ov-cli asr --model ./whisper/ov-large\n"
             "  ./ov-cli image --model ./FLUX/ov-int4\n"
             "  ./ov-cli tts --model ./0.6B-CV-ov --prompt 你好 --speaker Vivian\n"
+            "  ./ov-cli ui --model ./model-ov\n"
             "  ./ov-cli server --model ./model-ov --port 8080\n"
             "  ./ov-cli setup --fix\n"
         )
@@ -221,6 +226,7 @@ def _build_help():
             "  ./ov-cli asr --model ./whisper/ov-large\n"
             "  ./ov-cli image --model ./FLUX/ov-int4\n"
             "  ./ov-cli tts --model ./0.6B-CV-ov --prompt hello --speaker vivian\n"
+            "  ./ov-cli ui --model ./model-ov\n"
             "  ./ov-cli server --model ./model-ov --port 8080\n"
             "  ./ov-cli setup --fix\n"
         )
@@ -338,6 +344,21 @@ def main():
     p = sub.add_parser("venv", help=TR("进入环境", "Venv"))
     p.add_argument("--venv")
 
+    # ui
+    p = sub.add_parser("ui", help=TR("网页界面", "Web UI"),
+        description=TR(
+            "启动 Gradio 网页界面。自动检测模型类型。\n\n"
+            "示例:\n"
+            "  ov-cli ui --model ./Qwen3-ov\n"
+            "  ov-cli ui --model ./0.6B-CV-ov --port 7860\n"
+            "  ov-cli ui --model ./FLUX-ov --share",
+            "Launch Gradio web UI. Auto-detects model type."))
+    p.add_argument("--model", "-m", required=True)
+    p.add_argument("--device", default=None, help=TR("推理设备", "Device"))
+    p.add_argument("--port", type=int, default=7860, help=TR("端口", "Port"))
+    p.add_argument("--share", action="store_true", help=TR("生成公链", "Public link"))
+    p.add_argument("--reasoning", choices=["on","off"], default="on", help=TR("思考模式", "Reasoning"))
+
     args = parser.parse_args()
     if args.lang:
         ov_cli._LANG = args.lang
@@ -350,7 +371,7 @@ def main():
     dispatch = {
         "setup": lambda a: cmd_setup(a, W), "convert": cmd_convert, "chat": cmd_chat,
         "benchmark": cmd_benchmark, "venv": cmd_venv, "server": cmd_server,
-        "image": cmd_image, "tts": cmd_tts, "asr": cmd_asr,
+        "image": cmd_image, "tts": cmd_tts, "asr": cmd_asr, "ui": cmd_ui,
     }
     dispatch[args.cmd](args)
 

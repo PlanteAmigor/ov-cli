@@ -198,16 +198,34 @@ def cmd_setup(args, workspace):
             print(f"  {TR('请先运行', 'Run first')}: ./ov-cli setup")
             sys.exit(1)
         pip = _pip_path(venv_path)
+        _mode_file = os.path.join(venv_path, ".ov-cli-mode")
+        _prev_mode = None
+        if os.path.isfile(_mode_file):
+            with open(_mode_file) as f:
+                _prev_mode = f.read().strip()
+        _genai_src = os.path.join(workspace, "openvino.genai-2026.2.0.0-optimization")
+        # 简易→完整升级路径
+        if _prev_mode != "2" and os.path.isdir(_genai_src):
+            print(f"  {TR('检测到 GenAI 源码目录，可升级到完整模式', 'GenAI source found, can upgrade to full mode')}")
+            r = input(f"  {TR('升级到完整模式？(y/N)', 'Upgrade to full mode? (y/N)')}: ").strip().lower()
+            if r == "y":
+                _build_genai_from_source(venv_path, _genai_src)
+                with open(_mode_file, "w") as f:
+                    f.write("2")
+                print(f"  {TR('✅ 已升级到完整模式', '✅ Upgraded to full mode')}")
+                return
         print(f"  {TR('修复模式: 升级依赖 + 重打补丁', 'Fix mode: upgrade deps + repatch')}")
         try:
-            subprocess.check_call([pip, "install", "--upgrade", workspace])
-            _optimum_src = args.optimum_dir or os.path.join(workspace, "optimum-intel-main")
-            if os.path.isdir(_optimum_src):
-                subprocess.check_call([pip, "install", "--upgrade", _optimum_src])
-            else:
-                subprocess.check_call([pip, "install", "--upgrade",
+            # 升级 ov-cli（排除 openvino-genai 避免覆盖编译版）
+            _install_cmd = [pip, "install", "--upgrade", workspace]
+            if _prev_mode == "2":
+                _install_cmd += ["--no-deps"]
+                subprocess.check_call(_install_cmd)
+                subprocess.check_call([pip, "install", "--upgrade", "--no-deps",
                                        "optimum-intel@git+https://github.com/huggingface/optimum-intel.git"])
-            subprocess.check_call([pip, "install", "--upgrade", "--no-deps", "transformers"])
+                subprocess.check_call([pip, "install", "--upgrade", "--no-deps", "transformers"])
+            else:
+                subprocess.check_call(_install_cmd)
             _apply_gemma4_patch()
             _write_version_stamp(venv_path, workspace)
             print(f"  {TR('✅ 修复完成', '✅ Fix done')}")
@@ -334,6 +352,11 @@ def cmd_setup(args, workspace):
                 print(f"  ❌ {TR('未找到 {dep}，请先安装 ({hint})', '{dep} not found, install: {hint}').format(dep=dep, hint=hint)}")
                 sys.exit(1)
         _build_genai_from_source(venv_path, genai_src)
+
+    # 记录安装模式（供 --fix 使用）
+    _mode_file = os.path.join(venv_path, ".ov-cli-mode")
+    with open(_mode_file, "w") as f:
+        f.write(str(mode))
 
     _write_version_stamp(venv_path, workspace)
 

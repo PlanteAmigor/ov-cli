@@ -253,6 +253,23 @@ Text-to-image via OpenVINO GenAI Text2ImagePipeline. Supports interactive and si
 | `/help` | Help |
 | `/exit` | Exit |
 
+### `tts` — TTS
+
+Text-to-speech via OpenVINO Qwen3-TTS. Once mode only.
+
+**CustomVoice** (preset speakers):
+
+```bash
+./ov-cli tts --model ./0.6B-CV-ov --prompt "Hello" --speaker vivian
+./ov-cli tts --model ./0.6B-CV-ov --prompt "你好" --speaker Vivian --instruct "gently" -o voice.wav
+```
+
+**Base (Voice Clone)** (requires reference audio):
+
+```bash
+./ov-cli tts --model ./0.6B-ov --prompt "Hello" --ref-audio ref.mp3
+```
+
 ### `asr` — Speech-to-Text
 
 Auto-detects Whisper / Qwen3-ASR. **Qwen3-ASR recommended** (automatic punctuation, language identification, 52 languages/dialects).
@@ -376,10 +393,10 @@ Two model types, auto-detected:
 
 ```bash
 # CustomVoice
-ov-cli generate --model ./0.6B-CV-ov --prompt "Hello" --speaker vivian
+ov-cli tts --model ./0.6B-CV-ov --prompt "Hello" --speaker vivian
 
 # Base (voice clone)
-ov-cli generate --model ./0.6B-ov --prompt "Hello" --ref-audio ref.mp3
+ov-cli tts --model ./0.6B-ov --prompt "Hello" --ref-audio ref.mp3
 ```
 
 #### ASR (Speech-to-Text)
@@ -427,8 +444,11 @@ Tested on: Intel Arc Pro 130T/140T (Arrow Lake-P) GPU | openvino-genai 2026.2 | 
 | **Qwen3.5/0.8B** | int8 | 297ms | 19ms | 54.9 | 660ms | 20ms | 51.8 |
 | **Hy-MT2/1.8B** | int4 | 267ms | 25ms | 40.6 | 710ms | 24ms | 38.2 |
 | **Qwen3/2B** | int8 | 262ms | 33ms | 30.7 | 771ms | 35ms | 27.8 |
+| **DeepSeek-R1-7B** | int4 | 344ms | 65ms | 16.0 | 1816ms | 67ms | 15.5 |
 | **Qwen3/8B** | int4 AWQ | 402ms | 79ms | 12.9 | 2161ms | 82ms | 12.1 |
+| **Qwen3/14B** | int4 | 506ms | 388ms | 8.0 | 3045ms | 268ms | 7.6 |
 | **Gemma-4 E2B** | int4 | 342ms | 77ms | 14.2 | 1732ms | 196ms | 10.8 |
+| **Gemma-4 31B** | int4 | 1541ms | 281ms | 3.6 | 9243ms | 370ms | 3.3 |
 | **Qwen3.6/35B** (reasoning on) | int4 | 1069ms | 88ms | 11.8 | 4518ms | 87ms | 11.6 |
 | **Qwen3.6/35B** (reasoning off) | int4 | 1070ms | 92ms | 11.2 | 4571ms | 94ms | 10.9 |
 
@@ -448,7 +468,10 @@ ov-cli/
 │   ├── cli.py               # CLI parser + dispatcher + setup
 │   ├── chat.py              # Chat/translate terminal (GenAI + Optimum)
 │   ├── convert.py           # Model conversion (7 formats)
-│   ├── generate.py          # Text-to-image / TTS terminal
+│   ├── image.py             # Text-to-image terminal
+│   ├── tts.py               # TTS terminal
+│   ├── asr.py               # Speech-to-text terminal
+│   ├── ui.py                # Gradio web UI
 │   ├── server.py            # FastAPI OpenAI-compatible server
 │   └── benchmark.py         # Performance benchmark
 │
