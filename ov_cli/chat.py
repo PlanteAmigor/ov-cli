@@ -85,7 +85,8 @@ def _make_streamer(reply_parts, stop_flag, on_first_token=None):
 
 def _is_genai_format(model_path):
     """检测模型目录是否为 OpenVINO GenAI 格式。"""
-    return os.path.isfile(os.path.join(model_path, "openvino_config.json"))
+    return (os.path.isfile(os.path.join(model_path, "openvino_config.json")) or
+            os.path.isfile(os.path.join(model_path, "openvino_model.xml")))
 
 
 def _is_optimum_format(model_path):
