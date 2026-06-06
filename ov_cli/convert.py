@@ -17,6 +17,7 @@ _MODEL_TF_VERSION = {
     "qwen3_5":    "==5.2",        # Qwen3.5 必须 5.2（否则 DynamicCache 兼容问题）
     "qwen3_6":    "==5.2",        # Qwen3.6 MoE 同 Qwen3.5
     "qwen3_tts":  None,           # Qwen3-TTS 用自定义 helper，不依赖 transformers 版本
+    "qwen3_asr":  None,           # Qwen3-ASR 同
 }
 
 
@@ -26,10 +27,12 @@ def _detect_model_type(model_path):
     if os.path.isfile(cfg_path):
         with open(cfg_path) as f:
             cfg = json.load(f)
-        # 优先检查 architectures（Qwen3-TTS 等自定义模型）
+        # 优先检查 architectures（Qwen3-TTS / Qwen3-ASR 等自定义模型）
         archs = cfg.get("architectures", [])
         if any("Qwen3TTS" in a for a in archs):
             return "qwen3_tts"
+        if any("Qwen3ASR" in a for a in archs):
+            return "qwen3_asr"
         # 多模态模型 model_type 在 text_config 里
         mt = cfg.get("model_type", "")
         if mt in ("gemma4", "qwen3_5", "qwen3_6"):
@@ -306,6 +309,106 @@ convert_qwen3_tts_model(
         _restore_qwen_transformers(saved_tf, saved_hf)
 
 
+def _ensure_qwen_asr():
+    """转换 Qwen3-ASR 前安装 qwen-asr，并修复 torchaudio CPU 兼容性。
+    返回 (old_transformers, old_hf_hub)。"""
+    old_tf = _get_pkg_version("transformers")
+    old_hf = _get_pkg_version("huggingface_hub")
+    print(f"  ⚡ 安装 qwen-asr（转换 Qwen3-ASR 所需）...")
+    try:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "--quiet", "qwen-asr"],
+            timeout=180,
+        )
+    except subprocess.TimeoutExpired:
+        print(f"  \u274c pip 下载超时 (180s)，请检查网络或手动执行: pip install qwen-asr")
+        sys.exit(1)
+    # 修复 torchaudio
+    try:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "--force-reinstall", "--no-deps",
+             "torchaudio", "--extra-index-url", "https://download.pytorch.org/whl/cpu"],
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired:
+        pass
+    new_tf = _get_pkg_version("transformers")
+    if new_tf != old_tf:
+        print(f"  ⚡ transformers 已从 {old_tf} 变为 {new_tf}，转换后恢复")
+    return old_tf, old_hf
+
+
+def _convert_qwen3_asr(model_path, output_path, weight_format):
+    """用自定义 helper 转换 Qwen3-ASR 模型。"""
+    import sys as _sys
+    helper_dirs = [
+        Path(__file__).parent.parent / "dlc",
+        Path(__file__).parent.parent / "model/openvino_notebooks-latest/notebooks/qwen3-asr",
+    ]
+    helper = None
+    for d in helper_dirs:
+        p = d / "qwen_3_asr_helper.py"
+        if p.exists():
+            helper = p
+            break
+    if helper is None:
+        print(f"  \u274c 找不到 qwen_3_asr_helper.py，请确认 dlc/ 或 notebooks 目录存在")
+        sys.exit(1)
+
+    _sys.path.insert(0, str(helper.parent))
+    # 安装/确保 qwen-asr 依赖
+    saved_tf, saved_hf = _ensure_qwen_asr()
+
+    # 量化配置（Qwen3-ASR 只支持 fp32/fp16/int8/int4）
+    _QWEN_ASR_QUANT = {
+        "fp32": None,
+        "fp16": None,
+        "int8": '{"mode": "int8"}',
+        "int4": '{"mode": "int4_sym", "ratio": 0.8, "group_size": 128}',
+    }
+    if weight_format not in _QWEN_ASR_QUANT:
+        supported = ", ".join(_QWEN_ASR_QUANT.keys())
+        print(f"  ⚠ Qwen3-ASR 不支持 {weight_format} 量化，支持: {supported}")
+        print(f"  将使用 fp32（不量化）继续...")
+        quant_config = "None"
+    else:
+        quant_config = _QWEN_ASR_QUANT[weight_format]
+
+    helper_mod = helper.stem
+    print(f"  使用 helper: {helper}")
+    print(f"  模型: {model_path}")
+    print(f"  量化: {weight_format}")
+    print(f"  输出: {output_path}")
+    print()
+    t0 = time.time()
+    try:
+        subprocess.check_call([
+            sys.executable, "-c", f"""
+import sys
+sys.path.insert(0, '{helper.parent}')
+from {helper_mod} import convert_qwen3_asr_model
+convert_qwen3_asr_model(
+    model_id=r'{model_path}',
+    output_dir=r'{output_path}',
+    quantization_config={quant_config},
+    use_local_dir=False,
+)
+"""], timeout=3600)
+        print(f"\n  ✓ ({time.time()-t0:.1f}s)")
+        total_mb = 0
+        for f in Path(output_path).rglob("*.bin"):
+            total_mb += f.stat().st_size
+        print(f"  保存到: {output_path}  ({total_mb / 1024 / 1024:.0f} MB)")
+    except subprocess.CalledProcessError:
+        print(f"\n  ✗ 导出失败")
+        sys.exit(1)
+    except subprocess.TimeoutExpired:
+        print(f"\n  ✗ 导出超时 (60分钟)")
+        sys.exit(1)
+    finally:
+        _restore_qwen_transformers(saved_tf, saved_hf)
+
+
 def convert_model(model_path, output_path, weight_format,
                   ratio=1.0, group_size=128):
     """用 optimum-cli 导出模型。"""
@@ -315,6 +418,8 @@ def convert_model(model_path, output_path, weight_format,
     # Qwen3-TTS 走自定义转换路径
     if model_type == "qwen3_tts":
         return _convert_qwen3_tts(model_path, output_path, weight_format)
+    if model_type == "qwen3_asr":
+        return _convert_qwen3_asr(model_path, output_path, weight_format)
 
     needs_restore = _ensure_transformers(model_type)
 
