@@ -295,19 +295,21 @@ Can be used by VS Code Copilot (agent mode), Cursor, Claude Desktop, and other M
 | `chat` | Send a prompt to the local LLM and get a response |
 | `chat_stream` | Streaming chat, returns text chunks |
 
-**VS Code config** (`.vscode/mcp.json`):
+**VS Code config** (`.vscode/mcp.json`) for example (replace paths with yours):
 ```json
 {
   "servers": {
     "ov-cli": {
-      "command": "/path/to/.venv/bin/ov-cli",
-      "args": ["mcp", "--model", "/path/to/model-ov"],
+      "command": "/run/media/amigor/Project/ov-cli/.venv/bin/ov-cli",
+      "args": ["mcp", "--model", "/run/media/amigor/Project/ov-cli/model/deepseek/7B-ov"],
       "type": "stdio",
       "description": "Local LLM inference (chat, translation, Q&A)"
     }
   }
 }
 ```
+
+**Other platforms** (Cursor → `.cursor/mcp.json`, Claude Desktop → `claude_desktop_config.json`), format is similar.
 
 ### `tts` — TTS
 
