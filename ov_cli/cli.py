@@ -94,7 +94,7 @@ def cmd_image(args):
 
 def cmd_tts(args):
     """ov-cli tts: 语音合成"""
-    from .tts import load_model, run_once, detect_model_type
+    from .tts import load_model, run_once, run_pipe, detect_model_type
     ov_path = os.path.abspath(args.model)
     if not os.path.isdir(ov_path):
         print(f"{TR('错误: 找不到模型目录', 'Error: model directory not found')}: {ov_path}")
@@ -111,6 +111,11 @@ def cmd_tts(args):
     else:
         print(f"  {TR('类型: Base (声音克隆)', 'Type: Base (Voice Clone)')}", file=sys.stderr)
     print(file=sys.stderr)
+    if args.mode == "pipe":
+        run_pipe(ctx, speaker=args.speaker, language=args.lang,
+                 instruct=args.instruct, ref_audio=args.ref_audio,
+                 warmup=not args.no_warmup)
+        return
     if not args.prompt:
         print(f"  ⚠ {TR('需要 --prompt 参数', 'requires --prompt')}")
         sys.exit(1)
@@ -161,7 +166,7 @@ def cmd_chat(args):
 
 def cmd_asr(args):
     """ov-cli asr: 语音转文字"""
-    from .asr import load_model, run_once, run_whisper
+    from .asr import load_model, run_once, run_whisper, run_pipe
     ov_path = os.path.abspath(args.model)
     if not os.path.isdir(ov_path):
         print(f"{TR('错误: 找不到模型目录', 'Error: model directory not found')}: {ov_path}")
@@ -172,6 +177,8 @@ def cmd_asr(args):
             print(f"  ⚠ {TR('once 模式需要 --file 参数', 'once mode requires --file')}")
             sys.exit(1)
         run_once(ctx, file_path=args.file, lang=args.lang, output=args.output, json_output=args.json)
+    elif args.mode == "pipe":
+        run_pipe(ctx, lang=args.lang)
     else:
         run_whisper(ctx, lang=args.lang)
 
@@ -300,7 +307,9 @@ def main():
             "  ov-cli tts --model ./0.6B-ov --prompt 你好 --ref-audio ref.mp3 --output voice.wav",
             "Text-to-speech via Qwen3-TTS."))
     p.add_argument("--model", "-m", required=True)
-    p.add_argument("--prompt", required=True), p.add_argument("--output", "-o")
+    p.add_argument("--prompt"), p.add_argument("--output", "-o")
+    p.add_argument("--mode", choices=["once","pipe"], default="once",
+        help=TR("once=单次输出 pipe=管道模式", "once=single pipe=pipeline"))
     p.add_argument("--speaker", help=TR("预设声音 (CustomVoice)", "Speaker (CustomVoice)"))
     p.add_argument("--lang", help=TR("语言 (auto/chinese/english...)", "Language"))
     p.add_argument("--instruct", help=TR("语气指令", "Voice instruction"))
@@ -313,13 +322,16 @@ def main():
     p = sub.add_parser("asr", help=TR("语音转文字", "ASR"),
         description=TR(
             "语音转文字，自动识别 Whisper / Qwen3-ASR。\n\n"
+            "  interactive  交互式终端 (默认)\n"
+            "  once         单次转录 --file speech.mp3\n"
+            "  pipe         管道模式: echo audio.wav | ov-cli asr --mode pipe\n\n"
             "Whisper 示例:\n"
             "  ov-cli asr --model ./whisper/ov-large --mode once --file speech.mp3\n\n"
             "Qwen3-ASR 示例:\n"
             "  ov-cli asr --model ./Qwen3-ASR-0.6B-ov --mode once --file speech.mp3",
             "Speech-to-text. Auto-detects Whisper / Qwen3-ASR."))
     p.add_argument("--model", "-m", required=True)
-    p.add_argument("--mode", choices=["interactive","once"], default="interactive")
+    p.add_argument("--mode", choices=["interactive","once","pipe"], default="interactive")
     p.add_argument("--file"), p.add_argument("--output", "-o")
     p.add_argument("--lang")
     p.add_argument("--json", action="store_true", help=TR("JSON 格式输出", "JSON output"))

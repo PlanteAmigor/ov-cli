@@ -226,6 +226,53 @@ def run_once(ctx, file_path, lang=None, output=None, json_output=False):
     _restore_tf(need_restore)
 
 
+# ── 管道模式 ──
+
+def run_pipe(ctx, lang=None):
+    """管道模式：从 stdin 读音频路径，向 stdout 写 JSON 结果。
+    模型常驻内存，每条结果 0.5s 内返回。
+
+    用法:
+      echo /path/to/audio.wav | ov-cli asr --model ./model --mode pipe
+    """
+    import json as _json
+    asr_type = ctx.get("asr_type", "whisper")
+    need_restore = ctx.get("_need_restore", False)
+
+    print(f"  🧪 {TR('管道模式已启动 (stdin/stdout)', 'Pipe mode started (stdin/stdout)')}", file=sys.stderr)
+    try:
+        while True:
+            line = sys.stdin.readline()
+            if not line:
+                break
+            path = line.strip()
+            if not path:
+                continue
+
+            ok, _ = _is_audio_file(path)
+            if not ok:
+                print(_json.dumps({"error": f"unsupported format: {path}"}), flush=True)
+                continue
+            if not os.path.isfile(path):
+                print(_json.dumps({"error": f"file not found: {path}"}), flush=True)
+                continue
+
+            t0 = time.time()
+            try:
+                if asr_type == "qwen3_asr":
+                    text = _transcribe_qwen_asr(ctx, path, lang)
+                else:
+                    text = _transcribe_whisper(ctx, path, lang)
+            except Exception as e:
+                print(_json.dumps({"error": str(e)[:200]}), flush=True)
+                continue
+
+            elapsed = time.time() - t0
+            print(_json.dumps({"text": text, "time": round(elapsed, 1)}, ensure_ascii=False), flush=True)
+    finally:
+        _restore_tf(need_restore)
+
+
 # ── 交互模式 ──
 
 def run_whisper(ctx, lang=None):
