@@ -278,7 +278,8 @@ EOF
     "ov-cli": {
       "command": "/path/to/.venv/bin/ov-cli",
       "args": ["mcp", "--model", "/path/to/model-ov"],
-      "type": "stdio"
+      "type": "stdio",
+      "description": "本地 LLM 推理（聊天、翻译、问答）"
     }
   }
 }
