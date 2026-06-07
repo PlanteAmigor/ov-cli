@@ -355,9 +355,11 @@ TTS-generated audio has even pacing without natural pauses, so transcriptions ma
 
 ## External Integration
 
-ov-cli can be called from other projects via `--mode once` and `--json`. Logs go to stderr, stdout contains only the clean result.
+ov-cli supports two external calling modes: `--mode once` (single-shot) and `--mode pipe` (pipeline).
 
-### Commands Supporting External Calls
+### Way 1: `--mode once` — Single-shot
+
+Each call loads the model independently. Logs go to stderr, stdout contains only the clean result.
 
 | Command | once mode | `--json` | stdout output |
 |:--------|:---------:|:--------:|:--------------|
@@ -366,18 +368,32 @@ ov-cli can be called from other projects via `--mode once` and `--json`. Logs go
 | `image` | `--mode once --prompt "cat" [-o output.png]` | ✅ | image path / `{"path":"...","time":n}` |
 | `tts` | `--prompt TEXT` | ✅ | audio path / `{"path":"...","time":n,"duration":n}` |
 
-### Recommended Usage
+### Way 2: `--mode pipe` — Pipeline (recommended)
+
+Model stays in memory. Read input from stdin, write JSON to stdout. Ideal for high-frequency batch calls.
 
 ```bash
-# Shell: capture plain text
-text=$(/path/to/ov-cli asr -m ./model --mode once -f speech.mp3 2>/dev/null)
+# ASR batch transcription
+printf '/path/to/a.wav\n/path/to/b.wav\n' | ov-cli asr --model ./model --mode pipe
+# → {"text":"...","time":0.5}
 
-# Shell: capture JSON
-json=$(/path/to/ov-cli asr -m ./model --mode once -f speech.mp3 --json 2>/dev/null)
+# TTS batch synthesis
+printf 'Hello\nHi\n' | ov-cli tts --model ./model --mode pipe --speaker Vivian
+# → {"path":"outputs/pipe_1.wav","text":"Hello","time":2.1}
+
+# Chat batch Q&A
+printf 'What is AI?\nTell me a joke\n' | ov-cli chat --model ./model --mode pipe
+# → {"text":"AI stands for...","time":3.2}
+
+# Image batch generation
+printf 'a cat\na dog\n' | ov-cli image --model ./FLUX-ov --mode pipe
+# → {"path":"outputs/pipe_cat.png","time":10.2}
 ```
 
+### Python Examples
+
 ```python
-# Python subprocess
+# Subprocess: --mode once (single call)
 import subprocess, json
 
 result = subprocess.run([
@@ -390,7 +406,19 @@ result = subprocess.run([
 
 if result.returncode == 0:
     data = json.loads(result.stdout)
-    print(data["text"])  # transcription result
+    print(data["text"])  # transcription
+
+# Subprocess: --mode pipe (persistent)
+proc = subprocess.Popen(
+    ["/path/to/ov-cli", "asr", "--model", "./model", "--mode", "pipe"],
+    stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True
+)
+for audio in ["a.wav", "b.wav"]:
+    proc.stdin.write(audio + "\n")
+    proc.stdin.flush()
+    data = json.loads(proc.stdout.readline())
+    print(data["text"])  # ~0.5s each
+proc.stdin.close()
 ```
 
 > 💡 Use `2>/dev/null` to suppress logs and keep only stdout. Without it, both logs and results show in terminal.
