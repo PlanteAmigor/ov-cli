@@ -302,7 +302,8 @@ Can be used by VS Code Copilot (agent mode), Cursor, Claude Desktop, and other M
     "ov-cli": {
       "command": "/path/to/.venv/bin/ov-cli",
       "args": ["mcp", "--model", "/path/to/model-ov"],
-      "type": "stdio"
+      "type": "stdio",
+      "description": "Local LLM inference (chat, translation, Q&A)"
     }
   }
 }
