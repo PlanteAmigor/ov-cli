@@ -33,6 +33,12 @@ eval "$(./ov-cli venv)"
 
 # 6. API server
 ./ov-cli server --model ./Qwen3/2B-ov
+
+# 7. Web UI
+./ov-cli ui --model ./Qwen3/2B-ov
+
+# 8. MCP Protocol
+./ov-cli mcp --model ./Qwen3/2B-ov
 ```
 
 ## How to Upgrade
@@ -272,6 +278,36 @@ Text-to-image via OpenVINO GenAI Text2ImagePipeline. Supports interactive and si
 | `/help` | Help |
 | `/exit` | Exit |
 
+### `mcp` — MCP Protocol Server
+
+MCP (Model Context Protocol) server that exposes LLM tools via stdin/stdout JSON-RPC.
+Can be used by VS Code Copilot (agent mode), Cursor, Claude Desktop, and other MCP-compatible AI tools.
+
+```bash
+./ov-cli mcp --model ./Qwen3/2B-ov
+./ov-cli mcp --model ./deepseek/7B-ov
+```
+
+**Exposed tools:**
+
+| Tool | Description |
+|------|-------------|
+| `chat` | Send a prompt to the local LLM and get a response |
+| `chat_stream` | Streaming chat, returns text chunks |
+
+**VS Code config** (`.vscode/mcp.json`):
+```json
+{
+  "servers": {
+    "ov-cli": {
+      "command": "/path/to/.venv/bin/ov-cli",
+      "args": ["mcp", "--model", "/path/to/model-ov"],
+      "type": "stdio"
+    }
+  }
+}
+```
+
 ### `tts` — TTS
 
 Text-to-speech via OpenVINO Qwen3-TTS. Once mode only.
@@ -491,8 +527,7 @@ ov-cli/
 │   ├── tts.py               # TTS terminal
 │   ├── asr.py               # Speech-to-text terminal
 │   ├── ui.py                # Gradio web UI
-│   ├── server.py            # FastAPI OpenAI-compatible server
-│   └── benchmark.py         # Performance benchmark
+│   ├── server.py            # FastAPI OpenAI-compatible server│   ├── mcp.py               # MCP protocol server│   └── benchmark.py         # Performance benchmark
 │
 └── openvino.genai-2026.2.0.0-optimization/  # Modified GenAI source (full mode)
 ```

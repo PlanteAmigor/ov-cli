@@ -36,6 +36,9 @@ eval "$(./ov-cli venv)"
 
 # 7. Web 界面
 ./ov-cli ui --model ./Qwen3/2B-ov
+
+# 8. MCP 协议
+./ov-cli mcp --model ./Qwen3/2B-ov
 ```
 
 ## 如何升级
@@ -250,6 +253,36 @@ EOF
 - 图片上传（VLM 模型）
 - 对话历史保存 / 加载 / 删除
 - `Ctrl+C` 安全退出
+
+### `mcp` — MCP 协议服务器
+
+启动 MCP (Model Context Protocol) 服务器，通过 stdin/stdout JSON-RPC 暴露 LLM 工具。
+可被 VS Code Copilot (agent 模式)、Cursor、Claude Desktop 等支持 MCP 的 AI 编程工具调用。
+
+```bash
+./ov-cli mcp --model ./Qwen3/2B-ov
+./ov-cli mcp --model ./deepseek/7B-ov
+```
+
+**暴露的工具：**
+
+| 工具 | 说明 |
+|------|------|
+| `chat` | 向本地 LLM 发送提示并获取回复 |
+| `chat_stream` | 流式聊天，逐块返回文本 |
+
+**VS Code 配置**（`.vscode/mcp.json`）：
+```json
+{
+  "servers": {
+    "ov-cli": {
+      "command": "/path/to/.venv/bin/ov-cli",
+      "args": ["mcp", "--model", "/path/to/model-ov"],
+      "type": "stdio"
+    }
+  }
+}
+```
 
 ### `tts` — 语音合成
 
@@ -507,6 +540,7 @@ ov-cli/
 │   ├── tts.py               # TTS 语音合成终端
 │   ├── asr.py               # 语音转文字终端
 │   ├── server.py            # FastAPI OpenAI 兼容服务
+│   ├── mcp.py               # MCP 协议服务器
 │   └── benchmark.py         # 性能测试
 │
 └── openvino.genai-2026.2.0.0-optimization/  # 修改版 GenAI 源码（setup 完整模式用）
