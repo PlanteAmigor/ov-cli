@@ -176,6 +176,13 @@ def cmd_asr(args):
         run_whisper(ctx, lang=args.lang)
 
 
+def cmd_mcp(args):
+    """ov-cli mcp: MCP 协议服务器"""
+    from .mcp import run_mcp
+    ov_path = os.path.abspath(args.model)
+    run_mcp(ov_path)
+
+
 # ── 帮助文本 ──
 
 def _build_help():
@@ -204,6 +211,7 @@ def _build_help():
             "  ./ov-cli tts --model ./0.6B-CV-ov --prompt hello --speaker vivian\n"
             "  ./ov-cli ui --model ./model-ov\n"
             "  ./ov-cli server --model ./model-ov --port 8080\n"
+            "  ./ov-cli mcp --model ./model-ov\n"
             "  ./ov-cli setup --fix\n"
         )
     return desc, epilog
@@ -335,6 +343,18 @@ def main():
     p.add_argument("--share", action="store_true", help=TR("生成公链", "Public link"))
     p.add_argument("--reasoning", choices=["on","off"], default="on", help=TR("思考模式", "Reasoning"))
 
+    # mcp
+    p = sub.add_parser("mcp", help=TR("MCP 协议服务器", "MCP Server"),
+        description=TR(
+            "启动 MCP (Model Context Protocol) 服务器。\n"
+            "通过 stdin/stdout JSON-RPC 暴露 LLM 工具。\n\n"
+            "示例:\n"
+            "  ov-cli mcp --model ./Qwen3-ov\n"
+            "  ov-cli mcp --model ./deepseek/7B-ov",
+            "MCP (Model Context Protocol) server.\n"
+            "Exposes LLM tools via stdin/stdout JSON-RPC."))
+    p.add_argument("--model", "-m", required=True)
+
     args = parser.parse_args()
     if args.lang:
         ov_cli._LANG = args.lang
@@ -347,7 +367,7 @@ def main():
     dispatch = {
         "setup": lambda a: cmd_setup(a, W), "convert": cmd_convert, "chat": cmd_chat,
         "benchmark": cmd_benchmark, "venv": cmd_venv, "server": cmd_server,
-        "image": cmd_image, "tts": cmd_tts, "asr": cmd_asr, "ui": cmd_ui,
+        "image": cmd_image, "tts": cmd_tts, "asr": cmd_asr, "ui": cmd_ui, "mcp": cmd_mcp,
     }
     dispatch[args.cmd](args)
 
