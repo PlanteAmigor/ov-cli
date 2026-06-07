@@ -73,7 +73,7 @@ def cmd_server(args):
 
 def cmd_image(args):
     """ov-cli image: 文生图"""
-    from .image import load_model, run_once, run_generate
+    from .image import load_model, run_once, run_generate, run_pipe
     ov_path = os.path.abspath(args.model)
     if not os.path.isdir(ov_path):
         print(f"{TR('错误: 找不到模型目录', 'Error: model directory not found')}: {ov_path}")
@@ -87,6 +87,9 @@ def cmd_image(args):
                  width=args.width, height=args.height,
                  steps=args.steps, guidance=args.guidance,
                  seed=args.seed, json_output=args.json)
+    elif args.mode == "pipe":
+        run_pipe(ctx, width=args.width, height=args.height,
+                 steps=args.steps, guidance=args.guidance)
     else:
         run_generate(ctx, width=args.width, height=args.height,
                      steps=args.steps, guidance=args.guidance)
@@ -158,6 +161,9 @@ def cmd_chat(args):
                  output=args.output, temperature=args.temp, top_p=args.top_p,
                  top_k=args.top_k, max_tokens=args.max_tokens,
                  reasoning=args.reasoning == "on", json_output=args.json)
+    elif mode == "pipe":
+        from .chat import run_pipe
+        run_pipe(ctx, reasoning=args.reasoning == "on", max_tokens=args.max_tokens, temperature=args.temp)
     else:
         run_chat(ctx, system=args.system, temperature=args.temp, top_p=args.top_p,
                  top_k=args.top_k, max_tokens=args.max_tokens, image_path=args.image,
@@ -259,7 +265,7 @@ def main():
     # chat
     p = sub.add_parser("chat", help=TR("聊天/翻译", "Chat"))
     p.add_argument("--model", "-m", required=True)
-    p.add_argument("--mode", choices=["chat","translate","once"], default="chat")
+    p.add_argument("--mode", choices=["chat","translate","once","pipe"], default="chat")
     p.add_argument("--prompt"), p.add_argument("--file", action="append", default=None)
     p.add_argument("--output"), p.add_argument("--system", default="You are a helpful AI assistant.")
     p.add_argument("--json", action="store_true", help=TR("JSON 格式输出", "JSON output"))
@@ -289,7 +295,7 @@ def main():
             "  ov-cli image --model ./FLUX-ov --prompt 'a cat' --width 1024 --height 768",
             "Image generation via Text2ImagePipeline."))
     p.add_argument("--model", "-m", required=True)
-    p.add_argument("--mode", choices=["interactive","once"], default="interactive")
+    p.add_argument("--mode", choices=["interactive","once","pipe"], default="interactive")
     p.add_argument("--prompt"), p.add_argument("--output", "-o")
     p.add_argument("--width", type=int, default=512)
     p.add_argument("--height", type=int, default=512)
