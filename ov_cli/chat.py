@@ -180,6 +180,59 @@ def _make_genai_config(temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024, pr
     return cfg
 
 
+# ── 管道模式 ────────────────────────────────────────────
+
+def run_pipe(ctx, reasoning=True, max_tokens=1024, temperature=0.7):
+    """管道模式：从 stdin 读提示词，向 stdout 写 JSON 结果。"""
+    import json as _json
+    pipe = ctx.get("pipe")
+    is_vlm = ctx.get("is_vlm", False)
+    from . import TR as _TR
+
+    print(f"  🧪 {_TR('管道模式已启动 (stdin/stdout)', 'Pipe mode started (stdin/stdout)')}", file=sys.stderr)
+    try:
+        while True:
+            line = sys.stdin.readline()
+            if not line:
+                break
+            prompt = line.strip()
+            if not prompt:
+                continue
+
+            conv = [{"role": "user", "content": prompt}]
+            full = _build_prompt(conv, pipe.get_tokenizer(), enable_thinking=reasoning)
+
+            cfg = ov_genai.GenerationConfig(max_new_tokens=max_tokens, temperature=temperature)
+            cfg.do_sample = temperature >= 0.01
+
+            if not reasoning:
+                try:
+                    tok = pipe.get_tokenizer()
+                    think_id = int(list(tok.encode("<think>", add_special_tokens=False).input_ids.data)[0][0])
+                    nothink_id = int(list(tok.encode("</think>", add_special_tokens=False).input_ids.data)[0][0])
+                    cfg.reasoning_budget_tokens = 0
+                    cfg.thinking_start_token_id = think_id
+                    cfg.thinking_end_token_id = nothink_id
+                except Exception:
+                    pass
+
+            t0 = time.time()
+            try:
+                if is_vlm:
+                    result = pipe.generate(full, generation_config=cfg, images=[])
+                else:
+                    result = pipe.generate(full, cfg)
+            except Exception as e:
+                print(_json.dumps({"error": str(e)[:200]}, ensure_ascii=False), flush=True)
+                continue
+
+            elapsed = time.time() - t0
+            resp = str(result).strip()
+            print(_json.dumps({"text": resp, "time": round(elapsed, 1)}, ensure_ascii=False), flush=True)
+    except KeyboardInterrupt:
+        pass
+
+
 # ── 行编辑器 ────────────────────────────────────────────
 # 支持方向键、Home/End、退格、Delete、历史记录（仿 llama.cpp）
 

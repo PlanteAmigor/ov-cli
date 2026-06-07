@@ -41,6 +41,48 @@ def load_model(ov_path):
 
 
 
+# ── 管道模式 ──
+
+def run_pipe(ctx, width=_DEFAULT_WIDTH, height=_DEFAULT_HEIGHT,
+             steps=_DEFAULT_STEPS, guidance=_DEFAULT_GUIDANCE):
+    """管道模式：从 stdin 读提示词，向 stdout 写 JSON（图片路径）。"""
+    import json as _json
+    pipe = ctx["pipe"]
+    from PIL import Image as _PIL
+    from ov_cli import TR as _TR
+
+    print(f"  🧪 {_TR('管道模式已启动 (stdin/stdout)', 'Pipe mode started (stdin/stdout)')}", file=sys.stderr)
+    try:
+        while True:
+            line = sys.stdin.readline()
+            if not line:
+                break
+            prompt = line.strip()
+            if not prompt:
+                continue
+
+            kwargs = {"width": width, "height": height,
+                      "num_inference_steps": steps, "guidance_scale": guidance}
+            t0 = time.time()
+            try:
+                result = pipe.generate(prompt, **kwargs)
+            except Exception as e:
+                print(_json.dumps({"error": str(e)[:200]}, ensure_ascii=False), flush=True)
+                continue
+
+            elapsed = time.time() - t0
+            img = _PIL.fromarray(result.data[0])
+            safe = "".join(c if c.isalnum() or c in " _-" else "_" for c in prompt)[:40]
+            fname = f"pipe_{time.strftime('%Y%m%d_%H%M%S')}_{safe}.png"
+            os.makedirs("outputs", exist_ok=True)
+            path = os.path.join("outputs", fname)
+            img.save(path)
+
+            print(_json.dumps({"path": path, "time": round(elapsed, 1)}, ensure_ascii=False), flush=True)
+    except KeyboardInterrupt:
+        pass
+
+
 # ── 单次生图 ──
 
 def run_once(ctx, prompt, output=None, width=_DEFAULT_WIDTH, height=_DEFAULT_HEIGHT,
