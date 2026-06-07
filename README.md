@@ -271,19 +271,21 @@ EOF
 | `chat` | 向本地 LLM 发送提示并获取回复 |
 | `chat_stream` | 流式聊天，逐块返回文本 |
 
-**VS Code 配置**（`.vscode/mcp.json`）：
+**VS Code 配置**（`.vscode/mcp.json`）例如（将路径替换为你的实际路径）：
 ```json
 {
   "servers": {
     "ov-cli": {
-      "command": "/path/to/.venv/bin/ov-cli",
-      "args": ["mcp", "--model", "/path/to/model-ov"],
+      "command": "/run/media/amigor/Project/ov-cli/.venv/bin/ov-cli",
+      "args": ["mcp", "--model", "/run/media/amigor/Project/ov-cli/model/deepseek/7B-ov"],
       "type": "stdio",
       "description": "本地 LLM 推理（聊天、翻译、问答）"
     }
   }
 }
 ```
+
+**其他平台**（Cursor → `.cursor/mcp.json`，Claude Desktop → `claude_desktop_config.json`），格式基本一致。
 
 ### `tts` — 语音合成
 
