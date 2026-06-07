@@ -62,6 +62,71 @@ def _warmup(model, mtype):
     print(f"✓ ({time.time()-t0:.1f}s)", file=sys.stderr)
 
 
+# ── 管道模式 ──
+
+def run_pipe(ctx, speaker=None, language=None, instruct=None, ref_audio=None, warmup=True):
+    """管道模式：从 stdin 读文本，向 stdout 写 JSON 结果（音频路径）。
+    模型常驻内存，逐条合成语音。
+
+    用法:
+      echo '你好' | ov-cli tts --model ./0.6B-CV-ov --mode pipe --speaker Vivian
+    """
+    import json as _json, soundfile as sf
+    model = ctx["model"]
+    mtype = ctx["model_type"]
+
+    if warmup:
+        _warmup(model, mtype)
+
+    print(f"  🧪 {TR('管道模式已启动 (stdin/stdout)', 'Pipe mode started (stdin/stdout)')}", file=sys.stderr)
+    try:
+        while True:
+            line = sys.stdin.readline()
+            if not line:
+                break
+            text = line.strip()
+            if not text:
+                continue
+
+            t0 = time.time()
+            try:
+                if mtype == "custom_voice":
+                    if not speaker:
+                        print(_json.dumps({"error": "CustomVoice 需要 --speaker"}), flush=True)
+                        continue
+                    wavs, sr = model.generate_custom_voice(
+                        text=text, language=language or "auto",
+                        speaker=speaker, instruct=instruct,
+                    )
+                else:
+                    if not ref_audio:
+                        print(_json.dumps({"error": "Base 模型需要 --ref-audio"}), flush=True)
+                        continue
+                    wavs, sr = model.generate_voice_clone(
+                        text=text, language=language or "auto",
+                        ref_audio=ref_audio, x_vector_only_mode=True,
+                    )
+            except Exception as e:
+                print(_json.dumps({"error": str(e)[:200]}), flush=True)
+                continue
+
+            elapsed = time.time() - t0
+            audio_len = len(wavs[0]) / sr if len(wavs[0]) > 0 else 0
+
+            safe = "".join(c if c.isalnum() or c in " _-" else "_" for c in text)[:40]
+            fname = f"pipe_{time.strftime('%Y%m%d_%H%M%S')}_{safe}.wav"
+            os.makedirs("outputs", exist_ok=True)
+            path = os.path.join("outputs", fname)
+            sf.write(path, wavs[0], sr)
+
+            print(_json.dumps({
+                "path": path, "text": text,
+                "time": round(elapsed, 1), "duration": round(audio_len, 1),
+            }, ensure_ascii=False), flush=True)
+    except KeyboardInterrupt:
+        pass
+
+
 # ── 单次推理 ──
 
 def run_once(ctx, text, output=None, speaker=None, language=None, instruct=None,
