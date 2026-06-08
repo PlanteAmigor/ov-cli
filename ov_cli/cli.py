@@ -7,6 +7,9 @@ import ov_cli
 from ov_cli import TR
 from ov_cli.setup import cmd_setup, _activate_path
 
+# 工作区根目录
+_WORKSPACE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 
 def _check_version_warning(venv_path):
     """每次运行都提示 --fix，确保用户及时升级依赖。"""
@@ -31,6 +34,11 @@ def _check_wsl2_gpu():
 
 def cmd_convert(args):
     """ov-cli convert"""
+    from .features import has as _has_feature
+    _venv = getattr(args, "venv", None) or os.path.join(_WORKSPACE, ".venv")
+    if not _has_feature(_venv, "convert"):
+        print(f"  ⚠ {TR('convert 模块未安装，请运行:', 'convert not installed, run:')} ./ov-cli setup --with convert")
+        sys.exit(1)
     from .convert import convert_model
     model_path = os.path.abspath(args.model)
     if not os.path.isdir(model_path):
@@ -56,6 +64,11 @@ def cmd_venv(args):
 
 def cmd_benchmark(args):
     """ov-cli benchmark"""
+    from .features import has as _has_feature
+    _venv = getattr(args, "venv", None) or os.path.join(_WORKSPACE, ".venv")
+    if not _has_feature(_venv, "chat"):
+        print(f"  ⚠ {TR('benchmark 需要 chat 模块，请运行:', 'benchmark needs chat, run:')} ./ov-cli setup --with chat")
+        sys.exit(1)
     from .benchmark import run_benchmark
     ov_path = os.path.abspath(args.model)
     run_benchmark(ov_path, args.reasoning == "on")
@@ -63,6 +76,11 @@ def cmd_benchmark(args):
 
 def cmd_server(args):
     """ov-cli server: 启动 API 服务"""
+    from .features import has as _has_feature
+    _venv = getattr(args, "venv", None) or os.path.join(_WORKSPACE, ".venv")
+    if not _has_feature(_venv, "server"):
+        print(f"  ⚠ {TR('server 模块未安装，请运行:', 'server not installed, run:')} ./ov-cli setup --with server")
+        sys.exit(1)
     from .server import run_server
     model_path = os.path.abspath(args.model)
     if not os.path.isdir(model_path):
@@ -73,6 +91,11 @@ def cmd_server(args):
 
 def cmd_image(args):
     """ov-cli image: 文生图"""
+    from .features import has as _has_feature
+    _venv = getattr(args, "venv", None) or os.path.join(_WORKSPACE, ".venv")
+    if not _has_feature(_venv, "image"):
+        print(f"  ⚠ {TR('image 模块未安装，请运行:', 'image not installed, run:')} ./ov-cli setup --with image")
+        sys.exit(1)
     from .image import load_model, run_once, run_generate, run_pipe
     ov_path = os.path.abspath(args.model)
     if not os.path.isdir(ov_path):
@@ -97,6 +120,11 @@ def cmd_image(args):
 
 def cmd_tts(args):
     """ov-cli tts: 语音合成"""
+    from .features import has as _has_feature
+    _venv = getattr(args, "venv", None) or os.path.join(_WORKSPACE, ".venv")
+    if not _has_feature(_venv, "tts"):
+        print(f"  ⚠ {TR('tts 模块未安装，请运行:', 'tts not installed, run:')} ./ov-cli setup --with tts")
+        sys.exit(1)
     from .tts import load_model, run_once, run_pipe, detect_model_type
     ov_path = os.path.abspath(args.model)
     if not os.path.isdir(ov_path):
@@ -129,11 +157,21 @@ def cmd_tts(args):
 
 def cmd_ui(args):
     """ov-cli ui: 网页界面"""
+    from .features import has as _has_feature
+    _venv = getattr(args, "venv", None) or os.path.join(_WORKSPACE, ".venv")
+    if not _has_feature(_venv, "ui"):
+        print(f"  ⚠ {TR('ui 模块未安装，请运行:', 'ui not installed, run:')} ./ov-cli setup --with ui")
+        sys.exit(1)
     from .ui import launch_ui
     launch_ui(model_path=args.model, device=args.device, port=args.port, share=args.share, reasoning=args.reasoning == "on")
 
 def cmd_chat(args):
     """ov-cli chat"""
+    from .features import has as _has_feature
+    _venv = getattr(args, "venv", None) or os.path.join(_WORKSPACE, ".venv")
+    if not _has_feature(_venv, "chat"):
+        print(f"  ⚠ {TR('chat 模块未安装，请运行:', 'chat not installed, run:')} ./ov-cli setup --with chat")
+        sys.exit(1)
     from .chat import load_model, run_chat, run_translate
     if args.reasoning == "off" and args.mode != "translate":
         print(f"  {TR('💡 提示', '💡 Hint')}: "
@@ -172,6 +210,11 @@ def cmd_chat(args):
 
 def cmd_asr(args):
     """ov-cli asr: 语音转文字"""
+    from .features import has as _has_feature
+    _venv = getattr(args, "venv", None) or os.path.join(_WORKSPACE, ".venv")
+    if not _has_feature(_venv, "asr"):
+        print(f"  ⚠ {TR('asr 模块未安装，请运行:', 'asr not installed, run:')} ./ov-cli setup --with asr")
+        sys.exit(1)
     from .asr import load_model, run_once, run_whisper, run_pipe
     ov_path = os.path.abspath(args.model)
     if not os.path.isdir(ov_path):
@@ -191,6 +234,11 @@ def cmd_asr(args):
 
 def cmd_mcp(args):
     """ov-cli mcp: MCP 协议服务器"""
+    from .features import has as _has_feature
+    _venv = getattr(args, "venv", None) or os.path.join(_WORKSPACE, ".venv")
+    if not _has_feature(_venv, "mcp"):
+        print(f"  ⚠ {TR('mcp 模块未安装，请运行:', 'mcp not installed, run:')} ./ov-cli setup --with mcp")
+        sys.exit(1)
     from .mcp import run_mcp
     ov_path = os.path.abspath(args.model)
     run_mcp(ov_path)
@@ -233,7 +281,7 @@ def _build_help():
 # ── 入口 ──
 
 def main():
-    W = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # W = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     for i, a in enumerate(sys.argv[1:], 1):
         if a == "--lang" and i + 1 < len(sys.argv):
             ov_cli._LANG = sys.argv[i + 1]
@@ -252,6 +300,8 @@ def main():
     p = sub.add_parser("setup", help=TR("创建环境", "Setup"))
     p.add_argument("--venv", help=TR("venv 路径", "venv path"))
     p.add_argument("--optimum-dir", help=TR("optimum-intel 源码目录", "optimum-intel source"))
+    p.add_argument("--with", dest="with_features", default="all",
+        help=TR("按需安装 (chat,image,asr,tts,ui,mcp,server,convert)", "Features (chat,image,asr,tts,ui,mcp,server,convert)"))
     p.add_argument("--fix", action="store_true", help=TR("修复模式", "Fix mode"))
 
     # convert
@@ -377,13 +427,13 @@ def main():
     if args.lang:
         ov_cli._LANG = args.lang
     if args.cmd != "setup":
-        _venv = getattr(args, "venv", None) or os.path.join(W, ".venv")
+        _venv = getattr(args, "venv", None) or os.path.join(_WORKSPACE, ".venv")
         _check_version_warning(_venv)
     if args.cmd not in ("setup", "venv"):
         _check_wsl2_gpu()
 
     dispatch = {
-        "setup": lambda a: cmd_setup(a, W), "convert": cmd_convert, "chat": cmd_chat,
+        "setup": lambda a: cmd_setup(a, _WORKSPACE), "convert": cmd_convert, "chat": cmd_chat,
         "benchmark": cmd_benchmark, "venv": cmd_venv, "server": cmd_server,
         "image": cmd_image, "tts": cmd_tts, "asr": cmd_asr, "ui": cmd_ui, "mcp": cmd_mcp,
     }

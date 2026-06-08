@@ -1,14 +1,40 @@
 """
 ov-cli setup: 虚拟环境创建与依赖安装。
+
+支持按需安装:
+  ./ov-cli setup --with chat,image
+  ./ov-cli setup --with all
+  ./ov-cli setup --fix
 """
 
 import os, sys, json, shutil, subprocess, tempfile
 import ov_cli
 from ov_cli import TR
+from ov_cli.features import get_packages, get_extra_pips, save as _save_features
+
+
+_ALL_FEATURES = {"chat", "image", "asr", "tts", "ui", "mcp", "server", "convert"}
+
+_FEATURE_HINTS = {
+    "chat":    "聊天终端（PyMuPDF ~15MB）",
+    "image":   "文生图（无额外依赖）",
+    "asr":     "语音识别（soundfile + qwen-asr ~50MB）",
+    "tts":     "语音合成（soundfile + qwen-tts ~50MB）",
+    "ui":      "Web 界面（gradio ~30MB）",
+    "mcp":     "MCP 协议服务器（无额外依赖）",
+    "server":  "API 服务（fastapi + uvicorn ~15MB）",
+    "convert": "模型转换（torch ~3GB, optimum-intel, 需 5-10 分钟）",
+}
+
+_CONVERT_WARN = "⚠ convert 模块需要安装 torch + optimum-intel（约 3GB，耗时 5-10 分钟）"
 
 
 def _is_windows():
     return sys.platform == "win32"
+
+
+def _features_path(venv_path):
+    return os.path.join(venv_path, ".ov-cli-features")
 
 
 def _activate_path(venv_path):
@@ -67,15 +93,10 @@ def _ensure_vscode_settings(venv_path, workspace):
 
 
 def _apply_gemma4_patch():
-    """自动修复 optimum-intel 中 Gemma-4 共享 KV 层的属性引用错误。
-
-    model_patcher.py 的 gemma4_text_attention_forward 引用了不存在的
-    self.kv_shared_layer_index。需要在运行时根据 layer_type 动态计算
-    对应的非共享层索引（transformers 5.x 的 Gemma4TextAttention 实际 API）。
-    """
+    """自动修复 optimum-intel 中 Gemma-4 共享 KV 层的属性引用错误。"""
     patcher_path = None
     try:
-        import optimum.exporters.openvino.model_patcher as mp  # type: ignore[reportMissingImports]
+        import optimum.exporters.openvino.model_patcher as mp
         patcher_path = mp.__file__
     except (ImportError, AttributeError, ModuleNotFoundError):
         pass
@@ -172,6 +193,7 @@ def _build_genai_from_source(venv_path, genai_src):
 def _prompt_mode(has_genai_src):
     """交互选择安装模式：1=简易 2=完整（编译 GenAI）"""
     if not has_genai_src:
+        print(f"  - {TR('GenAI 源码目录不存在，使用简易模式', 'No GenAI source, using simple mode')}")
         return 1
     while True:
         try:
@@ -188,8 +210,54 @@ def _prompt_mode(has_genai_src):
             return 1
 
 
+def _install_features(pip, features: set[str], workspace):
+    """安装指定功能需要的 pip 包。"""
+    pkgs = get_packages(features)
+    if pkgs:
+        print(f"  {TR('安装基础依赖...', 'Installing base deps...')}")
+        subprocess.check_call([pip, "install", "-v"] + pkgs)
+
+    # Install optimum-intel + transformers if convert is requested
+    if "convert" in features:
+        print(f"  {TR('安装转换依赖...', 'Installing convert deps...')}")
+        _optimum_src = os.path.join(workspace, "optimum-intel-main")
+        if os.path.isdir(_optimum_src):
+            print(f"  {TR('安装 optimum-intel (本地源码)...', 'Installing optimum-intel (local)...')}: {_optimum_src}")
+            subprocess.check_call([pip, "install", _optimum_src])
+        else:
+            print(f"  {TR('安装 optimum-intel (GitHub)...', 'Installing optimum-intel (GitHub)...')}")
+            subprocess.check_call([pip, "install", "optimum-intel@git+https://github.com/huggingface/optimum-intel.git"])
+        print(f"  {TR('安装 transformers (no-deps)...', 'Installing transformers (no-deps)...')}")
+        subprocess.check_call([pip, "install", "--no-deps", "--force-reinstall", "transformers"])
+
+    # 额外 pip 包（qwen-tts/asr 等）
+    extra = get_extra_pips(features)
+    for pkg in extra:
+        print(f"  ⚡ {TR('安装 {}...', 'Installing {}...').format(pkg)}")
+        subprocess.check_call([pip, "install", "--quiet", pkg], timeout=180)
+
+    # torch 先安装（CPU 版）
+    if "convert" in features:
+        subprocess.check_call([pip, "install", "torch", "torchvision",
+                               "--index-url", "https://download.pytorch.org/whl/cpu"])
+
+
 def cmd_setup(args, workspace):
     """ov-cli setup: 创建虚拟环境并安装依赖"""
+
+    # ── 解析 --with ──
+    if args.with_features:
+        raw = args.with_features.strip()
+        features = _ALL_FEATURES if raw == "all" else {s.strip() for s in raw.split(",") if s.strip()}
+    else:
+        features = _ALL_FEATURES  # 默认全装
+
+    invalid = features - _ALL_FEATURES
+    if invalid:
+        print(f"  ❌ {TR('不支持的功能', 'Unsupported features')}: {', '.join(sorted(invalid))}")
+        print(f"     {TR('支持', 'Supported')}: {', '.join(sorted(_ALL_FEATURES))}")
+        sys.exit(1)
+
     # ── 修复模式 ──
     if args.fix:
         venv_path = args.venv or os.path.join(workspace, ".venv")
@@ -198,12 +266,23 @@ def cmd_setup(args, workspace):
             print(f"  {TR('请先运行', 'Run first')}: ./ov-cli setup")
             sys.exit(1)
         pip = _pip_path(venv_path)
+
+        # 读取已装功能
+        installed = set()
+        fp = _features_path(venv_path)
+        if os.path.isfile(fp):
+            with open(fp) as f:
+                installed = {s.strip() for s in f.read().strip().split(",") if s.strip()}
+        if not installed:
+            installed = _ALL_FEATURES
+
         _mode_file = os.path.join(venv_path, ".ov-cli-mode")
         _prev_mode = None
         if os.path.isfile(_mode_file):
             with open(_mode_file) as f:
                 _prev_mode = f.read().strip()
         _genai_src = os.path.join(workspace, "openvino.genai-2026.2.0.0-optimization")
+
         # 简易→完整升级路径
         if _prev_mode != "2" and os.path.isdir(_genai_src):
             print(f"  {TR('检测到 GenAI 源码目录，可升级到完整模式', 'GenAI source found, can upgrade to full mode')}")
@@ -214,26 +293,30 @@ def cmd_setup(args, workspace):
                     f.write("2")
                 print(f"  {TR('✅ 已升级到完整模式', '✅ Upgraded to full mode')}")
                 return
+
         print(f"  {TR('修复模式: 升级依赖 + 重打补丁', 'Fix mode: upgrade deps + repatch')}")
-        try:
-            # 升级 ov-cli（排除 openvino-genai 避免覆盖编译版）
-            _install_cmd = [pip, "install", "--upgrade", workspace]
-            if _prev_mode == "2":
-                _install_cmd += ["--no-deps"]
-                subprocess.check_call(_install_cmd)
-                subprocess.check_call([pip, "install", "--upgrade", "--no-deps",
-                                       "optimum-intel@git+https://github.com/huggingface/optimum-intel.git"])
-                subprocess.check_call([pip, "install", "--upgrade", "--no-deps", "transformers"])
-            else:
-                subprocess.check_call(_install_cmd)
+        # 只修复已装的功能
+        _install_features(pip, installed, workspace)
+        if "convert" in installed:
             _apply_gemma4_patch()
-            _write_version_stamp(venv_path, workspace)
-            print(f"  {TR('✅ 修复完成', '✅ Fix done')}")
-        except KeyboardInterrupt:
-            print()
-            print(f"  {TR('修复已取消', 'Fix cancelled')}")
-            sys.exit(1)
+        print(f"  {TR('✅ 修复完成', '✅ Fix done')}")
         return
+
+    # ── 打印安装概要 ──
+    print(f"  {TR('即将安装以下模块', 'Will install:')}")
+    for f in sorted(features):
+        hint = _FEATURE_HINTS.get(f, f)
+        print(f"    • {f} — {hint}")
+
+    if "convert" in features:
+        print(f"  {_CONVERT_WARN}")
+        try:
+            r = input(f"  {TR('是否继续?', 'Continue?')} [Y/n]: ")
+            if r.strip().lower() == "n":
+                sys.exit(0)
+        except (EOFError, KeyboardInterrupt):
+            print()
+            sys.exit(0)
 
     # 检查目录写入权限
     if not os.access(workspace, os.W_OK):
@@ -244,12 +327,18 @@ def cmd_setup(args, workspace):
         sys.exit(1)
 
     genai_src = os.path.join(workspace, "openvino.genai-2026.2.0.0-optimization")
-    try:
-        mode = _prompt_mode(os.path.isdir(genai_src))
-    except KeyboardInterrupt:
+
+    # ── 只有装了 chat 才问 mode ──
+    mode = 1
+    if "chat" in features:
         print()
-        print(f"  {TR('安装已取消', 'Setup cancelled')}")
-        sys.exit(1)
+        print(f"  {TR('chat 模块需要选择安装模式', 'chat module needs mode selection')}")
+        try:
+            mode = _prompt_mode(os.path.isdir(genai_src))
+        except KeyboardInterrupt:
+            print()
+            print(f"  {TR('安装已取消', 'Setup cancelled')}")
+            sys.exit(1)
 
     if mode == 2:
         print()
@@ -265,19 +354,7 @@ def cmd_setup(args, workspace):
         print(f"  • {TR('首次编译需联网下载依赖 (~100MB)', 'First build downloads deps (~100MB)')}")
         print(f"  • {TR('编译耗时约 2-5 分钟', 'Build takes ~2-5 minutes')}")
 
-    _build_tmp = tempfile.mkdtemp(prefix="ov-cli-setup-")
-    _old_tmpdir = os.environ.get("TMPDIR")
-    os.environ["TMPDIR"] = _build_tmp
-    print("=" * 54)
-    try:
-        r = input(f"  {TR('是否继续?', 'Continue?')} [y/N]: ")
-        if r.strip().lower() != "y":
-            mode = 1
-    except (EOFError, KeyboardInterrupt):
-        print()
-        print(f"  {TR('安装已取消', 'Setup cancelled')}")
-        sys.exit(1)
-
+    # ── venv 就绪检查 ──
     for _pkg, _hint in [("venv", "python3-venv"), ("pip", "python3-pip")]:
         _ok = subprocess.run(
             [sys.executable, "-c", f"import {_pkg}"],
@@ -293,57 +370,23 @@ def cmd_setup(args, workspace):
         print(f"  {TR('创建虚拟环境', 'Creating venv')}: {venv_path}")
         subprocess.check_call([sys.executable, "-m", "venv", venv_path, "--clear"])
         pip = _pip_path(venv_path)
-        print(f"  {TR('安装依赖...', 'Installing dependencies...')}")
-        subprocess.check_call([pip, "install", "-v",
-                               "torch", "torchvision",
-                               "--index-url", "https://download.pytorch.org/whl/cpu"])
 
-        pkgs = [
-            "openvino>=2026.2",
-            "openvino-tokenizers",
-            "openvino-genai",
-            "nncf>=3.0",
-            "pillow",
-            "numpy",
-            "jinja2",
-            "huggingface-hub",
-            "safetensors",
-            "sentencepiece",
-            "tokenizers",
-            "fastapi>=0.100",
-            "uvicorn[standard]>=0.20",
-            "accelerate",
-            "wcwidth",
-            "PyMuPDF",
-            "soundfile",
-            "scipy",
-            "gradio",
-        ]
-        subprocess.check_call([pip, "install", "-v"] + pkgs)
+        # 安装所选功能
+        _install_features(pip, features, workspace)
 
-        _optimum_src = args.optimum_dir
-        if _optimum_src:
-            _optimum_src = os.path.abspath(_optimum_src)
-        if not _optimum_src or not os.path.isdir(_optimum_src):
-            _optimum_src = os.path.join(workspace, "optimum-intel-main")
-        if os.path.isdir(_optimum_src):
-            print(f"  {TR('安装 optimum-intel (本地源码)...', 'Installing optimum-intel (local)...')}: {_optimum_src}")
-            subprocess.check_call([pip, "install", _optimum_src])
-        else:
-            print(f"  {TR('安装 optimum-intel (GitHub)...', 'Installing optimum-intel (GitHub)...')}")
-            subprocess.check_call([pip, "install", "optimum-intel@git+https://github.com/huggingface/optimum-intel.git"])
-
-        print(f"  {TR('安装 transformers (no-deps)...', 'Installing transformers (no-deps)...')}")
-        subprocess.check_call([pip, "install", "--no-deps", "--force-reinstall", "transformers"])
     except KeyboardInterrupt:
         print()
         print(f"  {TR('安装已取消', 'Setup cancelled')}")
         sys.exit(1)
 
-    _apply_gemma4_patch()
+    # 补丁（只有装了 convert 才需要）
+    if "convert" in features:
+        _apply_gemma4_patch()
+
     _ensure_vscode_settings(venv_path, workspace)
 
-    if mode == 2:
+    # 编译 GenAI（仅 mode 2 且包含 chat）
+    if mode == 2 and "chat" in features:
         for dep, hint in [("cmake", "sudo apt install cmake"),
                           ("gcc", "sudo apt install gcc"),
                           ("g++", "sudo apt install g++"),
@@ -354,16 +397,12 @@ def cmd_setup(args, workspace):
                 sys.exit(1)
         _build_genai_from_source(venv_path, genai_src)
 
-    # 记录安装模式（供 --fix 使用）
+    # ── 记录安装信息 ──
+    _save_features(venv_path, features)
+
     _mode_file = os.path.join(venv_path, ".ov-cli-mode")
     with open(_mode_file, "w") as f:
         f.write(str(mode))
-
-    shutil.rmtree(_build_tmp, ignore_errors=True)
-    if _old_tmpdir:
-        os.environ["TMPDIR"] = _old_tmpdir
-    else:
-        os.environ.pop("TMPDIR", None)
 
     print()
     print(f"  {TR('✅ 完成!', '✅ Done!')}")
@@ -375,4 +414,3 @@ def cmd_setup(args, workspace):
 def _write_version_stamp(venv_path, workspace):
     """（已废弃）保留桩函数避免引用错误。"""
     pass
-
