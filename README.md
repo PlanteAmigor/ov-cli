@@ -317,10 +317,10 @@ EOF
 ./ov-cli tts --model ./0.6B-CV-ov --prompt "今天天气真好" --speaker Vivian
 ./ov-cli tts --model ./0.6B-CV-ov --prompt "Hello" --speaker vivian --lang english
 ./ov-cli tts --model ./0.6B-CV-ov --prompt "你好" --speaker Vivian --instruct "温柔地" -o voice.wav
-```
 
 # 管道模式（模型常驻，批量合成）
 printf '你好\n再见\n' | ./ov-cli tts --model ./0.6B-CV-ov --mode pipe --speaker Vivian
+```
 
 **Base（声音克隆）**（需参考音频）：
 

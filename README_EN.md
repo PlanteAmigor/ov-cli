@@ -333,6 +333,9 @@ Text-to-speech via OpenVINO Qwen3-TTS. Once mode only.
 ```bash
 ./ov-cli tts --model ./0.6B-CV-ov --prompt "Hello" --speaker vivian
 ./ov-cli tts --model ./0.6B-CV-ov --prompt "你好" --speaker Vivian --instruct "gently" -o voice.wav
+
+# Pipe mode (model stays in memory, batch synthesis)
+printf 'Hello\nHi\n' | ./ov-cli tts --model ./0.6B-CV-ov --mode pipe --speaker Vivian
 ```
 
 **Base (Voice Clone)** (requires reference audio):
