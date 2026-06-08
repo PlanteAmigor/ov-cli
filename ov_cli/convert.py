@@ -106,7 +106,15 @@ def _ensure_qwen_tts():
     except subprocess.TimeoutExpired:
         print(f"  \u274c pip 下载超时 (180s)，请检查网络或手动执行: pip install qwen-tts")
         sys.exit(1)
-    # 修复 torchaudio：qwen-tts 可能带了 CUDA 版，强制换 CPU 版
+    # 修复 torch + torchaudio：qwen-tts 可能带了 CUDA 版，强制换 CPU 版
+    try:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "--force-reinstall", "--no-deps",
+             "torch", "--index-url", "https://download.pytorch.org/whl/cpu"],
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired:
+        pass
     try:
         subprocess.check_call(
             [sys.executable, "-m", "pip", "install", "--force-reinstall", "--no-deps",
@@ -317,7 +325,15 @@ def _ensure_qwen_asr():
     except subprocess.TimeoutExpired:
         print(f"  \u274c pip 下载超时 (180s)，请检查网络或手动执行: pip install qwen-asr")
         sys.exit(1)
-    # 修复 torchaudio
+    # 修复 torch + torchaudio
+    try:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "--force-reinstall", "--no-deps",
+             "torch", "--index-url", "https://download.pytorch.org/whl/cpu"],
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired:
+        pass
     try:
         subprocess.check_call(
             [sys.executable, "-m", "pip", "install", "--force-reinstall", "--no-deps",

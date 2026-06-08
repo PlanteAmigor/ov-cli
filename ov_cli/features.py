@@ -42,36 +42,30 @@ def has(venv_path: str, feature: str) -> bool:
 # ── 功能 → pip 包映射 ──
 
 _FEATURE_PACKAGES = {
-    "chat":     [],
+    "chat":     ["wcwidth", "PyMuPDF", "soxr"],
     "image":    [],
     "asr":      ["soundfile", "scipy"],
-    "tts":      ["soundfile"],
+    "tts":      ["soundfile", "sox"],
     "ui":       ["gradio"],
     "mcp":      [],
-    "server":   [],
+    "server":   ["fastapi>=0.100", "uvicorn[standard]>=0.20"],
     "convert":  ["torch", "torchvision"],
 }
 
 _FEATURE_EXTRA_PIPS = {
     "asr":  ["qwen-asr"],
     "tts":  ["qwen-tts"],
-    "convert": ["optimum-intel@git+https://github.com/huggingface/optimum-intel.git",
-                 "transformers", "nncf>=3.0", "safetensors", "sentencepiece",
-                 "accelerate"],
+    "convert": [],
 }
 
 
 def get_packages(features: set[str]) -> list[str]:
     """根据功能列表获取需要 pip 安装的包。"""
     pkgs = set()
-    # 基础依赖（始终安装）
+    # 基础依赖（所有功能都需要）
     pkgs.update([
         "openvino>=2026.2", "openvino-tokenizers", "openvino-genai",
         "pillow", "numpy", "jinja2", "huggingface-hub",
-        "wcwidth", "PyMuPDF",  # chat 用
-        "soundfile", "scipy",  # asr/tts 用
-        "fastapi>=0.100", "uvicorn[standard]>=0.20",  # server 用
-        "gradio",  # ui 用
     ])
     for f in features:
         pkgs.update(_FEATURE_PACKAGES.get(f, []))

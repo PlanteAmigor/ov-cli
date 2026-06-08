@@ -4,9 +4,42 @@ ov-cli tts: 语音合成终端。
 支持 OpenVINO Qwen3-TTS 推理（CustomVoice / Base 声音克隆）。
 """
 
-import os, sys, time, json
+import os, sys, time, json, subprocess
 from pathlib import Path
 from ov_cli import TR
+
+
+def _pip_version(pkg):
+    try:
+        r = subprocess.run(
+            [sys.executable, "-m", "pip", "show", pkg],
+            capture_output=True, text=True, timeout=30,
+        )
+        for line in r.stdout.splitlines():
+            if line.startswith("Version:"):
+                v = line.split(":", 1)[1].strip()
+                return v if v else None
+    except Exception:
+        pass
+    return None
+
+
+def _restore_tf(need_restore=True):
+    """恢复 transformers + huggingface_hub 到最新版。"""
+    if not need_restore:
+        return
+    print(f"  ⚡ {TR('恢复 transformers...', 'Restoring transformers...')}")
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", "--no-deps", "--force-reinstall",
+         "transformers"],
+        timeout=120,
+    )
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", "--no-deps", "--force-reinstall",
+         "huggingface_hub"],
+        timeout=60,
+    )
+    print(f"  ✓ {TR('已恢复至 transformers {}', 'Restored to transformers {}').format(_pip_version('transformers') or '?')}")
 
 
 # ── 设备选择 ──
@@ -19,8 +52,34 @@ def _choose_device():
 
 # ── 加载模型 ──
 
+_TTS_TF_VERSION = "4.57.3"  # qwen-tts 需要 transformers 4.57.3
+
+
+def _ensure_qwen_tts_tf():
+    """Qwen3-TTS 推理前确保 transformers 版本兼容，返回是否需恢复。"""
+    cur = _pip_version("transformers")
+    if cur and cur.startswith("4."):
+        return False  # 已经是 4.x，无需切换
+    old_hf = _pip_version("huggingface_hub")
+    print(f"  ⚡ {TR('Qwen3-TTS 需要 transformers 4.x（当前 {}），临时切换...', 'Qwen3-TTS needs transformers 4.x (current {}), switching...').format(cur)}")
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", "--no-deps", "--force-reinstall",
+         f"transformers=={_TTS_TF_VERSION}"],
+        timeout=120,
+    )
+    if old_hf and old_hf.startswith("1."):
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "--no-deps", "--force-reinstall",
+             "huggingface_hub==0.36.2"],
+            timeout=60,
+        )
+    print(f"  ✓ {TR('已切换至 transformers {}', 'Switched to transformers {}').format(_TTS_TF_VERSION)}")
+    return True
+
+
 def load_model(ov_path, device=None):
     """加载 Qwen3-TTS OpenVINO 模型。"""
+    need_restore = _ensure_qwen_tts_tf()
     if device is None:
         device = _choose_device()
     import sys as _sys
@@ -32,7 +91,7 @@ def load_model(ov_path, device=None):
     model = OVQwen3TTSModel.from_pretrained(ov_path, device=device)
     print(f"✓ ({time.time()-t0:.1f}s)", file=sys.stderr)
     mtype = "custom_voice" if model.tts_model_type == "custom_voice" else "base"
-    return {"model": model, "device": device, "model_type": mtype}
+    return {"model": model, "device": device, "model_type": mtype, "_need_restore": need_restore}
 
 
 # ── 模型类型检测 ──
@@ -74,6 +133,7 @@ def run_pipe(ctx, speaker=None, language=None, instruct=None, ref_audio=None, wa
     import json as _json, soundfile as sf
     model = ctx["model"]
     mtype = ctx["model_type"]
+    need_restore = ctx.get("_need_restore", False)
 
     if warmup:
         _warmup(model, mtype)
@@ -125,6 +185,8 @@ def run_pipe(ctx, speaker=None, language=None, instruct=None, ref_audio=None, wa
             }, ensure_ascii=False), flush=True)
     except KeyboardInterrupt:
         pass
+    finally:
+        _restore_tf(need_restore)
 
 
 # ── 单次推理 ──
@@ -135,6 +197,7 @@ def run_once(ctx, text, output=None, speaker=None, language=None, instruct=None,
     import soundfile as sf
     model = ctx["model"]
     mtype = ctx["model_type"]
+    need_restore = ctx.get("_need_restore", False)
 
     # 预热
     if warmup:
@@ -190,4 +253,5 @@ def run_once(ctx, text, output=None, speaker=None, language=None, instruct=None,
     else:
         print(path)
 
+    _restore_tf(need_restore)
     return wavs, sr

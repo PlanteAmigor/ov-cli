@@ -5,7 +5,7 @@ ov-cli: OpenVINO LLM 命令行工具
 import os, sys, argparse
 import ov_cli
 from ov_cli import TR
-from ov_cli.setup import cmd_setup, _activate_path
+from ov_cli.setup import cmd_setup
 
 # 工作区根目录
 _WORKSPACE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -48,18 +48,6 @@ def cmd_convert(args):
     output_path = os.path.abspath(output_path)
     convert_model(model_path, output_path, args.format,
                   ratio=args.ratio, group_size=args.group_size)
-
-
-def cmd_venv(args):
-    """ov-cli venv: 进入 setup 创建的虚拟环境"""
-    workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    venv_path = args.venv or os.path.join(workspace, ".venv")
-    activate = _activate_path(venv_path)
-    if not os.path.isfile(activate):
-        print(f"{TR('错误: 找不到虚拟环境', 'Error: venv not found')}: {activate}")
-        print(f"  {TR('请先运行', 'Run first')}: ./ov-cli setup")
-        sys.exit(1)
-    print(f"  source {activate}")
 
 
 def cmd_benchmark(args):
@@ -351,6 +339,7 @@ def main():
     p.add_argument("--height", type=int, default=512)
     p.add_argument("--steps", type=int, default=4)
     p.add_argument("--guidance", type=float, default=0.0)
+    p.add_argument("--seed", type=int, default=None, help=TR("随机种子", "Random seed"))
     p.add_argument("--json", action="store_true", help=TR("JSON 格式输出", "JSON output"))
 
     # tts
@@ -392,10 +381,6 @@ def main():
     p.add_argument("--lang")
     p.add_argument("--json", action="store_true", help=TR("JSON 格式输出", "JSON output"))
 
-    # venv
-    p = sub.add_parser("venv", help=TR("进入环境", "Venv"))
-    p.add_argument("--venv")
-
     # ui
     p = sub.add_parser("ui", help=TR("网页界面", "Web UI"),
         description=TR(
@@ -429,12 +414,12 @@ def main():
     if args.cmd != "setup":
         _venv = getattr(args, "venv", None) or os.path.join(_WORKSPACE, ".venv")
         _check_version_warning(_venv)
-    if args.cmd not in ("setup", "venv"):
+    if args.cmd not in ("setup",):
         _check_wsl2_gpu()
 
     dispatch = {
         "setup": lambda a: cmd_setup(a, _WORKSPACE), "convert": cmd_convert, "chat": cmd_chat,
-        "benchmark": cmd_benchmark, "venv": cmd_venv, "server": cmd_server,
+        "benchmark": cmd_benchmark, "server": cmd_server,
         "image": cmd_image, "tts": cmd_tts, "asr": cmd_asr, "ui": cmd_ui, "mcp": cmd_mcp,
     }
     dispatch[args.cmd](args)

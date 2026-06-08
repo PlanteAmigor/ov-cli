@@ -92,6 +92,53 @@ def _ensure_vscode_settings(venv_path, workspace):
         print(f"  ✓ VS Code 设置已更新: .vscode/settings.json")
 
 
+_APT_DEPS = {
+    "sox": {
+        "pkg": "sox",
+        "hint": "音频处理（TTS/ASR 需要）",
+        "features": ["asr", "tts"],
+    },
+    "libsndfile1": {
+        "pkg": "libsndfile1",
+        "hint": "音频 I/O（soundfile 需要）",
+        "features": ["asr", "tts"],
+    },
+}
+
+
+def _check_apt_deps(features):
+    """检测系统级 apt 依赖是否安装，缺失则给出安装提示。"""
+    missing = []
+    for cmd, info in _APT_DEPS.items():
+        if not any(f in features for f in info["features"]):
+            continue
+        if shutil.which(cmd) if cmd != "libsndfile1" else _check_ld_lib(cmd):
+            continue
+        missing.append((info["pkg"], info["hint"]))
+
+    if not missing:
+        return
+
+    print(f"  ⚠ {TR('检测到系统依赖缺失', 'Missing system dependencies')}:")
+    for pkg, hint in missing:
+        print(f"    • {pkg} — {hint}")
+    print(f"  {TR('请执行以下命令安装:', 'Run the following to install:')}")
+    print(f"    sudo apt install {' '.join(pkg for pkg, _ in missing)}")
+
+
+def _check_ld_lib(lib):
+    """检查共享库是否可用（ldconfig / ld 查找）。"""
+    try:
+        r = subprocess.run(["ldconfig", "-p"], capture_output=True, text=True, timeout=10)
+        return lib in r.stdout
+    except Exception:
+        try:
+            r = subprocess.run(["ld", f"-l{lib}"], capture_output=True, text=True, timeout=5)
+            return r.returncode == 0
+        except Exception:
+            return True  # 无法检测时放行
+
+
 def _apply_gemma4_patch():
     """自动修复 optimum-intel 中 Gemma-4 共享 KV 层的属性引用错误。"""
     patcher_path = None
@@ -210,12 +257,17 @@ def _prompt_mode(has_genai_src):
             return 1
 
 
-def _install_features(pip, features: set[str], workspace):
+def _install_features(pip, features: set[str], workspace, fix_mode=False):
     """安装指定功能需要的 pip 包。"""
     pkgs = get_packages(features)
     if pkgs:
         print(f"  {TR('安装基础依赖...', 'Installing base deps...')}")
         subprocess.check_call([pip, "install", "-v"] + pkgs)
+
+    # 修复模式下：升级 huggingface-hub + 重打补丁，跳过 optimum-intel 重装
+    if fix_mode:
+        subprocess.check_call([pip, "install", "--upgrade", "huggingface-hub", "transformers"])
+        return
 
     # Install optimum-intel + transformers if convert is requested
     if "convert" in features:
@@ -235,6 +287,12 @@ def _install_features(pip, features: set[str], workspace):
     for pkg in extra:
         print(f"  ⚡ {TR('安装 {}...', 'Installing {}...').format(pkg)}")
         subprocess.check_call([pip, "install", "--quiet", pkg], timeout=180)
+
+    # qwen 包可能拉入 CUDA torch，强制换回 CPU 版
+    if "asr" in features or "tts" in features:
+        print(f"  ⚡ {TR('修复 torch 为 CPU 版...', 'Fixing torch to CPU version...')}")
+        subprocess.check_call([pip, "install", "--force-reinstall", "--no-deps",
+                               "torch", "--index-url", "https://download.pytorch.org/whl/cpu"])
 
     # torch 先安装（CPU 版）
     if "convert" in features:
@@ -296,7 +354,7 @@ def cmd_setup(args, workspace):
 
         print(f"  {TR('修复模式: 升级依赖 + 重打补丁', 'Fix mode: upgrade deps + repatch')}")
         # 只修复已装的功能
-        _install_features(pip, installed, workspace)
+        _install_features(pip, installed, workspace, fix_mode=True)
         if "convert" in installed:
             _apply_gemma4_patch()
         print(f"  {TR('✅ 修复完成', '✅ Fix done')}")
@@ -354,7 +412,8 @@ def cmd_setup(args, workspace):
         print(f"  • {TR('首次编译需联网下载依赖 (~100MB)', 'First build downloads deps (~100MB)')}")
         print(f"  • {TR('编译耗时约 2-5 分钟', 'Build takes ~2-5 minutes')}")
 
-    # ── venv 就绪检查 ──
+    # ── venv 就绪检查 + 系统依赖 ──
+    _check_apt_deps(features)
     for _pkg, _hint in [("venv", "python3-venv"), ("pip", "python3-pip")]:
         _ok = subprocess.run(
             [sys.executable, "-c", f"import {_pkg}"],
