@@ -638,6 +638,10 @@ sudo apt install intel-level-zero-gpu libze1
 - **PlanteAmigor** — 引导和方向把控
 - **DeepSeek V4 Flash** — 代码生成
 
+## 反馈
+
+有问题或建议？欢迎直接[提交 Issue](https://github.com/PlanteAmigor/ov-cli/issues/new)。
+
 ## 相关链接
 
 - [OpenVINO 文档](https://docs.openvino.ai/)

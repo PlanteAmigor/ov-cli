@@ -604,6 +604,10 @@ sudo apt install intel-level-zero-gpu libze1
 - **PlanteAmigor** — Direction & guidance
 - **DeepSeek V4 Flash** — Code generation
 
+## Feedback
+
+Questions or suggestions? Feel free to [open an issue](https://github.com/PlanteAmigor/ov-cli/issues/new).
+
 ## Related Links
 
 - [OpenVINO Documentation](https://docs.openvino.ai/)
