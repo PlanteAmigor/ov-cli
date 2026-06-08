@@ -63,27 +63,40 @@ Fix mode (`setup --fix`) only upgrades package versions and reapplies patches �
 
 ### `setup` — Create Environment
 
-Creates a Python venv, installs all dependencies (openvino-genai, optimum-intel, transformers, torch, etc.),
-auto-detects `optimum-intel-main/` source in project root to skip GitHub download,
-applies Gemma-4 shared KV layer patch automatically.
+Creates a Python venv and installs dependencies. Supports on-demand installation.
 
 ```bash
-./ov-cli setup                          # default ./.venv (interactive mode selection)
-./ov-cli setup --venv ./my-venv         # custom path
-./ov-cli setup --optimum-dir ./optimum-intel-main
-./ov-cli setup --fix                    # fix mode (no rebuild, upgrade + repatch)
+# Install only what you need
+./ov-cli setup --with chat                          # Chat only
+./ov-cli setup --with chat,image,asr                # Chat + Image + ASR
+./ov-cli setup --with all                           # Everything
+
+# Custom venv path
+./ov-cli setup --venv ./my-venv --with chat,convert
+
+# Fix mode (upgrade installed modules only, no rebuild)
+./ov-cli setup --fix
 ```
 
-**Mode selection** (interactive):
+**Available modules:**
+
+| Module | Description | Extra deps |
+|--------|-------------|-----------|
+| `chat` | Chat / Translation terminal | PyMuPDF |
+| `image` | Text-to-image | — |
+| `asr` | Speech-to-text | soundfile, qwen-asr |
+| `tts` | Text-to-speech | soundfile, qwen-tts |
+| `ui` | Gradio Web UI | gradio |
+| `mcp` | MCP protocol server | — |
+| `server` | API server | fastapi, uvicorn |
+| `convert` | Model conversion | torch, optimum-intel (~3GB, 5-10 min) |
+
+**Mode selection** (only when `chat` is included):
 1. **Simple mode** — pip install only. `--reasoning off` has no effect on thinking models.
 2. **Full mode** — compiles modified GenAI from source to enable thinking budget
    (logit-level `</think>` forcing).
 
-**Version detection**: After `git pull`, running any command will auto-detect version
-changes and suggest `./ov-cli setup --fix` for a quick fix.
-
-**Fix mode** (`--fix`): Skips venv recreation, only upgrades dependencies and
-reapplies patches. Takes seconds — ideal for version updates or patch fixes.
+**Fix mode** (`--fix`): Upgrades installed modules only, reapplies patches, no rebuild.
 
 ### `venv` — Enter Virtual Environment
 
