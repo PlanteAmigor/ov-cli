@@ -66,27 +66,41 @@ git pull
 
 ### `setup` — 创建环境
 
-创建 Python 虚拟环境，安装所有依赖（openvino-genai、optimum-intel、transformers、torch 等），
-自动检测项目根目录下的 `optimum-intel-main/` 源码目录以跳过 GitHub 下载，
-安装完成后自动应用 Gemma-4 共享 KV 层补丁。
+创建 Python 虚拟环境，安装依赖。支持按需安装，只装你需要的模块。
 
 ```bash
-./ov-cli setup                          # 默认 ./.venv（交互选择安装模式）
-./ov-cli setup --venv ./my-venv         # 指定路径
-./ov-cli setup --optimum-dir ./optimum-intel-main  # 指定 optimum 源码
-./ov-cli setup --fix                    # 修复环境（不重建，仅升级+重打补丁）
+# 按需安装（只装需要的模块）
+./ov-cli setup --with chat                          # 只装聊天终端
+./ov-cli setup --with chat,image,asr                # 聊天 + 文生图 + 语音识别
+./ov-cli setup --with all                           # 全装
+
+# 指定 venv 路径
+./ov-cli setup --venv ./my-venv --with chat,convert
+
+# 修复模式（不重建，仅升级已安装的模块）
+./ov-cli setup --fix
 ```
 
-**模式选择**（交互式，由 `setup` 提示）：
+**可选模块：**
+
+| 模块 | 说明 | 额外依赖 |
+|------|------|---------|
+| `chat` | 聊天/翻译终端 | PyMuPDF |
+| `image` | 文生图 | — |
+| `asr` | 语音识别 | soundfile, qwen-asr |
+| `tts` | 语音合成 | soundfile, qwen-tts |
+| `ui` | Gradio Web 界面 | gradio |
+| `mcp` | MCP 协议服务器 | — |
+| `server` | API 服务器 | fastapi, uvicorn |
+| `convert` | 模型转换 | torch，optimum-intel（约 3GB，耗时 5-10 分钟） |
+
+**模式选择**（仅装 `chat` 时提示）：
 1. **简易模式** — pip 安装，日常使用。`--reasoning off` 对思考型模型无效。
 2. **完整模式** — 从源码编译 OpenVINO GenAI 以启用 thinking budget 功能
    （logit 级别的 `</think>` 强制结束思考）。
 
-**版本检测**：`git pull` 更新代码后运行任意命令会自动检测版本变化，
-提示执行 `./ov-cli setup --fix` 快速修复。
-
-**修复模式** (`--fix`)：不重建虚拟环境，仅升级依赖、重打补丁，
-适用于版本更新或补丁修复，数秒完成。
+**修复模式** (`--fix`)：不重建虚拟环境，仅升级已安装的模块、重打补丁，
+数秒完成。
 
 ### `venv` — 进入虚拟环境
 
