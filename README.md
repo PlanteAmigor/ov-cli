@@ -4,7 +4,8 @@
 
 <p align="center"><b><a href="README.md">中文</a> | <a href="README_EN.md">English</a></b></p>
 
-> 我发现官方的 OpenVINO 工具在日常 LLM 实验中较为繁琐，因此我开发了 ov-cli 作为轻量级的替代方案。借助 AI 编码工具，我将我的工作流需求转化为简单的 CLI 操作——设置、转换、聊天——所有操作都可以在同一个地方完成。
+> 我发现官方的 OpenVINO 工具在日常 LLM 实验中较为繁琐，因此我开发了 ov-cli 作为轻量级的替代方案。
+> 代码几乎全部由 **DeepSeek V4 Flash** 自动生成，我只负责引导和方向把控。
 
 **OpenVINO LLM 命令行工具** — 轻量、离线、CPU/GPU 皆可运行。
 
@@ -631,6 +632,11 @@ sudo apt install intel-level-zero-gpu libze1
 ```
 
 安装后 `./ov-cli` 会自动检测 GPU 可用性，若缺少 runtime 会给出提示。
+
+## Contributors
+
+- **PlanteAmigor** — 引导和方向把控
+- **DeepSeek V4 Flash** — 代码生成
 
 ## 相关链接
 
