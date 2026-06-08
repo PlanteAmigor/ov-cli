@@ -183,6 +183,8 @@ printf '问题1\n问题2\n' | ./ov-cli chat --model ./model-ov --mode pipe
 | `/help` | 帮助 |
 | `/exit` | 退出 |
 
+> **多行输入**：Enter 换行，当前行空白时 Enter 提交消息。
+
 **单次输出模式**（`--mode once`）：
 
 | 参数 | 说明 |

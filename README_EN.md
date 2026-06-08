@@ -181,6 +181,8 @@ Interactive terminal. Auto-detects model format (GenAI / Optimum), supports stre
 | `/help` | Help |
 | `/exit` | Exit |
 
+> **Multiline input**: Enter inserts a newline; press Enter on an empty line to submit.
+
 **Once mode** (`--mode once`):
 
 | Option | Description |

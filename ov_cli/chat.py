@@ -6,7 +6,7 @@ ov-cli chat: LLM 聊天/翻译终端。
   Optimum 格式 (optimum-intel OVModelForVisualCausalLM): Gemma-4 等
 """
 
-import os, sys, time, json, signal, threading
+import os, sys, time, json, re, signal, threading
 import openvino as ov
 import openvino_genai as ov_genai
 from wcwidth import wcwidth, wcswidth
@@ -228,6 +228,8 @@ def run_pipe(ctx, reasoning=True, max_tokens=1024, temperature=0.7):
 
             elapsed = time.time() - t0
             resp = str(result).strip()
+            if not reasoning:
+                resp = re.sub(r'</?think>', '', resp).strip()
             print(_json.dumps({"text": resp, "time": round(elapsed, 1)}, ensure_ascii=False), flush=True)
     except KeyboardInterrupt:
         pass
@@ -295,6 +297,8 @@ _in_readline = False
 
 
 def _char_width(ch):
+    if ch == "\n":
+        return 0
     return max(wcwidth(ch), 1)
 
 
@@ -303,7 +307,11 @@ def _total_width(chars, start=0, end=None):
         end = len(chars)
     if start >= end:
         return 0
-    return wcswidth("".join(chars[start:end]))
+    # 只计算当前行（最后一个 \n 之后）的宽度
+    s = "".join(chars[start:end])
+    if "\n" in s:
+        s = s.rsplit("\n", 1)[1]
+    return wcswidth(s)
 
 
 def _move_cursor(delta):
@@ -356,6 +364,17 @@ def readline():
             if b == 4:
                 break
             if b in (13, 10):
+                # 取当前行（光标所在行，从上一个 \n 到光标）的内容
+                before = "".join(buf[:char_pos])
+                cur_line = before.rsplit("\n", 1)[1] if "\n" in before else before
+                if cur_line:  # 当前行有内容 → 换行继续输入
+                    buf.insert(char_pos, "\n")
+                    widths.insert(char_pos, 0)
+                    char_pos += 1
+                    _sys.stdout.write("\r\n")
+                    _sys.stdout.flush()
+                    continue
+                # 当前行无内容 → 提交
                 _sys.stdout.write("\r\n")
                 _sys.stdout.flush()
                 break
@@ -413,13 +432,24 @@ def readline():
             if b in (127, 8):
                 if char_pos > 0:
                     dw = _char_width(buf[char_pos - 1])
+                    is_nl = buf[char_pos - 1] == "\n"
                     del buf[char_pos - 1]
                     del widths[char_pos - 1]
                     char_pos -= 1
-                    _move_cursor(-dw)
-                    tail = "".join(buf[char_pos:])
-                    _sys.stdout.write(tail + " ")
-                    _move_cursor(-_total_width(buf[char_pos:]) - 1)
+                    if is_nl:
+                        _sys.stdout.write("\033[A")  # 光标上移一行
+                        # 清除当前行并重新绘制后续文本
+                        import shutil
+                        cols = shutil.get_terminal_size().columns
+                        _sys.stdout.write("\r\033[K")
+                        tail = "".join(buf[char_pos:])
+                        _sys.stdout.write(tail)
+                        _move_cursor(-_total_width(buf[char_pos:]))
+                    else:
+                        _move_cursor(-dw)
+                        tail = "".join(buf[char_pos:])
+                        _sys.stdout.write(tail + " ")
+                        _move_cursor(-_total_width(buf[char_pos:]) - 1)
                 _sys.stdout.flush()
                 continue
 
@@ -643,6 +673,9 @@ def run_once(ctx, prompt="", files=None, output=None,
                 progress_stop.set()
 
         reply_text = "".join(reply_parts)
+
+    if not reasoning:
+        reply_text = re.sub(r'</?think>', '', reply_text).strip()
 
     # 输出统计
     elapsed = time.time() - t0
@@ -1138,7 +1171,7 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
         thread.start()
 
         thinking_filter = not reasoning
-        in_think = [thinking_filter]
+        in_think = [False]  # 初始不在 think 块内，由 <think> 标签触发
         reply_parts = []
         _opt_first = [True]
         try:
@@ -1177,6 +1210,15 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
                                     sys.stdout.flush()
                             else:
                                 in_think[0] = True
+                        continue
+                    # 过滤孤立的 </think>（没有配对的 <think>）
+                    if '</think>' in t:
+                        idx = t.index('</think>')
+                        after = t[idx + 8:]
+                        if after:
+                            reply_parts.append(after)
+                            sys.stdout.write(after)
+                            sys.stdout.flush()
                         continue
                     sys.stdout.write(t)
                     sys.stdout.flush()
