@@ -55,13 +55,16 @@ TRANSLATE_LANGS = {
 }
 
 
-def _make_streamer(reply_parts, stop_flag, on_first_token=None):
+def _make_streamer(reply_parts, stop_flag, on_first_token=None, thinking_filter=False):
     """创建 streamer callback。
 
     on_first_token: 首个 token 到达时的回调（用于停止进度指示器）。
+    thinking_filter: 是否过滤 <think> 标签及思考内容。
     """
     import select as _sel
     _first = [True]
+    # 启用 filter 时，初始假设在 think 块内（模型可能先输出思考才输出 </think>）
+    in_think = [thinking_filter]
 
     def cb(t):
         if stop_flag[0]:
@@ -75,9 +78,40 @@ def _make_streamer(reply_parts, stop_flag, on_first_token=None):
             if c == '\x03':
                 stop_flag[0] = True
                 return True
-        reply_parts.append(t)
-        sys.stdout.write(t)
-        sys.stdout.flush()
+
+        if thinking_filter:
+            if in_think[0]:
+                # 在 think 块内：只找 </think>
+                if '</think>' in t:
+                    idx = t.index('</think>')
+                    after = t[idx + 8:]
+                    if after:
+                        reply_parts.append(after)
+                        sys.stdout.write(after)
+                    in_think[0] = False
+                # 否则丢弃（思考内容）
+            else:
+                if '<think>' in t:
+                    # 进入 think 块，丢弃前面的内容
+                    idx = t.index('<think>')
+                    after = t[idx + 7:]
+                    if '</think>' in after:
+                        idx2 = after.index('</think>')
+                        rest = after[idx2 + 8:]
+                        if rest:
+                            reply_parts.append(rest)
+                            sys.stdout.write(rest)
+                        # 同一块内打开了又关闭，不改变状态
+                    else:
+                        in_think[0] = True
+                else:
+                    reply_parts.append(t)
+                    sys.stdout.write(t)
+            sys.stdout.flush()
+        else:
+            reply_parts.append(t)
+            sys.stdout.write(t)
+            sys.stdout.flush()
         return False
 
     return cb
@@ -657,7 +691,7 @@ def run_once(ctx, prompt="", files=None, output=None,
 
         reply_parts = []
         stop_flag = [False]
-        streamer_cb = _make_streamer(reply_parts, stop_flag, on_first)
+        streamer_cb = _make_streamer(reply_parts, stop_flag, on_first, thinking_filter=not reasoning)
 
         kwargs = {"generation_config": gen_cfg, "streamer": streamer_cb}
         if image_tensors is not None:
@@ -1448,7 +1482,7 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
                     progress_stop.wait(1.0)
             threading.Thread(target=_show_progress, daemon=True).start()
 
-        streamer_callback = _make_streamer(reply_parts, stop_flag, on_first_token)
+        streamer_callback = _make_streamer(reply_parts, stop_flag, on_first_token, thinking_filter=not reasoning)
 
         t0 = time.time()
         old_handler = signal.signal(signal.SIGINT, lambda s, f: stop_flag.__setitem__(0, True))
@@ -1467,6 +1501,9 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
         finally:
             signal.signal(signal.SIGINT, old_handler)
         reply_text = "".join(reply_parts)
+
+        if not reasoning:
+            reply_text = re.sub(r'</?think>', '', reply_text).strip()
 
         elapsed = time.time() - t0
         if stop_flag[0]:
@@ -1588,7 +1625,7 @@ def _run_translate_genai(ctx, max_tokens):
         sys.stdout.flush()
         reply_parts = []
         stop_flag = [False]
-        streamer_callback = _make_streamer(reply_parts, stop_flag)
+        streamer_callback = _make_streamer(reply_parts, stop_flag, thinking_filter=not reasoning)
 
         old_handler = signal.signal(signal.SIGINT, lambda s, f: stop_flag.__setitem__(0, True))
         try:
