@@ -246,7 +246,7 @@ def _prompt_mode(has_genai_src):
         try:
             r = input(f"  {TR('选择安装模式', 'Select mode')}:\n"
                       f"    1. {TR('简易模式 - 仅 pip 安装', 'Simple - pip only')}\n"
-                      f"    2. {TR('完整模式 - 编译 GenAI 源码启用 thinking budget', 'Full - build GenAI from source')}\n"
+                      f"    2. {TR('完整模式 - 安装修改版 openvino-genai 启用 thinking budget', 'Full - install patched openvino-genai for thinking budget')}\n"
                       f"  {TR('请输入 [1/2]', 'Enter [1/2]')} (1): ")
             if r.strip() == "":
                 return 1
@@ -342,15 +342,18 @@ def cmd_setup(args, workspace):
         _genai_src = os.path.join(workspace, "openvino.genai-2026.2.0.0-optimization")
 
         # 简易→完整升级路径
-        if _prev_mode != "2" and os.path.isdir(_genai_src):
-            print(f"  {TR('检测到 GenAI 源码目录，可升级到完整模式', 'GenAI source found, can upgrade to full mode')}")
-            r = input(f"  {TR('升级到完整模式？(y/N)', 'Upgrade to full mode? (y/N)')}: ").strip().lower()
-            if r == "y":
-                _build_genai_from_source(venv_path, _genai_src)
-                with open(_mode_file, "w") as f:
-                    f.write("2")
-                print(f"  {TR('✅ 已升级到完整模式', '✅ Upgraded to full mode')}")
-                return
+        if _prev_mode != "2":
+            _thinking_whl = os.path.join(workspace, "openvino-genai-thinking", "dist",
+                                         "openvino_genai_thinking-2026.2.0.0-cp313-cp313-manylinux_2_41_x86_64.whl")
+            if os.path.isfile(_thinking_whl):
+                print(f"  {TR('检测到修改版 openvino-genai whl，可升级到完整模式', 'Patched openvino-genai whl found, can upgrade to full mode')}")
+                r = input(f"  {TR('升级到完整模式？(y/N)', 'Upgrade to full mode? (y/N)')}: ").strip().lower()
+                if r == "y":
+                    subprocess.check_call([pip, "install", _thinking_whl])
+                    with open(_mode_file, "w") as f:
+                        f.write("2")
+                    print(f"  {TR('✅ 已升级到完整模式', '✅ Upgraded to full mode')}")
+                    return
 
         print(f"  {TR('修复模式: 升级依赖 + 重打补丁', 'Fix mode: upgrade deps + repatch')}")
         # 只修复已装的功能
@@ -402,15 +405,12 @@ def cmd_setup(args, workspace):
         print()
         print("=" * 54)
         print(f"  {TR('完整模式将执行以下操作', 'Full mode will:')}")
-        print(f"  {TR('1. 检查编译环境 (cmake, gcc)', '1. Check build env (cmake, gcc)')}")
-        print(f"  {TR('2. 创建虚拟环境并 pip 安装依赖', '2. Create venv & pip install deps')}")
-        print(f"  {TR('3. 编译 GenAI 源码 → 启用 thinking budget', '3. Build GenAI from source')}")
-        print(f"  {TR('4. 安装编译产物到虚拟环境', '4. Install to venv')}")
+        print(f"  {TR('1. 创建虚拟环境并 pip 安装依赖', '1. Create venv & pip install deps')}")
+        print(f"  {TR('2. 安装修改版 openvino-genai（预编译 whl，数秒完成）', '2. Install patched openvino-genai (prebuilt whl, seconds)')}")
         print()
         print(f"  {TR('前置条件', 'Prerequisites')}:")
-        print(f"  • cmake, gcc/g++, make, patchelf")
-        print(f"  • {TR('首次编译需联网下载依赖 (~100MB)', 'First build downloads deps (~100MB)')}")
-        print(f"  • {TR('编译耗时约 2-5 分钟', 'Build takes ~2-5 minutes')}")
+        print(f"  • {TR('Python 3.10+', 'Python 3.10+')}")
+        print(f"  • {TR('Intel GPU / CPU', 'Intel GPU / CPU')}")
 
     # ── venv 就绪检查 + 系统依赖 ──
     _check_apt_deps(features)
@@ -446,15 +446,21 @@ def cmd_setup(args, workspace):
 
     # 编译 GenAI（仅 mode 2 且包含 chat）
     if mode == 2 and "chat" in features:
-        for dep, hint in [("cmake", "sudo apt install cmake"),
-                          ("gcc", "sudo apt install gcc"),
-                          ("g++", "sudo apt install g++"),
-                          ("make", "sudo apt install make"),
-                          ("patchelf", "sudo apt install patchelf")]:
-            if not shutil.which(dep):
-                print(f"  ❌ {TR('未找到 {dep}，请先安装 ({hint})', '{dep} not found, install: {hint}').format(dep=dep, hint=hint)}")
-                sys.exit(1)
-        _build_genai_from_source(venv_path, genai_src)
+        _thinking_whl = os.path.join(workspace, "openvino-genai-thinking", "dist", "openvino_genai_thinking-2026.2.0.0-cp313-cp313-manylinux_2_41_x86_64.whl")
+        if os.path.isfile(_thinking_whl):
+            print(f"  ⚡ {TR('安装修改版 openvino-genai（含 ThinkingBudgetTransform）...', 'Installing patched openvino-genai (with ThinkingBudgetTransform)...')}")
+            subprocess.check_call([pip, "install", _thinking_whl])
+        else:
+            print(f"  ⚠ {TR('未找到预编译 whl，回退到源码编译...', 'Prebuilt whl not found, falling back to source build...')}")
+            for dep, hint in [("cmake", "sudo apt install cmake"),
+                              ("gcc", "sudo apt install gcc"),
+                              ("g++", "sudo apt install g++"),
+                              ("make", "sudo apt install make"),
+                              ("patchelf", "sudo apt install patchelf")]:
+                if not shutil.which(dep):
+                    print(f"  ❌ {TR('未找到 {dep}，请先安装 ({hint})', '{dep} not found, install: {hint}').format(dep=dep, hint=hint)}")
+                    sys.exit(1)
+            _build_genai_from_source(venv_path, genai_src)
 
     # ── 记录安装信息 ──
     _save_features(venv_path, features)
