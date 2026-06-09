@@ -605,6 +605,7 @@ def run_once(ctx, prompt="", files=None, output=None,
 
         reply_parts = []
         thread = Thread(target=ctx["model"].generate, kwargs=gen_kwargs)
+        t0 = time.time()
         thread.start()
         for t in streamer:
             sys.stdout.write(t)
