@@ -290,6 +290,8 @@ def main():
     p.add_argument("--optimum-dir", help=TR("optimum-intel 源码目录", "optimum-intel source"))
     p.add_argument("--with", dest="with_features", default="all",
         help=TR("按需安装 (chat,image,asr,tts,ui,mcp,server,convert)", "Features (chat,image,asr,tts,ui,mcp,server,convert)"))
+    p.add_argument("--remove", dest="remove_features", default="",
+        help=TR("移除模块 (chat,image,asr,tts,ui,mcp,server,convert)", "Remove features (chat,image,asr,tts,ui,mcp,server,convert)"))
     p.add_argument("--fix", action="store_true", help=TR("修复模式", "Fix mode"))
 
     # convert

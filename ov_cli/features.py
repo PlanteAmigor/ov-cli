@@ -78,3 +78,22 @@ def get_extra_pips(features: set[str]) -> list[str]:
     for f in features:
         pkgs.extend(_FEATURE_EXTRA_PIPS.get(f, []))
     return pkgs
+
+
+def get_exclusive_packages(removed: set[str], remaining: set[str]) -> dict[str, list[str]]:
+    """计算被移除功能独有的 pip 包：只在 removed 中、不在 remaining 中。
+    
+    返回 { 功能名: [包列表] }，只包含该功能独有且不在剩余功能中的包。
+    """
+    result = {}
+    for f in removed:
+        pkgs = set(_FEATURE_PACKAGES.get(f, []))
+        extra = set(_FEATURE_EXTRA_PIPS.get(f, []))
+        # 排除剩余功能也需要的包
+        for rf in remaining:
+            pkgs -= set(_FEATURE_PACKAGES.get(rf, []))
+            extra -= set(_FEATURE_EXTRA_PIPS.get(rf, []))
+        exclusive = sorted(pkgs | extra)
+        if exclusive:
+            result[f] = exclusive
+    return result

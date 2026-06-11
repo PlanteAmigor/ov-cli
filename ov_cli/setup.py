@@ -10,7 +10,7 @@ ov-cli setup: 虚拟环境创建与依赖安装。
 import os, sys, json, shutil, subprocess, tempfile
 import ov_cli
 from ov_cli import TR
-from ov_cli.features import get_packages, get_extra_pips, save as _save_features
+from ov_cli.features import get_packages, get_extra_pips, get_exclusive_packages, get_installed, save as _save_features
 
 
 _ALL_FEATURES = {"chat", "image", "asr", "tts", "ui", "mcp", "server", "convert"}
@@ -300,6 +300,60 @@ def _install_features(pip, features: set[str], workspace, fix_mode=False):
                                "--index-url", "https://download.pytorch.org/whl/cpu"])
 
 
+def _remove_features(pip, venv_path, removed: set[str]):
+    """卸载指定功能独有（不被其他已装功能需要）的 pip 包。"""
+    installed = get_installed(venv_path)
+    remaining = installed - removed
+
+    if not removed:
+        print(f"  {TR('没有指定要移除的模块', 'No features to remove')}")
+        return
+
+    invalid = removed - _ALL_FEATURES
+    if invalid:
+        print(f"  ❌ {TR('不支持的功能', 'Unsupported features')}: {', '.join(sorted(invalid))}")
+        print(f"     {TR('支持', 'Supported')}: {', '.join(sorted(_ALL_FEATURES))}")
+        return
+
+    not_installed = removed - installed
+    if not_installed:
+        print(f"  - {TR('以下模块未安装，跳过', 'Already not installed')}: {', '.join(sorted(not_installed))}")
+
+    to_remove = removed - not_installed
+    if not to_remove:
+        print(f"  {TR('没有需要移除的模块', 'Nothing to remove')}")
+        return
+
+    exclusive = get_exclusive_packages(to_remove, remaining)
+    if not exclusive:
+        print(f"  {TR('所有包均为其他模块共享，无需卸载', 'All packages are shared, nothing to uninstall')}")
+    else:
+        print(f"  {TR('将卸载以下独有包', 'Will uninstall exclusive packages')}:")
+        for f, pkgs in sorted(exclusive.items()):
+            print(f"    • {f}: {', '.join(pkgs)}")
+        print()
+        try:
+            r = input(f"  {TR('确认卸载？(y/N)', 'Confirm uninstall? (y/N)')}: ").strip().lower()
+            if r != "y":
+                print(f"  {TR('已取消', 'Cancelled')}")
+                return
+        except (EOFError, KeyboardInterrupt):
+            print()
+            print(f"  {TR('已取消', 'Cancelled')}")
+            return
+        all_pkgs = sorted(set(p for pkgs in exclusive.values() for p in pkgs))
+        try:
+            subprocess.check_call([pip, "uninstall", "-y"] + all_pkgs)
+            print(f"  ✓ {TR('卸载完成', 'Uninstall done')}")
+        except subprocess.CalledProcessError:
+            print(f"  ⚠ {TR('部分包卸载失败（可能已被手动移除）', 'Some packages may already be removed')}")
+
+    _save_features(venv_path, remaining)
+    print(f"  ✓ {TR('已更新安装记录', 'Features list updated')}: {', '.join(sorted(remaining))}")
+    print(f"  {TR('基础依赖（openvino 等）始终保持不变', 'Base deps (openvino etc.) are kept')}")
+    print(f"  {TR('如需彻底清理，可重建环境', 'For full cleanup, recreate with ./ov-cli setup')}")
+
+
 def cmd_setup(args, workspace):
     """ov-cli setup: 创建虚拟环境并安装依赖"""
 
@@ -361,6 +415,19 @@ def cmd_setup(args, workspace):
         if "convert" in installed:
             _apply_gemma4_patch()
         print(f"  {TR('✅ 修复完成', '✅ Fix done')}")
+        return
+
+    # ── 移除模式 ──
+    if args.remove_features:
+        raw = args.remove_features.strip()
+        to_remove = {s.strip() for s in raw.split(",") if s.strip()}
+        venv_path = args.venv or os.path.join(workspace, ".venv")
+        if not os.path.isdir(venv_path):
+            print(f"  {TR('错误: 未找到虚拟环境', 'Error: venv not found')}: {venv_path}")
+            print(f"  {TR('请先运行', 'Run first')}: ./ov-cli setup")
+            sys.exit(1)
+        pip = _pip_path(venv_path)
+        _remove_features(pip, venv_path, to_remove)
         return
 
     # ── 打印安装概要 ──
