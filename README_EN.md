@@ -75,6 +75,10 @@ Creates a Python venv and installs dependencies. Supports on-demand installation
 # Custom venv path
 ./ov-cli setup --venv ./my-venv --with chat,convert
 
+# Remove modules (auto-detects exclusive packages, shared ones kept)
+./ov-cli setup --remove chat                        # Remove chat's exclusive packages
+./ov-cli setup --remove asr,tts                     # Remove ASR + TTS
+
 # Fix mode (upgrade installed modules only, no rebuild)
 ./ov-cli setup --fix
 ```

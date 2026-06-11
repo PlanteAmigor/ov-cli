@@ -78,6 +78,10 @@ git pull
 # 指定 venv 路径
 ./ov-cli setup --venv ./my-venv --with chat,convert
 
+# 移除模块（自动计算独有包，共享包不受影响）
+./ov-cli setup --remove chat                        # 卸载 chat 独有包
+./ov-cli setup --remove asr,tts                     # 同时卸载 asr + tts
+
 # 修复模式（不重建，仅升级已安装的模块）
 ./ov-cli setup --fix
 ```
