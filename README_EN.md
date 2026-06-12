@@ -578,6 +578,8 @@ Xe driver resolves GPU fence timeout with multi-image VLM ([#36260](https://gith
 | **DeepSeek-7B** | int4 | 370ms | 61ms | 16.7 | 1693ms | 64ms | 16.1 |
 | **Qwen3/8B** | — | 383ms | 68ms | 15.2 | 2089ms | 73ms | 13.9 |
 | **Gemma-4 E2B** | int4 | 287ms | 73ms | 16.4 | 2019ms | 227ms | 12.4 |
+| **Qwen3/14B** | int4 | 509ms | 386ms | 8.0 | 3113ms | 266ms | 7.5 |
+| **Gemma-4 31B** | int4 | 1577ms | 261ms | 3.9 | 9949ms | 437ms | 3.3 |
 | **Qwen3.6/35B** (reasoning off) | int4 | 1415ms | 221ms | 13.7 | 4543ms | 224ms | 13.6 |
 
 ## Project Structure

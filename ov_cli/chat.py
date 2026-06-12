@@ -804,7 +804,7 @@ def _build_prompt(messages, tokenizer=None, enable_thinking=True):
     return prompt
 
 
-def _load_image(path, max_pixels=448*448):
+def _load_image(path, max_pixels=1024*1024):
     """加载图片为 PIL Image，缩放到像素预算内。"""
     from PIL import Image
     img = Image.open(path).convert("RGB")
@@ -900,9 +900,9 @@ def _pdf_to_images(path):
         raise
     total = len(doc)
     # 统一 300 DPI 高清渲染，448px 截断
-    max_pixels = 448 * 448
+    max_pixels = 1024 * 1024
     dpi = 300
-    px = 448
+    px = 1024
     tok_per_page = max(1, max_pixels // (32 * 32))
     total_tokens = tok_per_page * total
     images = []
