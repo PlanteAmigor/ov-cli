@@ -178,15 +178,15 @@ printf '问题1\n问题2\n' | ./ov-cli chat --model ./model-ov --mode pipe
 | 命令 | 说明 |
 |------|------|
 | `//img PATH1 [PATH2 ...]` | 加载图片（支持多文件，VLM） |
-| `//pdf PATH` | 加载 PDF（自动转图片，最多 24 页，[限页原因](https://github.com/openvinotoolkit/openvino/issues/36260)） |
+| `//pdf PATH` | 加载 PDF（自动转图片，全部页面） |
 | `//txt PATH1 [PATH2 ...]` | 加载文本文件（支持多文件） |
-| `/file` | 查看已加载文件列表 |
 | `/temp N` | 设置温度 (0-2) |
 | `/system TEXT` | 设置系统提示词 |
-| `/clear [ids]` | 清空全部上下文或指定文件 ID |
 | `/help` | 帮助 |
 | `/exit` | 退出 |
 
+> **文件不跨轮次**：每轮对话后自动清除已加载文件（图片/PDF/文本），下轮需重新 `//img` / `//pdf` / `//txt`。这是 OpenVINO VLMPipeline 的上游限制——它不缓存图片编码结果，即使文件持久化，每轮也会重新编码所有图片。
+>
 > **多行输入**：Enter 换行，当前行空白时 Enter 提交消息。
 
 **单次输出模式**（`--mode once`）：
@@ -579,6 +579,10 @@ OpenVINO 官方提供了大量预转换模型，**下载即用**：
 
 ## 性能参考
 
+> tok/s 基于生成文本的编码结果。中文约 1.8 字符/subword。
+
+### i915 驱动（默认）
+
 测试环境: Intel Arc Pro 130T/140T (Arrow Lake-P) GPU | openvino-genai 2026.2 | 3 轮预热
 
 | 模型 | 量化 | 32 1st | 32 2nd | 32 tok/s | 1024 1st | 1024 2nd | 1024 tok/s |
@@ -594,7 +598,20 @@ OpenVINO 官方提供了大量预转换模型，**下载即用**：
 | **Qwen3.6/35B** (思考开) | int4 | 1069ms | 88ms | 11.8 | 4518ms | 87ms | 11.6 |
 | **Qwen3.6/35B** (思考关) | int4 | 1070ms | 92ms | 11.2 | 4571ms | 94ms | 10.9 |
 
-> tok/s 基于生成文本的编码结果。中文约 1.8 字符/subword。
+### Xe 驱动
+
+测试环境: Intel Arc Pro 130T/140T (Arrow Lake-P) GPU | openvino-genai 2026.2 | 3 轮预热
+Xe 驱动下多图 VLM 推理不再触发 GPU fence timeout（[#36260](https://github.com/openvinotoolkit/openvino/issues/36260)），但部分模型 2nd token 延迟有轻微增加。
+
+| 模型 | 量化 | 32 1st | 32 2nd | 32 tok/s | 1024 1st | 1024 2nd | 1024 tok/s |
+|:-----|:----:|:------:|:------:|:--------:|:---------:|:---------:|:----------:|
+| **Qwen3.5/0.8B** | — | 259ms | 25ms | 38.8 | 615ms | 30ms | 37.4 |
+| **Hy-MT2/1.8B** | int8 | 250ms | 29ms | 36.1 | 636ms | 31ms | 32.8 |
+| **Qwen3/2B** | — | 258ms | 29ms | 33.1 | 766ms | 34ms | 29.9 |
+| **DeepSeek-7B** | int4 | 370ms | 61ms | 16.7 | 1693ms | 64ms | 16.1 |
+| **Qwen3/8B** | — | 383ms | 68ms | 15.2 | 2089ms | 73ms | 13.9 |
+| **Gemma-4 E2B** | int4 | 287ms | 73ms | 16.4 | 2019ms | 227ms | 12.4 |
+| **Qwen3.6/35B** (思考关) | int4 | 1415ms | 221ms | 13.7 | 4543ms | 224ms | 13.6 |
 
 ## 项目结构
 

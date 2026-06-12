@@ -34,4 +34,6 @@ THINKING-BUDGET-DEVLOG.md
 outputs/
 hf-space/
 modelscope-space/
-demo/
+optimum-intel-2.0.0/
+moe-test/
+scripts/

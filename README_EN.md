@@ -176,15 +176,15 @@ Interactive terminal. Auto-detects model format (GenAI / Optimum), supports stre
 | Command | Description |
 |---------|-------------|
 | `//img PATH1 [PATH2 ...]` | Load image(s) (VLM) |
-| `//pdf PATH` | Load PDF (auto-convert to images, max 24 pages, [why?](https://github.com/openvinotoolkit/openvino/issues/36260)) |
+| `//pdf PATH` | Load PDF (auto-convert to images, all pages) |
 | `//txt PATH1 [PATH2 ...]` | Load text file(s) |
-| `/file` | List loaded files |
 | `/temp N` | Set temperature (0-2) |
 | `/system TEXT` | Set system prompt |
-| `/clear [ids]` | Clear context or specific files by ID |
 | `/help` | Help |
 | `/exit` | Exit |
 
+> **Files don't persist across turns**: All loaded files (images/PDFs/text) are cleared automatically after each turn. Re-`//img` / `//pdf` / `//txt` on subsequent turns. This is an upstream limitation of OpenVINO's VLMPipeline — it does not cache image embeddings, so even with persistence every turn would still re-encode all images.
+>
 > **Multiline input**: Enter inserts a newline; press Enter on an empty line to submit.
 
 **Once mode** (`--mode once`):
@@ -546,6 +546,10 @@ ov-cli convert --model ./Qwen3-ASR-0.6B --output ./Qwen3-ASR-0.6B-ov
 
 ## Performance
 
+> tok/s based on encoded text. Chinese ~1.8 chars/subword.
+
+### i915 driver (default)
+
 Tested on: Intel Arc Pro 130T/140T (Arrow Lake-P) GPU | openvino-genai 2026.2 | 3 warmup rounds
 
 | Model | Quant | 32 1st | 32 2nd | 32 tok/s | 1024 1st | 1024 2nd | 1024 tok/s |
@@ -561,7 +565,20 @@ Tested on: Intel Arc Pro 130T/140T (Arrow Lake-P) GPU | openvino-genai 2026.2 | 
 | **Qwen3.6/35B** (reasoning on) | int4 | 1069ms | 88ms | 11.8 | 4518ms | 87ms | 11.6 |
 | **Qwen3.6/35B** (reasoning off) | int4 | 1070ms | 92ms | 11.2 | 4571ms | 94ms | 10.9 |
 
-> tok/s based on encoded text. Chinese ~1.8 chars/subword.
+### Xe driver
+
+Tested on: Intel Arc Pro 130T/140T (Arrow Lake-P) GPU | openvino-genai 2026.2 | 3 warmup rounds
+Xe driver resolves GPU fence timeout with multi-image VLM ([#36260](https://github.com/openvinotoolkit/openvino/issues/36260)), but may have slightly higher 2nd token latency on some models.
+
+| Model | Quant | 32 1st | 32 2nd | 32 tok/s | 1024 1st | 1024 2nd | 1024 tok/s |
+|:-----|:----:|:------:|:------:|:--------:|:---------:|:---------:|:----------:|
+| **Qwen3.5/0.8B** | — | 259ms | 25ms | 38.8 | 615ms | 30ms | 37.4 |
+| **Hy-MT2/1.8B** | int8 | 250ms | 29ms | 36.1 | 636ms | 31ms | 32.8 |
+| **Qwen3/2B** | — | 258ms | 29ms | 33.1 | 766ms | 34ms | 29.9 |
+| **DeepSeek-7B** | int4 | 370ms | 61ms | 16.7 | 1693ms | 64ms | 16.1 |
+| **Qwen3/8B** | — | 383ms | 68ms | 15.2 | 2089ms | 73ms | 13.9 |
+| **Gemma-4 E2B** | int4 | 287ms | 73ms | 16.4 | 2019ms | 227ms | 12.4 |
+| **Qwen3.6/35B** (reasoning off) | int4 | 1415ms | 221ms | 13.7 | 4543ms | 224ms | 13.6 |
 
 ## Project Structure
 

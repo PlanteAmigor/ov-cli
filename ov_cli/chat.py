@@ -761,10 +761,8 @@ def run_chat(ctx, system="You are a helpful AI assistant.",
         print("  //img PATH  " + TR("加载图片", "load image"))
         print("  //pdf PATH  " + TR("加载 PDF（全页转图片）", "load PDF (pages as images)"))
     print("  //txt PATH  " + TR("加载文本文件", "load text file"))
-    print("  /file       " + TR("查看已加载文件", "list loaded files"))
     print("  /temp N     " + TR("温度 (0-2)", "temperature"))
     print("  /system T   " + TR("系统提示词", "system prompt"))
-    print("  /clear [ids]" + TR("清空上下文或指定文件", "clear context or specific files"))
     print("  /help       " + TR("帮助", "help"))
     print("  /exit       " + TR("退出", "quit"))
     print("=" * 50)
@@ -843,12 +841,32 @@ def _load_text_file(path):
         return f.read()
 
 
+def _get_gpu_driver():
+    """检测当前 GPU 使用的内核驱动。
+
+    Returns:
+        "i915" | "xe" | None
+    """
+    import glob
+    try:
+        for card in glob.glob("/sys/class/drm/card*"):
+            dev = os.path.join(card, "device", "driver", "module")
+            if os.path.isdir(os.path.join(card, "device")):
+                link = os.path.join(card, "device", "driver")
+                if os.path.islink(link):
+                    driver = os.path.basename(os.readlink(link))
+                    if driver in ("i915", "xe"):
+                        return driver
+    except Exception:
+        pass
+    return None
+
+
 def _pdf_to_images(path):
     """把 PDF 每页转成 PIL Image，返回列表。
 
-    每页独立编码（不拼图），页数多时适当降低分辨率。
-    ≤10 页 → 448px（~196 visual tokens/页）
-    >10 页 → 384px（~144 visual tokens/页）
+    i915 驱动下 PDF 超 20 页会触发 GPU fence timeout，返回 None 并提示切换到 Xe。
+    Xe 驱动或 CPU 下无限制，使用 300 DPI 高清晰度渲染。
     """
     try:
         import fitz
@@ -858,6 +876,13 @@ def _pdf_to_images(path):
 
     import numpy as np
     from PIL import Image
+
+    # 检测 GPU 驱动
+    driver = _get_gpu_driver()
+    if driver == "i915":
+        print(f"  \u26a0 {TR('\u5f53\u524d\u4f7f\u7528 i915 \u9a71\u52a8\uff0cPDF \u591a\u9875\u7f16\u7801\u4f1a\u89e6\u53d1 GPU fence timeout', 'i915 driver detected: multi-page PDF encoding triggers GPU fence timeout')}")
+        print(f"    {TR('\u9700\u8981\u5728\u5f15\u5bfc\u65f6\u5207\u6362\u5230 Xe \u9a71\u52a8\uff08\u5982\u8bbe\u7f6e initramfs \u6216\u5185\u6838\u53c2\u6570\uff09', 'Switch to Xe driver at boot time (initramfs or kernel parameter)')}")
+        return None
 
     # 屏蔽 MuPDF 的 C 层 + Python 层 stderr 警告
     old_stderr_fd = os.dup(2)
@@ -874,12 +899,10 @@ def _pdf_to_images(path):
         sys.stderr = old_sys_stderr
         raise
     total = len(doc)
-    if total > 24:
-        print(f"  \u26a0 PDF 超过 24 页上限，仅处理前 24 页")
-        total = 24
-    # 统一使用 384px 保证清晰度
-    max_pixels, dpi = (384 * 384, 120) if total > 10 else (448 * 448, 150)
-    px = int(max_pixels ** 0.5)
+    # 统一 300 DPI 高清渲染，448px 截断
+    max_pixels = 448 * 448
+    dpi = 300
+    px = 448
     tok_per_page = max(1, max_pixels // (32 * 32))
     total_tokens = tok_per_page * total
     images = []
@@ -1013,51 +1036,13 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
 
         if text in ("/exit", "exit"):
             break
-        if text == "/file":
-            if not loaded_files:
-                print(f"  {TR('\u672a\u52a0\u8f7d\u4efb\u4f55\u6587\u4ef6', 'No files loaded')}")
-            else:
-                print(f"  {TR('\u5df2\u52a0\u8f7d\u6587\u4ef6', 'Loaded files')}:")
-                for f in loaded_files:
-                    if f["type"] == "text":
-                        print(f"    #{f['id']} \U0001f4c4 {f['path']}")
-                    else:
-                        tag = "\U0001f4c4" if f["type"] == "pdf" else "\U0001f5bc\ufe0f"
-                        pages = len(f["pages"])
-                        print(f"    #{f['id']} {tag} {f['path']} ({pages} page(s))")
-            print()
-            continue
-        if text == "/clear" or text == "/clear all":
-            conv.clear()
-            loaded_files.clear()
-            print(f"  \u2713 {TR('\u4e0a\u4e0b\u6587\u5df2\u6e05\u7a7a', 'Context cleared')}")
-            print()
-            continue
-        if text.startswith("/clear "):
-            ids_to_remove = set()
-            for token in text[7:].split():
-                try:
-                    ids_to_remove.add(int(token))
-                except ValueError:
-                    pass
-            if ids_to_remove:
-                loaded_files = [f for f in loaded_files if f["id"] not in ids_to_remove]
-                conv.clear()
-                removed = ", ".join(str(i) for i in sorted(ids_to_remove))
-                print(f"  \u2713 {TR('\u5df2\u6e05\u9664\u6587\u4ef6', 'Removed file(s)')}: #{removed}")
-            else:
-                print(f"  \u26a0 {TR('\u7528\u6cd5', 'Usage')}: /clear 1 3 5 \u6216 /clear all")
-            print()
-            continue
         if text == "/help":
             if is_vlm:
                 print("  //img PATH   " + TR("\u52a0\u8f7d\u56fe\u7247", "load image"))
                 print("  //pdf PATH   " + TR("\u52a0\u8f7d PDF\uff08\u5168\u9875\u8f6c\u56fe\u7247\uff09", "load PDF (pages as images)"))
             print("  //txt PATH   " + TR("\u52a0\u8f7d\u6587\u672c\u6587\u4ef6", "load text file"))
-            print("  /file        " + TR("\u67e5\u770b\u5df2\u52a0\u8f7d\u6587\u4ef6", "list loaded files"))
             print("  /temp N      " + TR("\u6e29\u5ea6 (0-2)", "temperature"))
             print("  /system T    " + TR("\u7cfb\u7edf\u63d0\u793a\u8bcd", "system prompt"))
-            print("  /clear [ids] " + TR("\u6e05\u7a7a\u4e0a\u4e0b\u6587\u6216\u6307\u5b9a\u6587\u4ef6", "clear context or specific files"))
             print("  /help        " + TR("\u5e2e\u52a9", "help"))
             print("  /exit        " + TR("\u9000\u51fa", "quit"))
             print()
@@ -1146,6 +1131,7 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
                 all_pages.extend(f["pages"])
         if txt_prefix:
             text = txt_prefix + text
+        loaded_files.clear()
         if all_pages and is_vlm:
             content = [{"type": "image", "image": img} for img in all_pages]
             content.append({"type": "text", "text": text})
@@ -1277,7 +1263,6 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
         reply_text = "".join(reply_parts)
         elapsed = time.time() - t0
         conv.append({"role": "assistant", "content": reply_text})
-        # \u56fe\u7247/PDF \u4fdd\u7559\u5728\u4e0a\u4e0b\u6587\u4e2d\uff0c\u7528 /clear \u6216\u91cd\u65b0 //img \u6765\u66ff\u6362
         char_count = len(reply_text.replace(" ", ""))
         tok_count = _count_tokens(ctx, reply_text)
         print()
@@ -1316,51 +1301,13 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
 
         if text in ("/exit", "exit"):
             break
-        if text == "/file":
-            if not loaded_files:
-                print(f"  {TR('未加载任何文件', 'No files loaded')}")
-            else:
-                print(f"  {TR('已加载文件', 'Loaded files')}:")
-                for f in loaded_files:
-                    if f["type"] == "text":
-                        print(f"    #{f['id']} 📄 {f['path']}")
-                    else:
-                        tag = "📄" if f["type"] == "pdf" else "🖼️"
-                        pages = len(f["pages"])
-                        print(f"    #{f['id']} {tag} {f['path']} ({pages} page(s))")
-            print()
-            continue
-        if text == "/clear" or text == "/clear all":
-            conv.clear()
-            loaded_files.clear()
-            print(f"  {TR('上下文已清空', 'Context cleared')}")
-            print()
-            continue
-        if text.startswith("/clear "):
-            ids_to_remove = set()
-            for token in text[7:].split():
-                try:
-                    ids_to_remove.add(int(token))
-                except ValueError:
-                    pass
-            if ids_to_remove:
-                loaded_files = [f for f in loaded_files if f["id"] not in ids_to_remove]
-                conv.clear()
-                removed = ", ".join(str(i) for i in sorted(ids_to_remove))
-                print(f"  {TR('已清除文件', 'Removed file(s)')}: #{removed}")
-            else:
-                print(f"  ⚠ {TR('用法', 'Usage')}: /clear 1 3 5 或 /clear all")
-            print()
-            continue
         if text == "/help":
             if is_vlm:
                 print("  //img PATH   " + TR("加载图片", "load image"))
                 print("  //pdf PATH   " + TR("加载 PDF（全页转图片）", "load PDF (pages as images)"))
             print("  //txt PATH   " + TR("加载文本文件", "load text file"))
-            print("  /file        " + TR("查看已加载文件", "list loaded files"))
             print("  /temp N      " + TR("温度 (0-2)", "temperature"))
             print("  /system T    " + TR("系统提示词", "system prompt"))
-            print("  /clear [ids] " + TR("清空上下文或指定文件", "clear context or specific files"))
             print("  /help        " + TR("帮助", "help"))
             print("  /exit        " + TR("退出", "quit"))
             print()
@@ -1447,6 +1394,7 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
             text = img_tag * len(all_pages) + text
         if txt_prefix:
             text = txt_prefix + text
+        loaded_files.clear()
         conv.append({"role": "user", "content": text})
         messages = []
         if system:
@@ -1511,7 +1459,6 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
             conv.append({"role": "assistant", "content": reply_text + TR(" [已中断]", " [Interrupted]")})
         else:
             conv.append({"role": "assistant", "content": reply_text})
-        # 图片/PDF 保留在上下文中
         char_count = len(reply_text.replace(" ", ""))
         tok_count = _count_tokens(ctx, reply_text)
         print()
