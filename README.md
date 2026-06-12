@@ -178,7 +178,7 @@ printf '问题1\n问题2\n' | ./ov-cli chat --model ./model-ov --mode pipe
 | 命令 | 说明 |
 |------|------|
 | `//img PATH1 [PATH2 ...]` | 加载图片（支持多文件，VLM） |
-| `//pdf PATH` | 加载 PDF（自动转图片，全部页面） |
+| `//pdf PATH` | ~~加载 PDF（自动转图片）~~ 暂时禁用—[#36386](https://github.com/openvinotoolkit/openvino/issues/36386) |
 | `//txt PATH1 [PATH2 ...]` | 加载文本文件（支持多文件） |
 | `/temp N` | 设置温度 (0-2) |
 | `/system TEXT` | 设置系统提示词 |

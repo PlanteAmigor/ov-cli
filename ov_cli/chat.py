@@ -592,10 +592,7 @@ def run_once(ctx, prompt="", files=None, output=None,
                 continue
             ext = os.path.splitext(fpath)[1].lower()
             if ext == ".pdf" and is_vlm:
-                pages = _pdf_to_images(fpath)
-                if pages:
-                    all_pages.extend(pages)
-                    print(f"  ✓ {TR('已加载 PDF', 'PDF loaded')}: {fpath} ({len(pages)} 页)")
+                print(f"  ⚠ {TR('PDF 暂时禁用—见 #36386', 'PDF temporarily disabled—see #36386')} (https://github.com/openvinotoolkit/openvino/issues/36386)")
             elif ext in (".jpg", ".jpeg", ".png", ".bmp", ".webp") and is_vlm:
                 from PIL import Image
                 all_pages.append(_load_image(fpath))
@@ -759,7 +756,6 @@ def run_chat(ctx, system="You are a helpful AI assistant.",
     print("=" * 50)
     if ctx.get("is_vlm"):
         print("  //img PATH  " + TR("加载图片", "load image"))
-        print("  //pdf PATH  " + TR("加载 PDF（全页转图片）", "load PDF (pages as images)"))
     print("  //txt PATH  " + TR("加载文本文件", "load text file"))
     print("  /temp N     " + TR("温度 (0-2)", "temperature"))
     print("  /system T   " + TR("系统提示词", "system prompt"))
@@ -1039,7 +1035,6 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
         if text == "/help":
             if is_vlm:
                 print("  //img PATH   " + TR("\u52a0\u8f7d\u56fe\u7247", "load image"))
-                print("  //pdf PATH   " + TR("\u52a0\u8f7d PDF\uff08\u5168\u9875\u8f6c\u56fe\u7247\uff09", "load PDF (pages as images)"))
             print("  //txt PATH   " + TR("\u52a0\u8f7d\u6587\u672c\u6587\u4ef6", "load text file"))
             print("  /temp N      " + TR("\u6e29\u5ea6 (0-2)", "temperature"))
             print("  /system T    " + TR("\u7cfb\u7edf\u63d0\u793a\u8bcd", "system prompt"))
@@ -1080,23 +1075,7 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
             continue
 
         if text.startswith("//pdf ") and is_vlm:
-            import shlex
-            paths = shlex.split(text[6:])
-            if not paths:
-                print(f"  \u26a0 {TR('\u7528\u6cd5', 'Usage')}: //pdf PATH1 [PATH2 ...]")
-                print()
-                continue
-            loaded_any = 0
-            for pdf_path in paths:
-                if os.path.isfile(pdf_path):
-                    pages = _pdf_to_images(pdf_path)
-                    if pages:
-                        loaded_files.append({"id": _next_id, "path": pdf_path, "type": "pdf", "pages": pages})
-                        print(f"  #{_next_id} \u2713 {TR('\u5df2\u52a0\u8f7d PDF', 'PDF loaded')}: {pdf_path}")
-                        _next_id += 1
-                        loaded_any += 1
-                else:
-                    print(f"  \u26a0 {TR('\u627e\u4e0d\u5230\u6587\u4ef6', 'File not found')}: {pdf_path}")
+            print(f"  \u26a0 {TR('PDF \u6682\u65f6\u7981\u7528—\u89c1 #36386', 'PDF temporarily disabled—see #36386')} (https://github.com/openvinotoolkit/openvino/issues/36386)")
             print()
             continue
 
@@ -1304,7 +1283,6 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
         if text == "/help":
             if is_vlm:
                 print("  //img PATH   " + TR("加载图片", "load image"))
-                print("  //pdf PATH   " + TR("加载 PDF（全页转图片）", "load PDF (pages as images)"))
             print("  //txt PATH   " + TR("加载文本文件", "load text file"))
             print("  /temp N      " + TR("温度 (0-2)", "temperature"))
             print("  /system T    " + TR("系统提示词", "system prompt"))
@@ -1343,21 +1321,7 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
             continue
 
         if text.startswith("//pdf ") and is_vlm:
-            import shlex
-            paths = shlex.split(text[6:])
-            if not paths:
-                print(f"  ⚠ {TR('用法', 'Usage')}: //pdf PATH1 [PATH2 ...]")
-                print()
-                continue
-            for pdf_path in paths:
-                if os.path.isfile(pdf_path):
-                    pages = _pdf_to_images(pdf_path)
-                    if pages:
-                        loaded_files.append({"id": _next_id, "path": pdf_path, "type": "pdf", "pages": pages})
-                        print(f"  #{_next_id} {TR('已加载 PDF', 'PDF loaded')}: {pdf_path}")
-                        _next_id += 1
-                else:
-                    print(f"  ⚠ {TR('找不到文件', 'File not found')}: {pdf_path}")
+            print(f"  ⚠ {TR('PDF 暂时禁用—见 #36386', 'PDF temporarily disabled—see #36386')} (https://github.com/openvinotoolkit/openvino/issues/36386)")
             print()
             continue
 
