@@ -225,7 +225,7 @@ def _build_help():
         desc = "ov-cli — 基于 OpenVINO 的 LLM 本地推理工具箱\n轻量、离线、CPU/GPU 皆可运行。"
         epilog = (
             "📖 使用示例:\n\n"
-            "  ./ov-cli setup\n  ./ov-cli convert --model ./Qwen3.5 --format int8\n"
+            "  ./ov-cli setup\n"
             "  ./ov-cli chat --model ./gemma-4-E2B-it-ov-int4\n"
             "  ./ov-cli asr --model ./whisper/ov-large\n"
             "  ./ov-cli image --model ./FLUX/ov-int4\n"
@@ -238,7 +238,7 @@ def _build_help():
         desc = "ov-cli — OpenVINO-powered LLM local inference toolkit."
         epilog = (
             "📖 Examples:\n\n"
-            "  ./ov-cli setup\n  ./ov-cli convert --model ./Qwen3.5 --format int8\n"
+            "  ./ov-cli setup\n"
             "  ./ov-cli chat --model ./gemma-4-E2B-it-ov-int4\n"
             "  ./ov-cli asr --model ./whisper/ov-large\n"
             "  ./ov-cli image --model ./FLUX/ov-int4\n"
