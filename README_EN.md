@@ -11,7 +11,7 @@
 
 > 💡 **Switch to Chinese UI**: Prefix any command with `--lang zh`, e.g. `./ov-cli --lang zh chat --model ./model-ov`
 
-Built on Optimum Intel + OpenVINO GenAI. Features: model conversion (7 quantization formats), interactive chat (streaming, translation, VLM), OpenAI-compatible API server.
+Built on OpenVINO GenAI. Features: interactive chat (streaming, translation, VLM), OpenAI-compatible API server.
 
 ## Quick Start
 
@@ -20,25 +20,22 @@ Built on Optimum Intel + OpenVINO GenAI. Features: model conversion (7 quantizat
 ./ov-cli setup
 eval "$(./ov-cli venv)"
 
-# 2. Convert model (HuggingFace → OpenVINO IR)
-./ov-cli convert --model ./Qwen3/2B --format int8
-
-# 3. Chat terminal
+# 2. Chat terminal
 ./ov-cli chat --model ./Qwen3/2B-ov
 
-# 4. Image Generation
+# 3. Image Generation
 ./ov-cli image --model ./FLUX/ov-int4
 
-# 5. TTS
+# 4. TTS
 ./ov-cli tts --model ./0.6B-CV-ov --prompt Hello --speaker vivian
 
-# 6. API server
+# 5. API server
 ./ov-cli server --model ./Qwen3/2B-ov
 
-# 7. Web UI
+# 6. Web UI
 ./ov-cli ui --model ./Qwen3/2B-ov
 
-# 8. MCP Protocol
+# 7. MCP Protocol
 ./ov-cli mcp --model ./Qwen3/2B-ov
 ```
 
@@ -94,7 +91,6 @@ Creates a Python venv and installs dependencies. Supports on-demand installation
 | `ui` | Gradio Web UI | gradio |
 | `mcp` | MCP protocol server | — |
 | `server` | API server | fastapi, uvicorn |
-| `convert` | Model conversion | torch, optimum-intel (~3GB, 5-10 min) |
 
 **Mode selection** (only when `chat` is included):
 1. **Simple mode** — pip install only. `--reasoning off` has no effect on thinking models.
@@ -109,38 +105,6 @@ Creates a Python venv and installs dependencies. Supports on-demand installation
 eval "$(./ov-cli venv)"
 eval "$(./ov-cli venv --venv ./my-venv)"
 ```
-
-### `convert` — Model Conversion
-
-Exports HuggingFace models to OpenVINO IR via Optimum Intel, auto-detecting task type.
-
-```bash
-./ov-cli convert --model ./Qwen3/2B --format int8     # output to ./model-ov
-./ov-cli convert --model ./Qwen3/2B --format int4 -o ./custom-path
-```
-
-**Quantization formats** (7):
-
-| Format | Size (vs fp32) | Notes |
-|--------|:-------------:|-------|
-| `fp32` | 100% | Lossless |
-| `fp16` | ~50% | Half precision |
-| `int8` | ~25% | 8-bit |
-| `int4` | ~12.5% | 4-bit |
-| `mxfp4` | ~12.5% | MX float 4-bit |
-| `nf4` | ~12.5% | Normal float 4-bit |
-| `cb4` | ~12.5% | 4-bit (double) |
-
-**INT4 mixed precision**:
-
-```bash
-./ov-cli convert --model ./Hy-MT2/1.8B --format int4 --ratio 0.8 --group-size 128
-```
-
-| Param | Default | Description |
-|-------|---------|-------------|
-| `--ratio` | 1.0 | INT4 ratio (0-1), lower = more INT8 |
-| `--group-size` | 128 | Quantization group size |
 
 ### `chat` — Chat Terminal
 
@@ -472,7 +436,7 @@ proc.stdin.close()
 
 #### Manual Conversion
 
-`./ov-cli convert` supports:
+The following architectures can be converted with `optimum-cli`:
 
 | Architecture | Notes |
 |------|------|
@@ -488,7 +452,7 @@ proc.stdin.close()
 
 | Option | Type | Features | Command |
 |:------|:----|:---------|:--------|
-| **Qwen3-TTS** ⭐ | Custom OV | Preset voices / Voice clone / 10 languages / Emotion control | `ov-cli convert --model ./Qwen3-TTS-0.6B-CV --output ./0.6B-CV-ov` |
+| **Qwen3-TTS** ⭐ | Custom OV | Preset voices / Voice clone / 10 languages / Emotion control | `optimum-cli export openvino --model ./Qwen3-TTS-0.6B-CV --output ./0.6B-CV-ov` |
 | **SpeechT5** | GenAI Pipeline | Lightweight (600M), CPU real-time, English | Download pre-converted |
 
 **Qwen3-TTS** (recommended):
@@ -497,8 +461,8 @@ Two model types, auto-detected:
 
 | Type | Feature | Convert |
 |:----|:--------|:--------|
-| **CustomVoice** | 9 preset speakers, no ref audio needed | `ov-cli convert --model ./Qwen3-TTS-0.6B-CV --output ./0.6B-CV-ov` |
-| **Base** | Voice clone, needs reference audio | `ov-cli convert --model ./Qwen3-TTS-0.6B --output ./0.6B-ov` |
+| **CustomVoice** | 9 preset speakers, no ref audio needed | `optimum-cli export openvino --model ./Qwen3-TTS-0.6B-CV --output ./0.6B-CV-ov` |
+| **Base** | Voice clone, needs reference audio | `optimum-cli export openvino --model ./Qwen3-TTS-0.6B --output ./0.6B-ov` |
 
 ```bash
 # CustomVoice
@@ -519,7 +483,7 @@ Two options. **Qwen3-ASR recommended** (automatic punctuation, language identifi
 
 **Qwen3-ASR** conversion:
 ```bash
-ov-cli convert --model ./Qwen3-ASR-0.6B --output ./Qwen3-ASR-0.6B-ov
+optimum-cli export openvino --model ./Qwen3-ASR-0.6B --output ./Qwen3-ASR-0.6B-ov
 ```
 
 **Whisper**: Download official pre-converted models:
@@ -577,7 +541,7 @@ Xe driver resolves GPU fence timeout with multi-image VLM ([#36260](https://gith
 | **Qwen3/2B** | — | 258ms | 29ms | 33.1 | 766ms | 34ms | 29.9 |
 | **DeepSeek-7B** | int4 | 370ms | 61ms | 16.7 | 1693ms | 64ms | 16.1 |
 | **Qwen3/8B** | — | 383ms | 68ms | 15.2 | 2089ms | 73ms | 13.9 |
-| **Gemma-4 E2B** | int4 | 287ms | 73ms | 16.4 | 2019ms | 227ms | 12.4 |
+| **Gemma-4 E2B** | int4 | 439ms | 53ms | 19.1 | 1432ms | 71ms | 13.9 |
 | **Qwen3/14B** | int4 | 509ms | 386ms | 8.0 | 3113ms | 266ms | 7.5 |
 | **Gemma-4 31B** | int4 | 1577ms | 261ms | 3.9 | 9949ms | 437ms | 3.3 |
 | **Qwen3.6/35B** (reasoning off) | int4 | 1415ms | 221ms | 13.7 | 4543ms | 224ms | 13.6 |

@@ -11,7 +11,7 @@
 
 > 💡 **切换英文界面**：所有命令前加 `--lang en`，例如 `./ov-cli --lang en chat --model ./model-ov`
 
-基于 Optimum Intel + OpenVINO GenAI 推理引擎。支持模型转换（7 种量化格式）、交互式聊天（流式/翻译/图片）、OpenAI 兼容 API 服务。
+基于 OpenVINO GenAI 推理引擎。支持交互式聊天（流式/翻译/图片）、OpenAI 兼容 API 服务。
 
 ## 快速开始
 
@@ -20,28 +20,25 @@
 ./ov-cli setup
 source .venv/bin/activate
 
-# 2. 转换模型（HuggingFace → OpenVINO IR）
-./ov-cli convert --model ./Qwen3/2B --format int8
-
-# 3. 聊天终端
+# 2. 聊天终端
 ./ov-cli chat --model ./Qwen3/2B-ov
 
-# 4. 文生图
+# 3. 文生图
 ./ov-cli image --model ./FLUX/ov-int4
 
-# 5. TTS 语音合成
+# 4. TTS 语音合成
 ./ov-cli tts --model ./0.6B-CV-ov --prompt 你好 --speaker Vivian
 
-# 6. API 服务
+# 5. API 服务
 ./ov-cli server --model ./Qwen3/2B-ov
 
-# 7. Web 界面
+# 6. Web 界面
 ./ov-cli ui --model ./Qwen3/2B-ov
 
-# 8. MCP 协议
+# 7. MCP 协议
 ./ov-cli mcp --model ./Qwen3/2B-ov
 
-# 9. 管道模式（批量/外部调用）
+# 8. 管道模式（批量/外部调用）
 printf '你好\n再见' | ./ov-cli chat --model ./model-ov --mode pipe
 ```
 
@@ -76,7 +73,7 @@ git pull
 ./ov-cli setup --with all                           # 全装
 
 # 指定 venv 路径
-./ov-cli setup --venv ./my-venv --with chat,convert
+./ov-cli setup --venv ./my-venv --with chat
 
 # 移除模块（自动计算独有包，共享包不受影响）
 ./ov-cli setup --remove chat                        # 卸载 chat 独有包
@@ -99,7 +96,6 @@ git pull
 | `ui` | Gradio Web 界面 | gradio |
 | `mcp` | MCP 协议服务器 | — |
 | `server` | API 服务器 | fastapi, uvicorn |
-| `convert` | 模型转换 | torch, torchvision, optimum-intel（约 3GB，耗时 5-10 分钟） |
 
 **模式选择**（仅装 `chat` 时提示）：
 1. **简易模式** — pip 安装，日常使用。`--reasoning off` 对思考型模型无效。
@@ -108,38 +104,6 @@ git pull
 
 **修复模式** (`--fix`)：不重建虚拟环境，仅升级已安装的模块、重打补丁，
 数秒完成。
-
-### `convert` — 模型转换
-
-使用 Optimum Intel 将 HuggingFace 模型导出为 OpenVINO IR，自动推断 task 类型。
-
-```bash
-./ov-cli convert --model ./Qwen3/2B --format int8     # 默认输出到 ./model-ov
-./ov-cli convert --model ./Qwen3/2B --format int4 -o ./custom-path
-```
-
-**量化格式**（7 种）：
-
-| 格式 | 体积 (相对 fp32) | 说明 |
-|------|:-------------:|------|
-| `fp32` | 100% | 无损 |
-| `fp16` | ~50% | 半精度，几乎无损 |
-| `int8` | ~25% | 8-bit，几乎无损 |
-| `int4` | ~12.5% | 4-bit，有精度损失 |
-| `mxfp4` | ~12.5% | MX 浮点 4-bit |
-| `nf4` | ~12.5% | 正态分布 4-bit |
-| `cb4` | ~12.5% | 双峰 4-bit |
-
-**INT4 混合精度**：
-
-```bash
-./ov-cli convert --model ./Hy-MT2/1.8B --format int4 --ratio 0.8 --group-size 128
-```
-
-| 参数 | 默认 | 说明 |
-|------|------|------|
-| `--ratio` | 1.0 | INT4 比例 (0-1)，越低 INT8 越多 |
-| `--group-size` | 128 | 量化分组大小 |
 
 ### `chat` — 聊天终端
 
@@ -494,7 +458,7 @@ proc.stdin.close()
 
 #### 自行转换
 
-`./ov-cli convert` 支持以下架构（已验证）：
+以下架构可使用 `optimum-cli` 转换（已验证）：
 
 | 架构 | 说明 |
 |------|------|
@@ -510,7 +474,7 @@ proc.stdin.close()
 
 | 方案 | 类型 | 特点 | 命令 |
 |:----|:----|:-----|:-----|
-| **Qwen3-TTS** ⭐ | 自定义 OV | 预设声音 / 声音克隆 / 10 种语言 / 情感控制 | `ov-cli convert --model ./Qwen3-TTS-0.6B-CV --output ./0.6B-CV-ov` |
+| **Qwen3-TTS** ⭐ | 自定义 OV | 预设声音 / 声音克隆 / 10 种语言 / 情感控制 | `optimum-cli export openvino --model ./Qwen3-TTS-0.6B-CV --output ./0.6B-CV-ov` |
 | **SpeechT5** | GenAI Pipeline | 轻量（600M），CPU 实时，英文 | 下载预转换模型 |
 
 **Qwen3-TTS**（推荐）：
@@ -519,8 +483,8 @@ proc.stdin.close()
 
 | 类型 | 特点 | 转换命令 |
 |:----|:-----|:---------|
-| **CustomVoice** | 9 种预设声音，不需参考音频 | `ov-cli convert --model ./Qwen3-TTS-0.6B-CV --output ./0.6B-CV-ov` |
-| **Base** | 声音克隆，需提供参考音频 | `ov-cli convert --model ./Qwen3-TTS-0.6B --output ./0.6B-ov` |
+| **CustomVoice** | 9 种预设声音，不需参考音频 | `optimum-cli export openvino --model ./Qwen3-TTS-0.6B-CV --output ./0.6B-CV-ov` |
+| **Base** | 声音克隆，需提供参考音频 | `optimum-cli export openvino --model ./Qwen3-TTS-0.6B --output ./0.6B-ov` |
 
 转换时自动安装 `qwen-tts` 依赖，完成后恢复。
 
@@ -545,7 +509,7 @@ ov-cli tts --model ./0.6B-ov --prompt "你好" --ref-audio ref.mp3
 
 **Qwen3-ASR** 转换：
 ```bash
-ov-cli convert --model ./Qwen3-ASR-0.6B --output ./Qwen3-ASR-0.6B-ov
+optimum-cli export openvino --model ./Qwen3-ASR-0.6B --output ./Qwen3-ASR-0.6B-ov
 ```
 
 **Whisper** 请下载官方预转换模型：
@@ -556,7 +520,7 @@ ov-cli convert --model ./Qwen3-ASR-0.6B --output ./Qwen3-ASR-0.6B-ov
 
 #### 文生图（Text-to-Image）
 
-如 FLUX、SD3.5。当前 `convert` 不支持转换文生图模型，请下载官方预转换模型：
+如 FLUX、SD3.5。当前不支持转换文生图模型，请下载官方预转换模型：
 - [HuggingFace Image Generation 合集](https://huggingface.co/collections/OpenVINO/image-generation)
 - [ModelScope 文生图合集](https://www.modelscope.cn/collections/Image-Generation-eb38cde2fa3d46)
 
@@ -569,7 +533,7 @@ OpenVINO 官方提供了大量预转换模型，**下载即用**：
 
 ### 注意事项
 
-- **Gemma-4**：导出需修改 `model_patcher.py` 中 `kv_shared_layer_index` → `layer_type`，`setup` 自动打补丁。
+- **Gemma-4**：使用 `VLMPipeline` 直接加载，无需 `optimum-intel` 或额外补丁。
 - **Ctrl+C 中断**：生成期间按 Ctrl+C 可中断，但需等待当前 token 生成完毕（约 20-200ms）。
 - **`--reasoning off`**：Qwen3.6 等天生思考模型无法通过 prompt 技巧阻止推理。
   解决方案：ov-cli 在 LogitProcessor 中插入 `ThinkingBudgetTransform`，
@@ -610,7 +574,7 @@ Xe 驱动下多图 VLM 推理不再触发 GPU fence timeout（[#36260](https://g
 | **Qwen3/2B** | — | 258ms | 29ms | 33.1 | 766ms | 34ms | 29.9 |
 | **DeepSeek-7B** | int4 | 370ms | 61ms | 16.7 | 1693ms | 64ms | 16.1 |
 | **Qwen3/8B** | — | 383ms | 68ms | 15.2 | 2089ms | 73ms | 13.9 |
-| **Gemma-4 E2B** | int4 | 287ms | 73ms | 16.4 | 2019ms | 227ms | 12.4 |
+| **Gemma-4 E2B** | int4 | 439ms | 53ms | 19.1 | 1432ms | 71ms | 13.9 |
 | **Qwen3/14B** | int4 | 509ms | 386ms | 8.0 | 3113ms | 266ms | 7.5 |
 | **Gemma-4 31B** | int4 | 1577ms | 261ms | 3.9 | 9949ms | 437ms | 3.3 |
 | **Qwen3.6/35B** (思考关) | int4 | 1415ms | 221ms | 13.7 | 4543ms | 224ms | 13.6 |
