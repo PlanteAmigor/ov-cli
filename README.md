@@ -21,7 +21,7 @@
 source .venv/bin/activate
 
 # 2. 聊天终端
-./ov-cli chat --model ./Qwen3/2B-ov
+./ov-cli chat --model ./Qwen3/2B-ov-int4
 
 # 3. 文生图
 ./ov-cli image --model ./FLUX/ov-int4
@@ -30,13 +30,13 @@ source .venv/bin/activate
 ./ov-cli tts --model ./0.6B-CV-ov --prompt 你好 --speaker Vivian
 
 # 5. API 服务
-./ov-cli server --model ./Qwen3/2B-ov
+./ov-cli server --model ./Qwen3/8B-ov-int4-v2
 
 # 6. Web 界面
-./ov-cli ui --model ./Qwen3/2B-ov
+./ov-cli ui --model ./Qwen3/2B-ov-int4
 
 # 7. MCP 协议
-./ov-cli mcp --model ./Qwen3/2B-ov
+./ov-cli mcp --model ./Qwen3/2B-ov-int4
 
 # 8. 管道模式（批量/外部调用）
 printf '你好\n再见' | ./ov-cli chat --model ./model-ov --mode pipe
@@ -97,7 +97,7 @@ git pull
 | `mcp` | MCP 协议服务器 | — |
 | `server` | API 服务器 | fastapi, uvicorn |
 
-> ~~`convert`~~ 模型转换模块已移除。每个模型对 `optimum-intel` / `transformers` 的版本要求不同，统一入口反而制造兼容性问题。转换请直接用 [`optimum-cli`](https://huggingface.co/docs/optimum/main/en/intel/export)。
+> `convert` 模块已移除。每个模型对 `optimum-intel` / `transformers` 的版本要求不同，统一入口反而制造兼容性问题。转换直接用 [`optimum-cli`](https://huggingface.co/docs/optimum/main/en/intel/export)。
 
 **模式选择**（仅装 `chat` 时提示）：
 1. **简易模式** — pip 安装，日常使用。`--reasoning off` 对思考型模型无效。
@@ -113,7 +113,9 @@ git pull
 
 ```bash
 # 聊天模式
-./ov-cli chat --model ./Qwen3/2B-ov                               # GenAI 格式
+./ov-cli chat --model ./Qwen3.5/0.8B-ov-int4                      # 0.8B VLM
+./ov-cli chat --model ./Qwen3/2B-ov-int4                          # 2B VLM
+./ov-cli chat --model ./Qwen3/8B-ov-int4-v2                       # 8B VLM
 ./ov-cli chat --model ./gemma-4-E2B-it-ov                          # Optimum 格式
 ./ov-cli chat --model ./model-ov --temp 0.9 --max-tokens 2048
 
@@ -168,9 +170,9 @@ printf '问题1\n问题2\n' | ./ov-cli chat --model ./model-ov --mode pipe
 ### `server` — API 服务
 
 启动 OpenAI 兼容的 HTTP API 服务器。
-
+  
 ```bash
-./ov-cli server --model ./Qwen3/8B-ov                              # 默认端口 8080
+./ov-cli server --model ./Qwen3/8B-ov-int4-v2                      # 默认端口 8080
 ./ov-cli server --model ./model-ov --port 8081 --host 0.0.0.0
 ./ov-cli server --model ./model-ov --device CPU                     # 指定 CPU
 ```
@@ -215,8 +217,8 @@ EOF
 ### `benchmark` — 性能测试
 
 ```bash
-./ov-cli benchmark --model ./Qwen3.5/0.8B-ov
-./ov-cli benchmark --model ./Qwen3.6/35B-A3B-ov --reasoning off
+./ov-cli benchmark --model ./Qwen3.5/0.8B-ov-int4
+./ov-cli benchmark --model ./Qwen3.6/35B-A3B-ov-int4 --reasoning off
 ```
 
 ### `ui` — Web 界面
@@ -225,8 +227,8 @@ EOF
 
 ```bash
 # 聊天界面
-./ov-cli ui --model ./Qwen3/2B-ov
-./ov-cli ui --model ./Qwen3/8B-ov --port 7861                      # 指定端口
+./ov-cli ui --model ./Qwen3/2B-ov-int4
+./ov-cli ui --model ./Qwen3/8B-ov-int4-v2 --port 7861              # 指定端口
 ./ov-cli ui --model ./model-vlm-ov --share                          # 公开链接
 ./ov-cli ui --model ./deepseek/7B-ov --reasoning off                # 关闭思考
 
@@ -438,35 +440,22 @@ proc.stdin.close()
 
 ### 推理格式
 
-| 格式 | 加载方式 | 特征 |
-|------|---------|------|
-| **GenAI** | `LLMPipeline` / `VLMPipeline` | 标准 optimum-cli 导出，`openvino_config.json` |
-| **Optimum** | `OVModelForVisualCausalLM` + `AutoProcessor` | Gemma-4 等，有 `openvino_text_embeddings_per_layer_model.xml` |
+所有模型统一使用 `LLMPipeline` / `VLMPipeline` 加载，格式为标准 optimum-cli 导出（`openvino_config.json`）。
 
 ### 大语言模型
 
 #### 实测验证
 
-| 模型 | 格式 | 文字 | 图片 | 翻译 | 说明 |
-|------|------|:----:|:----:|:----:|------|
-| **Hy-MT2 1.8B** | GenAI | | | ✅ | 翻译模型，4 种精度全通过 |
-| **Gemma-4 E2B** | Optimum | ✅ | ✅ | | INT4，需 `kv_shared_layer` 补丁 |
-| **Qwen3-VL 8B** | GenAI | ✅ | ✅ | | 官方预转换 |
-| **Qwen3.6 35B-A3B** | GenAI | ✅ | ✅ | | MoE，官方预转换 |
-| **Qwen3.5 0.8B** | GenAI | ✅ | ❌ | | 小模型 VLM 不支持 |
-| **Qwen3 2B** | GenAI | ✅ | ❌ | | 视觉编码器 reshape 有 bug |
+| 模型 | 格式 | 文字 | 图片 | 翻译 | 大小 | 速度 | 说明 |
+|------|------|:----:|:----:|:----:|:----:|:----:|------|
+| **Hy-MT2 1.8B** | GenAI | | | ✅ | | | 翻译模型 |
+| **Gemma-4 E2B** | Optimum | ✅ | ✅ | | ~15 GB | 19.1 tok/s | INT4，需 `kv_shared_layer` 补丁 |
+| **Qwen3.5 0.8B** | GenAI | ✅ | ✅ | | 491 MB | 53.2 ch/s | AWQ INT4，自转换 |
+| **Qwen3-VL 2B** | GenAI | ✅ | ✅ | | 996 MB | 53.0 ch/s | AWQ INT4，自转换 |
+| **Qwen3-VL 8B** | GenAI | ✅ | ✅ | | 4.0 GB | 23.1 ch/s | 官方预转换 / AWQ INT4 自转换 |
+| **Qwen3.6 35B-A3B** | GenAI | ✅ | ✅ | | | | MoE，官方预转换 |
 
-> **VLM 说明**：GenAI `VLMPipeline` 只支持 **Qwen3-VL 8B**、**Qwen3.6 35B-A3B**、**Qwen3.5 35B-A3B** 的视觉能力。小模型（0.8B、2B）视觉编码器在 OpenVINO 上无法正常工作。
 
-#### 自行转换
-
-以下架构可使用 `optimum-cli` 转换（已验证）：
-
-| 架构 | 说明 |
-|------|------|
-| Qwen3 / Qwen3.5 / Qwen3.6 | 含 MoE 变体 |
-| Hy-MT2 | 多语言翻译模型 |
-| Llama / Mistral / DeepSeek / Phi / Gemma | 标准 transformers 架构 |
 
 ### 语音模型
 
@@ -481,16 +470,10 @@ proc.stdin.close()
 
 **Qwen3-TTS**（推荐）：
 
-支持两种模型类型，自动检测：
-
-| 类型 | 特点 | 转换命令 |
-|:----|:-----|:---------|
-| **CustomVoice** | 9 种预设声音，不需参考音频 | `optimum-cli export openvino --model ./Qwen3-TTS-0.6B-CV --output ./0.6B-CV-ov` |
-| **Base** | 声音克隆，需提供参考音频 | `optimum-cli export openvino --model ./Qwen3-TTS-0.6B --output ./0.6B-ov` |
-
-转换时自动安装 `qwen-tts` 依赖，完成后恢复。
-
-> TTS/ASR 推理时自动切换 transformers 版本（运行时临时降级到 4.x 兼容版本，退出后自动恢复）。
+| 类型 | 特点 |
+|:----|:-----|
+| **CustomVoice** | 9 种预设声音，不需参考音频 |
+| **Base** | 声音克隆，需提供参考音频 |
 
 ```bash
 # CustomVoice — 预设声音
@@ -509,29 +492,58 @@ ov-cli tts --model ./0.6B-ov --prompt "你好" --ref-audio ref.mp3
 | **Qwen3-ASR** ⭐ | 自定义 OV | 语义加标点 / 52 种语言方言 / 语种识别 |
 | **Whisper** | GenAI Pipeline | 轻量，交互式流畅 |
 
-**Qwen3-ASR** 转换：
+## 模型转换
+
+> `convert` 模块已移除，转换直接用 `optimum-cli`。
+
+### LLM / VLM
+
+**支持架构：** Qwen3 / Qwen3.5 / Qwen3.6（含 MoE）、Hy-MT2、Llama、Mistral、DeepSeek、Phi、Gemma
+
 ```bash
-optimum-cli export openvino --model ./Qwen3-ASR-0.6B --output ./Qwen3-ASR-0.6B-ov
+# 纯文本模型
+optimum-cli export openvino -m ./Qwen3-1.8B --weight-format int4 --output ./Qwen3-1.8B-ov
+
+# VLM（含 vision merger，务必加 --awq）
+optimum-cli export openvino -m ./Qwen3-VL-8B --task image-text-to-text \
+  --weight-format int4 --awq --output ./Qwen3-VL-8B-ov-int4
+
+# Gemma-4 VLM（无 merger，直接 int4 即可）
+optimum-cli export openvino -m ./Gemma-4-E2B --task image-text-to-text \
+  --weight-format int4 --output ./Gemma-4-E2B-ov
 ```
 
-**Whisper** 请下载官方预转换模型：
-- [HuggingFace Speech-to-Text 合集](https://huggingface.co/collections/OpenVINO/speech-to-text)
-- [ModelScope Speech-to-Text 合集](https://www.modelscope.cn/collections/Speech-to-Text-b9ab5c24c32649)
+> **VLM 注意**：转换后检查 `preprocessor_config.json` 是否存在，缺失则从源模型复制。
 
-### 图像模型
+### TTS / ASR
 
-#### 文生图（Text-to-Image）
+```bash
+# Qwen3-TTS CustomVoice（需安装 qwen-tts）
+optimum-cli export openvino -m ./Qwen3-TTS-0.6B-CV --output ./0.6B-CV-ov
 
-如 FLUX、SD3.5。当前不支持转换文生图模型，请下载官方预转换模型：
-- [HuggingFace Image Generation 合集](https://huggingface.co/collections/OpenVINO/image-generation)
-- [ModelScope 文生图合集](https://www.modelscope.cn/collections/Image-Generation-eb38cde2fa3d46)
+# Qwen3-TTS Base（声音克隆）
+optimum-cli export openvino -m ./Qwen3-TTS-0.6B --output ./0.6B-ov
 
-### 预转换模型来源
+# Qwen3-ASR（需安装 qwen-asr）
+optimum-cli export openvino -m ./Qwen3-ASR-0.6B --output ./Qwen3-ASR-0.6B-ov
+```
 
-OpenVINO 官方提供了大量预转换模型，**下载即用**：
+### 文生图（未测试，理论可行）
+
+```bash
+# FLUX（--library diffusers）
+optimum-cli export openvino -m ./FLUX-dev --library diffusers --weight-format int4 --output ./FLUX-ov-int4
+
+# SD3.5
+optimum-cli export openvino -m ./SD3.5-Medium --library diffusers --weight-format int4 --output ./SD3.5-ov-int4
+```
+
+### 预转换模型
 
 - [HuggingFace OpenVINO 模型库](https://huggingface.co/OpenVINO)
 - [ModelScope OpenVINO 模型库](https://www.modelscope.cn/organization/OpenVINO?tab=model)
+- [HuggingFace Speech-to-Text 合集](https://huggingface.co/collections/OpenVINO/speech-to-text)
+- [HuggingFace Image Generation 合集](https://huggingface.co/collections/OpenVINO/image-generation)
 
 ### 注意事项
 
@@ -541,7 +553,6 @@ OpenVINO 官方提供了大量预转换模型，**下载即用**：
   解决方案：ov-cli 在 LogitProcessor 中插入 `ThinkingBudgetTransform`，
   预算耗尽后强制输出 `</think>`。需 `setup` **完整模式**编译修改版 GenAI。
   简易模式下 `--reasoning off` 仅过滤输出中的 `<think>` 块，但无法阻止推理。
-- **预转换模型**：可在 [ModelScope OpenVINO 组织](https://www.modelscope.cn/organization/OpenVINO) 或 [HuggingFace OpenVINO](https://huggingface.co/OpenVINO) 查找。
 
 ## 性能参考
 
@@ -594,7 +605,6 @@ ov-cli/
 │   ├── __main__.py          # python -m ov_cli 入口
 │   ├── cli.py               # CLI 参数解析 + 命令分发 + setup
 │   ├── chat.py              # 聊天/翻译终端（GenAI + Optimum）
-│   ├── convert.py           # 模型转换（7 种量化）
 │   ├── image.py             # 文生图终端
 │   ├── tts.py               # TTS 语音合成终端
 │   ├── asr.py               # 语音转文字终端

@@ -3,7 +3,6 @@ ov-cli chat: LLM 聊天/翻译终端。
 
 支持两种官方格式:
   GenAI 格式 (optimum-cli 导出): 使用 openvino_genai LLMPipeline/VLMPipeline
-  Optimum 格式 (optimum-intel OVModelForVisualCausalLM): Gemma-4 等
 """
 
 import os, sys, time, json, re, signal, threading

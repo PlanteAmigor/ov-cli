@@ -70,7 +70,7 @@ Creates a Python venv and installs dependencies. Supports on-demand installation
 ./ov-cli setup --with all                           # Everything
 
 # Custom venv path
-./ov-cli setup --venv ./my-venv --with chat,convert
+./ov-cli setup --venv ./my-venv --with chat
 
 # Remove modules (auto-detects exclusive packages, shared ones kept)
 ./ov-cli setup --remove chat                        # Remove chat's exclusive packages
@@ -92,7 +92,7 @@ Creates a Python venv and installs dependencies. Supports on-demand installation
 | `mcp` | MCP protocol server | — |
 | `server` | API server | fastapi, uvicorn |
 
-> ~~`convert`~~ module removed. Each model requires different `optimum-intel` / `transformers` versions — a unified entry point creates more compatibility issues than it solves. Use [`optimum-cli`](https://huggingface.co/docs/optimum/main/en/intel/export) directly for conversions.
+> `convert` module removed. Each model requires different `optimum-intel` / `transformers` versions — a unified entry point creates more compatibility issues than it solves. Use [`optimum-cli`](https://huggingface.co/docs/optimum/main/en/intel/export) directly for conversions.
 
 **Mode selection** (only when `chat` is included):
 1. **Simple mode** — pip install only. `--reasoning off` has no effect on thinking models.
@@ -416,35 +416,22 @@ proc.stdin.close()
 
 ### Inference Formats
 
-| Format | Loader | Feature |
-|--------|--------|---------|
-| **GenAI** | `LLMPipeline` / `VLMPipeline` | Standard export, `openvino_config.json` |
-| **Optimum** | `OVModelForVisualCausalLM` + `AutoProcessor` | Gemma-4 etc., has `openvino_text_embeddings_per_layer_model.xml` |
+All models use `LLMPipeline` / `VLMPipeline` uniformly. Format is standard optimum-cli export (`openvino_config.json`).
 
 ### LLM
 
 #### Verified Models
 
-| Model | Format | Text | Image | Translate | Notes |
-|-------|--------|:----:|:-----:|:---------:|-------|
-| **Hy-MT2 1.8B** | GenAI | | | ✅ | Translation model, all 4 precisions |
-| **Gemma-4 E2B** | Optimum | ✅ | ✅ | | INT4, needs `kv_shared_layer` patch |
-| **Qwen3-VL 8B** | GenAI | ✅ | ✅ | | Pre-converted |
-| **Qwen3.6 35B-A3B** | GenAI | ✅ | ✅ | | MoE, pre-converted |
-| **Qwen3.5 0.8B** | GenAI | ✅ | ❌ | | Small model VLM unsupported |
-| **Qwen3 2B** | GenAI | ✅ | ❌ | | Vision encoder reshape bug |
+| Model | Format | Text | Image | Translate | Size | Speed | Notes |
+|-------|--------|:----:|:-----:|:---------:|:----:|:-----:|-------|
+| **Hy-MT2 1.8B** | GenAI | | | ✅ | | | Translation model |
+| **Gemma-4 E2B** | Optimum | ✅ | ✅ | | ~15 GB | 19.1 tok/s | INT4, needs `kv_shared_layer` patch |
+| **Qwen3.5 0.8B** | GenAI | ✅ | ✅ | | 491 MB | 53.2 ch/s | AWQ INT4, self-converted |
+| **Qwen3-VL 2B** | GenAI | ✅ | ✅ | | 996 MB | 53.0 ch/s | AWQ INT4, self-converted |
+| **Qwen3-VL 8B** | GenAI | ✅ | ✅ | | 4.0 GB | 23.1 ch/s | Official / AWQ INT4 self-converted |
+| **Qwen3.6 35B-A3B** | GenAI | ✅ | ✅ | | | | MoE, pre-converted |
 
-> **VLM note**: Among Qwen models, GenAI `VLMPipeline` only supports vision for **Qwen3-VL 8B**, **Qwen3.6 35B-A3B**, **Qwen3.5 35B-A3B**. Small models (0.8B, 2B) have vision encoder issues.
 
-#### Manual Conversion
-
-The following architectures can be converted with `optimum-cli`:
-
-| Architecture | Notes |
-|------|------|
-| Qwen3 / Qwen3.5 / Qwen3.6 | Includes MoE variants |
-| Hy-MT2 | Multi-language translation model |
-| Llama / Mistral / DeepSeek / Phi / Gemma | Standard transformers architectures |
 
 ### Speech Models
 
@@ -461,10 +448,10 @@ The following architectures can be converted with `optimum-cli`:
 
 Two model types, auto-detected:
 
-| Type | Feature | Convert |
-|:----|:--------|:--------|
-| **CustomVoice** | 9 preset speakers, no ref audio needed | `optimum-cli export openvino --model ./Qwen3-TTS-0.6B-CV --output ./0.6B-CV-ov` |
-| **Base** | Voice clone, needs reference audio | `optimum-cli export openvino --model ./Qwen3-TTS-0.6B --output ./0.6B-ov` |
+| Type | Features |
+|:----|:--------|
+| **CustomVoice** | 9 preset speakers, no ref audio needed |
+| **Base** | Voice clone, needs reference audio |
 
 ```bash
 # CustomVoice
@@ -483,32 +470,69 @@ Two options. **Qwen3-ASR recommended** (automatic punctuation, language identifi
 | **Qwen3-ASR** ⭐ | Custom OV | Semantic punctuation / 52 languages / LID |
 | **Whisper** | GenAI Pipeline | Lightweight, smooth interactive |
 
-**Qwen3-ASR** conversion:
+## Model Conversion
+
+> The `convert` module has been removed. Use `optimum-cli` directly.
+
+### LLM / VLM
+
+**Supported architectures:** Qwen3 / Qwen3.5 / Qwen3.6 (incl. MoE), Hy-MT2, Llama, Mistral, DeepSeek, Phi, Gemma
+
 ```bash
-optimum-cli export openvino --model ./Qwen3-ASR-0.6B --output ./Qwen3-ASR-0.6B-ov
+# Text-only
+optimum-cli export openvino -m ./Qwen3-1.8B --weight-format int4 --output ./Qwen3-1.8B-ov
+
+# VLM (with vision merger, must use --awq)
+optimum-cli export openvino -m ./Qwen3-VL-8B --task image-text-to-text \
+  --weight-format int4 --awq --output ./Qwen3-VL-8B-ov-int4
+
+# Gemma-4 VLM (no merger, direct int4 works)
+optimum-cli export openvino -m ./Gemma-4-E2B --task image-text-to-text \
+  --weight-format int4 --output ./Gemma-4-E2B-ov
 ```
 
-**Whisper**: Download official pre-converted models:
-- [HuggingFace Speech-to-Text Collection](https://huggingface.co/collections/OpenVINO/speech-to-text)
-- [ModelScope Speech-to-Text Collection](https://www.modelscope.cn/collections/Speech-to-Text-b9ab5c24c32649)
+> **VLM note**: Check `preprocessor_config.json` after conversion; copy from source if missing.
 
-### Image Models
+### TTS / ASR
 
-#### Text-to-Image
+```bash
+# Qwen3-TTS CustomVoice (requires qwen-tts)
+optimum-cli export openvino -m ./Qwen3-TTS-0.6B-CV --output ./0.6B-CV-ov
 
-`convert` does not support text-to-image models (FLUX, SD3.5, etc.). Download official pre-converted models:
-- [HuggingFace Image Generation Collection](https://huggingface.co/collections/OpenVINO/image-generation)
-> - [ModelScope Image Generation Collection](https://www.modelscope.cn/collections/Image-Generation-eb38cde2fa3d46)
+# Qwen3-TTS Base (voice clone)
+optimum-cli export openvino -m ./Qwen3-TTS-0.6B --output ./0.6B-ov
+
+# Qwen3-ASR (requires qwen-asr)
+optimum-cli export openvino -m ./Qwen3-ASR-0.6B --output ./Qwen3-ASR-0.6B-ov
+```
+
+### Text-to-Image (untested, theoretically possible)
+
+```bash
+# FLUX（--library diffusers）
+optimum-cli export openvino -m ./FLUX-dev --library diffusers --weight-format int4 --output ./FLUX-ov-int4
+
+# SD3.5
+optimum-cli export openvino -m ./SD3.5-Medium --library diffusers --weight-format int4 --output ./SD3.5-ov-int4
+```
+
+### Pre-converted Models
+
+Find all pre-converted models at:
+
+- [HuggingFace OpenVINO](https://huggingface.co/OpenVINO)
+- [ModelScope OpenVINO](https://www.modelscope.cn/organization/OpenVINO?tab=model)
+- [HuggingFace Speech-to-Text](https://huggingface.co/collections/OpenVINO/speech-to-text)
+- [HuggingFace Image Generation](https://huggingface.co/collections/OpenVINO/image-generation)
 
 ### Notes
 
-- **Gemma-4**: Export needs `model_patcher.py` patch (`kv_shared_layer_index` → `layer_type`), applied by `setup` automatically.
+- **Gemma-4**: Use `VLMPipeline` directly, no `optimum-intel` or patches needed.
 - **Ctrl+C**: Interrupt during generation may take 20-200ms (one token time).
 - **`--reasoning off`**: Inherent thinking models (Qwen3.6 etc.) cannot be stopped by prompt tricks.
   ov-cli inserts a `ThinkingBudgetTransform` into the LogitProcessor chain to force `</think>`.
   Requires `setup` **full mode** (compiled GenAI).
   Simple mode `--reasoning off` only filters `<think>` blocks from output, but cannot prevent the model from reasoning.
-- **Pre-converted models**: Available at [ModelScope OpenVINO](https://www.modelscope.cn/organization/OpenVINO) or [HuggingFace OpenVINO](https://huggingface.co/OpenVINO).
 
 ## Performance
 
@@ -561,7 +585,6 @@ ov-cli/
 │   ├── __main__.py          # python -m ov_cli entry
 │   ├── cli.py               # CLI parser + dispatcher + setup
 │   ├── chat.py              # Chat/translate terminal (GenAI + Optimum)
-│   ├── convert.py           # Model conversion (7 formats)
 │   ├── image.py             # Text-to-image terminal
 │   ├── tts.py               # TTS terminal
 │   ├── asr.py               # Speech-to-text terminal
