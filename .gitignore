@@ -2,7 +2,11 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
-dist/
+/dist/
+openvino-genai-thinking/openvino_genai/
+openvino-genai-thinking/pyproject.toml
+openvino-genai-thinking/setup.py
+openvino-genai-thinking/README.md
 /build/
 
 # 虚拟环境
