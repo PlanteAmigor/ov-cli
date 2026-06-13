@@ -97,6 +97,8 @@ git pull
 | `mcp` | MCP 协议服务器 | — |
 | `server` | API 服务器 | fastapi, uvicorn |
 
+> ~~`convert`~~ 模型转换模块已移除。每个模型对 `optimum-intel` / `transformers` 的版本要求不同，统一入口反而制造兼容性问题。转换请直接用 [`optimum-cli`](https://huggingface.co/docs/optimum/main/en/intel/export)。
+
 **模式选择**（仅装 `chat` 时提示）：
 1. **简易模式** — pip 安装，日常使用。`--reasoning off` 对思考型模型无效。
 2. **完整模式** — 从源码编译 OpenVINO GenAI 以启用 thinking budget 功能

@@ -92,6 +92,8 @@ Creates a Python venv and installs dependencies. Supports on-demand installation
 | `mcp` | MCP protocol server | — |
 | `server` | API server | fastapi, uvicorn |
 
+> ~~`convert`~~ module removed. Each model requires different `optimum-intel` / `transformers` versions — a unified entry point creates more compatibility issues than it solves. Use [`optimum-cli`](https://huggingface.co/docs/optimum/main/en/intel/export) directly for conversions.
+
 **Mode selection** (only when `chat` is included):
 1. **Simple mode** — pip install only. `--reasoning off` has no effect on thinking models.
 2. **Full mode** — compiles modified GenAI from source to enable thinking budget
