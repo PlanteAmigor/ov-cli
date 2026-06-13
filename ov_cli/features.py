@@ -9,7 +9,7 @@ ov-cli features: 按需安装的功能模块管理。
   ui        — Gradio Web 界面 (+gradio)
   mcp       — MCP 协议服务器
   server    — API 服务器 (+fastapi, uvicorn)
-  convert   — 模型转换 (+torch, optimum-intel...)
+
 """
 
 import os
@@ -22,7 +22,7 @@ def get_installed(venv_path: str) -> set[str]:
     path = os.path.join(venv_path, _FEATURES_FILE)
     if not os.path.isfile(path):
         # 旧版本未记录 → 假设全装
-        return {"chat", "image", "asr", "tts", "ui", "mcp", "server", "convert"}
+        return {"chat", "image", "asr", "tts", "ui", "mcp", "server"}
     with open(path) as f:
         return {s.strip() for s in f.read().strip().split(",") if s.strip()}
 
@@ -49,13 +49,11 @@ _FEATURE_PACKAGES = {
     "ui":       ["gradio"],
     "mcp":      [],
     "server":   ["fastapi>=0.100", "uvicorn[standard]>=0.20"],
-    "convert":  ["torch", "torchvision"],
 }
 
 _FEATURE_EXTRA_PIPS = {
     "asr":  ["qwen-asr"],
     "tts":  ["qwen-tts"],
-    "convert": [],
 }
 
 

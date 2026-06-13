@@ -13,7 +13,7 @@ from ov_cli import TR
 from ov_cli.features import get_packages, get_extra_pips, get_exclusive_packages, get_installed, save as _save_features
 
 
-_ALL_FEATURES = {"chat", "image", "asr", "tts", "ui", "mcp", "server", "convert"}
+_ALL_FEATURES = {"chat", "image", "asr", "tts", "ui", "mcp", "server"}
 
 _FEATURE_HINTS = {
     "chat":    "聊天终端（PyMuPDF ~15MB）",
@@ -23,10 +23,7 @@ _FEATURE_HINTS = {
     "ui":      "Web 界面（gradio ~30MB）",
     "mcp":     "MCP 协议服务器（无额外依赖）",
     "server":  "API 服务（fastapi + uvicorn ~15MB）",
-    "convert": "模型转换（torch ~3GB, optimum-intel, 需 5-10 分钟）",
 }
-
-_CONVERT_WARN = "⚠ convert 模块需要安装 torch + optimum-intel（约 3GB，耗时 5-10 分钟）"
 
 
 def _is_windows():
@@ -264,23 +261,10 @@ def _install_features(pip, features: set[str], workspace, fix_mode=False):
         print(f"  {TR('安装基础依赖...', 'Installing base deps...')}")
         subprocess.check_call([pip, "install", "-v"] + pkgs)
 
-    # 修复模式下：升级依赖 + 重打补丁
+    # 修复模式下：升级 huggingface-hub + 重打补丁，跳过 optimum-intel 重装
     if fix_mode:
         subprocess.check_call([pip, "install", "--upgrade", "huggingface-hub", "transformers"])
-        # 检查是否已安装 optimum-intel，是则重装为固定版本
-        r = subprocess.run([sys.executable, "-c", "import optimum.intel"], capture_output=True)
-        if r.returncode == 0:
-            print(f"  {TR('重装 optimum-intel==1.27.0...', 'Reinstalling optimum-intel==1.27.0...')}")
-            subprocess.check_call([pip, "install", "--force-reinstall", "optimum-intel==1.27.0"])
         return
-
-    # Install optimum-intel + transformers if convert is requested
-    if "convert" in features:
-        print(f"  {TR('安装转换依赖...', 'Installing convert deps...')}")
-        print(f"  {TR('安装 optimum-intel==1.27.0 (pip)...', 'Installing optimum-intel==1.27.0 (pip)...')}")
-        subprocess.check_call([pip, "install", "optimum-intel==1.27.0"])
-        print(f"  {TR('安装 transformers (no-deps)...', 'Installing transformers (no-deps)...')}")
-        subprocess.check_call([pip, "install", "--no-deps", "--force-reinstall", "transformers"])
 
     # 额外 pip 包（qwen-tts/asr 等）
     extra = get_extra_pips(features)
@@ -294,10 +278,7 @@ def _install_features(pip, features: set[str], workspace, fix_mode=False):
         subprocess.check_call([pip, "install", "--force-reinstall", "--no-deps",
                                "torch", "--index-url", "https://download.pytorch.org/whl/cpu"])
 
-    # torch 先安装（CPU 版）
-    if "convert" in features:
-        subprocess.check_call([pip, "install", "torch", "torchvision",
-                               "--index-url", "https://download.pytorch.org/whl/cpu"])
+
 
 
 def _remove_features(pip, venv_path, removed: set[str]):
@@ -412,8 +393,7 @@ def cmd_setup(args, workspace):
         print(f"  {TR('修复模式: 升级依赖 + 重打补丁', 'Fix mode: upgrade deps + repatch')}")
         # 只修复已装的功能
         _install_features(pip, installed, workspace, fix_mode=True)
-        if "convert" in installed:
-            _apply_gemma4_patch()
+        _apply_gemma4_patch()
         print(f"  {TR('✅ 修复完成', '✅ Fix done')}")
         return
 
@@ -436,8 +416,6 @@ def cmd_setup(args, workspace):
         hint = _FEATURE_HINTS.get(f, f)
         print(f"    • {f} — {hint}")
 
-    if "convert" in features:
-        print(f"  {_CONVERT_WARN}")
         try:
             r = input(f"  {TR('是否继续?', 'Continue?')} [Y/n]: ")
             if r.strip().lower() == "n":
@@ -505,9 +483,8 @@ def cmd_setup(args, workspace):
         print(f"  {TR('安装已取消', 'Setup cancelled')}")
         sys.exit(1)
 
-    # 补丁（只有装了 convert 才需要）
-    if "convert" in features:
-        _apply_gemma4_patch()
+    # 补丁
+    _apply_gemma4_patch()
 
     _ensure_vscode_settings(venv_path, workspace)
 

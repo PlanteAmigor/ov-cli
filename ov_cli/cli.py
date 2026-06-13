@@ -32,22 +32,7 @@ def _check_wsl2_gpu():
         pass
 
 
-def cmd_convert(args):
-    """ov-cli convert"""
-    from .features import has as _has_feature
-    _venv = getattr(args, "venv", None) or os.path.join(_WORKSPACE, ".venv")
-    if not _has_feature(_venv, "convert"):
-        print(f"  ⚠ {TR('convert 模块未安装，请运行:', 'convert not installed, run:')} ./ov-cli setup --with convert")
-        sys.exit(1)
-    from .convert import convert_model
-    model_path = os.path.abspath(args.model)
-    if not os.path.isdir(model_path):
-        print(f"{TR('错误: 找不到模型目录', 'Error: model directory not found')}: {model_path}")
-        sys.exit(1)
-    output_path = args.output or model_path.rstrip("/") + "-ov"
-    output_path = os.path.abspath(output_path)
-    convert_model(model_path, output_path, args.format,
-                  ratio=args.ratio, group_size=args.group_size)
+
 
 
 def cmd_benchmark(args):
@@ -287,20 +272,12 @@ def main():
     # setup
     p = sub.add_parser("setup", help=TR("创建环境", "Setup"))
     p.add_argument("--venv", help=TR("venv 路径", "venv path"))
-    # optimum-intel 固定从 pip 安装 (==1.27.0)，不再支持本地源码
+    p.add_argument("--optimum-dir", help=TR("optimum-intel 源码目录", "optimum-intel source"))
     p.add_argument("--with", dest="with_features", default="all",
-        help=TR("按需安装 (chat,image,asr,tts,ui,mcp,server,convert)", "Features (chat,image,asr,tts,ui,mcp,server,convert)"))
+        help=TR("按需安装 (chat,image,asr,tts,ui,mcp,server)", "Features (chat,image,asr,tts,ui,mcp,server)"))
     p.add_argument("--remove", dest="remove_features", default="",
-        help=TR("移除模块 (chat,image,asr,tts,ui,mcp,server,convert)", "Remove features (chat,image,asr,tts,ui,mcp,server,convert)"))
+        help=TR("移除模块 (chat,image,asr,tts,ui,mcp,server)", "Remove features (chat,image,asr,tts,ui,mcp,server)"))
     p.add_argument("--fix", action="store_true", help=TR("修复模式", "Fix mode"))
-
-    # convert
-    p = sub.add_parser("convert", help=TR("转换模型", "Convert"))
-    p.add_argument("--model", "-m", required=True, help=TR("模型目录", "model dir"))
-    p.add_argument("--output", "-o", help=TR("输出目录", "output dir"))
-    p.add_argument("--format", choices=["fp32","fp16","int8","int4","mxfp4","nf4","cb4"], default="fp32")
-    p.add_argument("--ratio", type=float, default=1.0)
-    p.add_argument("--group-size", type=int, default=128, dest="group_size")
 
     # chat
     p = sub.add_parser("chat", help=TR("聊天/翻译", "Chat"))
@@ -420,7 +397,7 @@ def main():
         _check_wsl2_gpu()
 
     dispatch = {
-        "setup": lambda a: cmd_setup(a, _WORKSPACE), "convert": cmd_convert, "chat": cmd_chat,
+        "setup": lambda a: cmd_setup(a, _WORKSPACE), "chat": cmd_chat,
         "benchmark": cmd_benchmark, "server": cmd_server,
         "image": cmd_image, "tts": cmd_tts, "asr": cmd_asr, "ui": cmd_ui, "mcp": cmd_mcp,
     }
