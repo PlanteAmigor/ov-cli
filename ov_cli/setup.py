@@ -264,21 +264,21 @@ def _install_features(pip, features: set[str], workspace, fix_mode=False):
         print(f"  {TR('安装基础依赖...', 'Installing base deps...')}")
         subprocess.check_call([pip, "install", "-v"] + pkgs)
 
-    # 修复模式下：升级 huggingface-hub + 重打补丁，跳过 optimum-intel 重装
+    # 修复模式下：升级依赖 + 重打补丁
     if fix_mode:
         subprocess.check_call([pip, "install", "--upgrade", "huggingface-hub", "transformers"])
+        # 检查是否已安装 optimum-intel，是则重装为固定版本
+        r = subprocess.run([sys.executable, "-c", "import optimum.intel"], capture_output=True)
+        if r.returncode == 0:
+            print(f"  {TR('重装 optimum-intel==1.27.0...', 'Reinstalling optimum-intel==1.27.0...')}")
+            subprocess.check_call([pip, "install", "--force-reinstall", "optimum-intel==1.27.0"])
         return
 
     # Install optimum-intel + transformers if convert is requested
     if "convert" in features:
         print(f"  {TR('安装转换依赖...', 'Installing convert deps...')}")
-        _optimum_src = os.path.join(workspace, "optimum-intel-main")
-        if os.path.isdir(_optimum_src):
-            print(f"  {TR('安装 optimum-intel (本地源码)...', 'Installing optimum-intel (local)...')}: {_optimum_src}")
-            subprocess.check_call([pip, "install", _optimum_src])
-        else:
-            print(f"  {TR('安装 optimum-intel (GitHub)...', 'Installing optimum-intel (GitHub)...')}")
-            subprocess.check_call([pip, "install", "optimum-intel@git+https://github.com/huggingface/optimum-intel.git"])
+        print(f"  {TR('安装 optimum-intel==1.27.0 (pip)...', 'Installing optimum-intel==1.27.0 (pip)...')}")
+        subprocess.check_call([pip, "install", "optimum-intel==1.27.0"])
         print(f"  {TR('安装 transformers (no-deps)...', 'Installing transformers (no-deps)...')}")
         subprocess.check_call([pip, "install", "--no-deps", "--force-reinstall", "transformers"])
 

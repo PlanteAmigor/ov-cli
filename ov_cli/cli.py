@@ -287,7 +287,7 @@ def main():
     # setup
     p = sub.add_parser("setup", help=TR("创建环境", "Setup"))
     p.add_argument("--venv", help=TR("venv 路径", "venv path"))
-    p.add_argument("--optimum-dir", help=TR("optimum-intel 源码目录", "optimum-intel source"))
+    # optimum-intel 固定从 pip 安装 (==1.27.0)，不再支持本地源码
     p.add_argument("--with", dest="with_features", default="all",
         help=TR("按需安装 (chat,image,asr,tts,ui,mcp,server,convert)", "Features (chat,image,asr,tts,ui,mcp,server,convert)"))
     p.add_argument("--remove", dest="remove_features", default="",
