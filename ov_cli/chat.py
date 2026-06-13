@@ -123,21 +123,6 @@ def _is_genai_format(model_path):
             os.path.isfile(os.path.join(model_path, "openvino_model.xml")))
 
 
-def _is_optimum_format(model_path):
-    """检测模型是否为 Optimum Intel 导出的 VLM 格式
-    （需要 OVModelForVisualCausalLM + AutoProcessor）。
-    特征：有 openvino_config.json 且包含逐层输入模型文件。"""
-    if not _is_genai_format(model_path):
-        return False
-    # 有逐层输入模型 => 必须用 Optimum 格式加载
-    if os.path.isfile(os.path.join(model_path, "openvino_text_embeddings_per_layer_model.xml")):
-        return True
-    # 有 vision 但不含 merger → Gemma-4 等 VLM
-    if _is_multimodal(model_path):
-        if not os.path.isfile(os.path.join(model_path, "openvino_vision_embeddings_merger_model.xml")):
-            return True
-    return False
-
 
 def _is_multimodal(model_path):
     """检测模型是否包含视觉组件。"""
@@ -149,9 +134,6 @@ def load_model(ov_path):
     device = "GPU" if "GPU" in ov.Core().available_devices else "CPU"
 
     if _is_genai_format(ov_path):
-        if _is_optimum_format(ov_path):
-            # === Optimum 格式（OVModelForVisualCausalLM + AutoProcessor） ===
-            return _load_optimum(ov_path, device)
 
         # === GenAI 格式（optimum-cli 导出，openvino-genai 推理） ===
         is_vlm = _is_multimodal(ov_path)
@@ -951,37 +933,6 @@ def _images_to_ov_tensor(images):
         canvas[y:y+h] = arr
         y += h
     return ov.Tensor(canvas[None])
-
-
-def _load_optimum(ov_path, device):
-    """加载 Optimum 格式模型（OVModelForVisualCausalLM + AutoProcessor）。"""
-    from . import TR
-
-    from optimum.intel import OVModelForVisualCausalLM
-    from transformers import AutoProcessor
-
-    print(f"  加载 OVModelForVisualCausalLM ({device})...", end=" ", flush=True, file=sys.stderr)
-    t0 = time.time()
-    model = OVModelForVisualCausalLM.from_pretrained(ov_path, device=device)
-    processor = AutoProcessor.from_pretrained(ov_path, trust_remote_code=True)
-    print(f"✓ ({time.time()-t0:.1f}s)")
-
-    # model_type
-    model_type = None
-    cfg_path = os.path.join(ov_path, "config.json")
-    if os.path.isfile(cfg_path):
-        with open(cfg_path) as f:
-            cfg = json.load(f)
-        model_type = cfg.get("model_type")
-
-    return {
-        "model": model,
-        "processor": processor,
-        "device": device,
-        "model_type": model_type,
-        "optimum": True,
-        "is_vlm": _is_multimodal(ov_path),
-    }
 
 
 def _count_tokens(ctx, text):

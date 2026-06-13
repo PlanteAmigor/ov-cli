@@ -41,3 +41,5 @@ modelscope-space/
 optimum-intel-2.0.0/
 moe-test/
 scripts/
+convert/
+convert-venv/
