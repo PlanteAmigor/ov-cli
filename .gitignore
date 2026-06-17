@@ -38,8 +38,15 @@ THINKING-BUDGET-DEVLOG.md
 outputs/
 hf-space/
 modelscope-space/
-optimum-intel-2.0.0/
+optimum-intel/
 moe-test/
 scripts/
 convert/
 .con-venv/
+.xpu-venv/
+rk3588-ov/
+rknn-llm/
+rknn-toolkit2/
+openvino/
+optimum-intel-new/
+optimum-intel-2.0.0/
