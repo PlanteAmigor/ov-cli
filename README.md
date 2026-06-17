@@ -452,6 +452,7 @@ proc.stdin.close()
 | **Gemma-4 E2B** | Optimum | ✅ | ✅ | | ~15 GB | 19.1 tok/s | INT4，需 `kv_shared_layer` 补丁 |
 | **Qwen3.5 0.8B** | GenAI | ✅ | ✅ | | 491 MB | 53.2 ch/s | AWQ INT4，自转换 |
 | **Qwen3-VL 2B** | GenAI | ✅ | ✅ | | 996 MB | 53.0 ch/s | AWQ INT4，自转换 |
+| **Qwen3.5 4B** | GenAI | ✅ | ✅ | | 2.4 GB | 20.5 tok/s | AWQ INT4，自转换 |
 | **Qwen3-VL 8B** | GenAI | ✅ | ✅ | | 4.0 GB | 23.1 ch/s | 官方预转换 / AWQ INT4 自转换 |
 | **Qwen3.6 35B-A3B** | GenAI | ✅ | ✅ | | | | MoE，官方预转换 |
 
@@ -567,6 +568,7 @@ optimum-cli export openvino -m ./SD3.5-Medium --library diffusers --weight-forma
 | **Qwen3.5/0.8B** | int8 | 297ms | 19ms | 54.9 | 660ms | 20ms | 51.8 |
 | **Hy-MT2/1.8B** | int4 | 267ms | 25ms | 40.6 | 710ms | 24ms | 38.2 |
 | **Qwen3/2B** | int8 | 262ms | 33ms | 30.7 | 771ms | 35ms | 27.8 |
+| **Qwen3.5/4B** | int4 AWQ | — | — | — | — | — | — |
 | **DeepSeek-R1-7B** | int4 | 344ms | 65ms | 16.0 | 1816ms | 67ms | 15.5 |
 | **Qwen3/8B** | int4 AWQ | 402ms | 79ms | 12.9 | 2161ms | 82ms | 12.1 |
 | **Qwen3/14B** | int4 | 506ms | 388ms | 8.0 | 3045ms | 268ms | 7.6 |
@@ -585,6 +587,7 @@ Xe 驱动下多图 VLM 推理不再触发 GPU fence timeout（[#36260](https://g
 | **Qwen3.5/0.8B** | — | 259ms | 25ms | 38.8 | 615ms | 30ms | 37.4 |
 | **Hy-MT2/1.8B** | int8 | 250ms | 29ms | 36.1 | 636ms | 31ms | 32.8 |
 | **Qwen3/2B** | — | 258ms | 29ms | 33.1 | 766ms | 34ms | 29.9 |
+| **Qwen3.5/4B** | int4 AWQ | 459ms | 48ms | 20.5 | 1706ms | 50ms | 19.1 |
 | **DeepSeek-7B** | int4 | 370ms | 61ms | 16.7 | 1693ms | 64ms | 16.1 |
 | **Qwen3/8B** | — | 383ms | 68ms | 15.2 | 2089ms | 73ms | 13.9 |
 | **Gemma-4 E2B** | int4 | 439ms | 53ms | 19.1 | 1432ms | 71ms | 13.9 |
