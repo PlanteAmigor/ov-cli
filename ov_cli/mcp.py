@@ -167,7 +167,7 @@ def _process_request(req: dict, model_path: str):
         _result(req, {
             "protocolVersion": "2025-03-26",
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "ov-cli", "version": "0.0.0-dev"},
+            "serverInfo": {"name": "ov-cli", "version": "1.4.0"},
         })
         return
 
