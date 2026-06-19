@@ -1478,7 +1478,7 @@ def _run_translate_genai(ctx, max_tokens):
             target = TR(TRANSLATE_LANGS["zh"][0], TRANSLATE_LANGS["zh"][1])
 
         prompt = t_zh.format(target=target, text=text) if has_chinese(text) else t_en.format(target=target, text=text)
-        gen_cfg = _make_genai_config(temperature=0, max_tokens=max_tokens, reasoning=True, tokenizer=pipe.get_tokenizer())
+        gen_cfg = _make_genai_config(temperature=0, max_tokens=max_tokens, reasoning=False, tokenizer=pipe.get_tokenizer())
 
         print(f"  → {target}", flush=True)
         t0 = time.time()
@@ -1486,7 +1486,7 @@ def _run_translate_genai(ctx, max_tokens):
         sys.stdout.flush()
         reply_parts = []
         stop_flag = [False]
-        streamer_callback = _make_streamer(reply_parts, stop_flag, thinking_filter=not reasoning)
+        streamer_callback = _make_streamer(reply_parts, stop_flag, thinking_filter=True)
 
         old_handler = signal.signal(signal.SIGINT, lambda s, f: stop_flag.__setitem__(0, True))
         try:
