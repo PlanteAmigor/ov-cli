@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ov-cli"
-version = "1.4.0"
+version = "1.4.2"
 description = "OpenVINO LLM 命令行工具"
 requires-python = ">=3.10"
 dependencies = [
-    "openvino>=2026.2",
+    "openvino==2026.2.0",
     "openvino-tokenizers",
-    "openvino-genai",
+    "openvino-genai==2026.2.0.0",
     "transformers>=4.57",
     "tokenizers",
     "jinja2",
