@@ -130,7 +130,8 @@ def _is_multimodal(model_path):
 
 def load_model(ov_path):
     """加载 OpenVINO 模型。自动检测 GenAI/传统格式。"""
-    device = "GPU" if "GPU" in ov.Core().available_devices else "CPU"
+    devices = ov.Core().available_devices
+    device = next((d for d in devices if "GPU" in d), "CPU")
 
     if _is_genai_format(ov_path):
 
