@@ -158,7 +158,7 @@ def _run_optimum_bench(model, processor, input_size):
     }
 
 
-def run_benchmark(model_path, reasoning=True):
+def run_benchmark(model_path, reasoning=True, device=""):
     """运行基准测试。"""
     from .chat import load_model
 
@@ -166,7 +166,7 @@ def run_benchmark(model_path, reasoning=True):
         print(f"错误: 找不到模型目录: {model_path}")
         sys.exit(1)
 
-    ctx = load_model(model_path)
+    ctx = load_model(model_path, device=device)
     device = ctx["device"]
 
     print(f"\n{'='*60}")

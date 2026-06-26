@@ -44,7 +44,7 @@ def cmd_benchmark(args):
         sys.exit(1)
     from .benchmark import run_benchmark
     ov_path = os.path.abspath(args.model)
-    run_benchmark(ov_path, args.reasoning == "on")
+    run_benchmark(ov_path, args.reasoning == "on", device=args.device)
 
 
 def cmd_server(args):
@@ -291,11 +291,13 @@ def main():
     p.add_argument("--top-k", type=int, default=40, dest="top_k")
     p.add_argument("--max-tokens", type=int, default=1024, dest="max_tokens")
     p.add_argument("--image", "-i"), p.add_argument("--reasoning", choices=["on","off"], default="on")
+    p.add_argument("--device", choices=["CPU","GPU","NPU"], default="")
 
     # benchmark
     p = sub.add_parser("benchmark", help=TR("基准测试", "Benchmark"))
     p.add_argument("--model", "-m", required=True)
     p.add_argument("--reasoning", choices=["on","off"], default="on")
+    p.add_argument("--device", choices=["CPU","GPU","NPU"], default="")
 
     # server
     p = sub.add_parser("server", help=TR("API服务", "Server"))

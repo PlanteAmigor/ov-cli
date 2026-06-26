@@ -128,12 +128,13 @@ def _is_multimodal(model_path):
     return os.path.isfile(os.path.join(model_path, "openvino_vision_embeddings_model.xml"))
 
 
-def load_model(ov_path):
+def load_model(ov_path, device=""):
     """加载 OpenVINO 模型。自动检测 GenAI/传统格式。"""
-    devices = ov.Core().available_devices
-    device = next((d for d in devices if "GPU" in d), "CPU")
+    if not device:
+        devices = ov.Core().available_devices
+        device = next((d for d in devices if "GPU" in d), "CPU")
 
-    if _is_genai_format(ov_path):
+    if _is_genai_format(ov_path):  
 
         # === GenAI 格式（optimum-cli 导出，openvino-genai 推理） ===
         is_vlm = _is_multimodal(ov_path)
@@ -760,11 +761,15 @@ def _build_prompt(messages, tokenizer=None, enable_thinking=True):
     """
     if tokenizer is not None:
         try:
-            return tokenizer.apply_chat_template(
+            prompt = tokenizer.apply_chat_template(
                 messages,
                 add_generation_prompt=True,
                 extra_context={"enable_thinking": enable_thinking},
             )
+            # 去掉空的 <think>\n\n</think>\n\n（仅当 thinking 关闭时的空壳）
+            prompt = prompt.replace("<think>\n\n</think>\n\n", "")
+            prompt = prompt.replace("<think>\n</think>\n\n", "")
+            return prompt
         except Exception:
             pass
     # 回退：手动构建 ChatML（通用兜底）
