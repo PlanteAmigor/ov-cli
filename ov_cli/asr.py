@@ -117,17 +117,18 @@ def _detect_asr_type(ov_path):
     return "whisper"
 
 
-def load_model(ov_path):
+def load_model(ov_path, device=None):
     """加载 ASR 模型，自动识别 Whisper / Qwen3-ASR。"""
     mtype = _detect_asr_type(ov_path)
     if mtype == "qwen3_asr":
-        return _load_qwen3_asr(ov_path)
-    return _load_whisper(ov_path)
+        return _load_qwen3_asr(ov_path, device=device)
+    return _load_whisper(ov_path, device=device)
 
 
-def _load_whisper(ov_path):
+def _load_whisper(ov_path, device=None):
     """加载 WhisperPipeline。"""
-    device = "GPU" if "GPU" in ov.Core().available_devices else "CPU"
+    if not device:
+        device = "GPU" if "GPU" in ov.Core().available_devices else "CPU"
     print(f"  {TR('加载 WhisperPipeline ({})...', 'Loading WhisperPipeline ({})...').format(device)}", end=" ", flush=True, file=sys.stderr)
     t0 = time.time()
     pipe = ov_genai.WhisperPipeline(ov_path, device)
@@ -135,7 +136,7 @@ def _load_whisper(ov_path):
     return {"pipe": pipe, "device": device, "asr_type": "whisper"}
 
 
-def _load_qwen3_asr(ov_path):
+def _load_qwen3_asr(ov_path, device=None):
     """加载 Qwen3-ASR OpenVINO 模型（自动切 transformers 版本）。"""
     _ensure_qwen_asr_tf()  # 只管切换，不管返回值
     need_restore = True    # 只要加载了 Qwen3-ASR，退出就得恢复
@@ -143,7 +144,8 @@ def _load_qwen3_asr(ov_path):
     _sys.path.insert(0, str(Path(__file__).parent.parent / "dlc"))
     from qwen_3_asr_helper import OVQwen3ASRModel
 
-    device = "GPU" if "GPU" in ov.Core().available_devices else "CPU"
+    if not device:
+        device = "GPU" if "GPU" in ov.Core().available_devices else "CPU"
     print(f"  {TR('加载 Qwen3-ASR ({})...', 'Loading Qwen3-ASR ({})...').format(device)}", end=" ", flush=True, file=sys.stderr)
     t0 = time.time()
     try:

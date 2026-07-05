@@ -74,7 +74,7 @@ def cmd_image(args):
     if not os.path.isdir(ov_path):
         print(f"{TR('错误: 找不到模型目录', 'Error: model directory not found')}: {ov_path}")
         sys.exit(1)
-    ctx = load_model(ov_path)
+    ctx = load_model(ov_path, device=args.device)
     if args.mode == "once":
         if not args.prompt:
             print(f"  ⚠ {TR('once 模式需要 --prompt 参数', 'once mode requires --prompt')}")
@@ -162,7 +162,7 @@ def cmd_chat(args):
        not os.path.isfile(os.path.join(ov_path, "openvino_config.json")):
         print(f"{TR('错误: 找不到模型文件', 'Error: model file not found')}: {ov_path}")
         sys.exit(1)
-    ctx = load_model(ov_path)
+    ctx = load_model(ov_path, device=args.device)
     if mode == "translate":
         run_translate(ctx, max_tokens=args.max_tokens)
     elif mode == "once":
@@ -193,7 +193,7 @@ def cmd_asr(args):
     if not os.path.isdir(ov_path):
         print(f"{TR('错误: 找不到模型目录', 'Error: model directory not found')}: {ov_path}")
         sys.exit(1)
-    ctx = load_model(ov_path)
+    ctx = load_model(ov_path, device=args.device)
     if args.mode == "once":
         if not args.file:
             print(f"  ⚠ {TR('once 模式需要 --file 参数', 'once mode requires --file')}")
@@ -291,18 +291,18 @@ def main():
     p.add_argument("--top-k", type=int, default=40, dest="top_k")
     p.add_argument("--max-tokens", type=int, default=1024, dest="max_tokens")
     p.add_argument("--image", "-i"), p.add_argument("--reasoning", choices=["on","off"], default="on")
-    p.add_argument("--device", choices=["CPU","GPU","NPU"], default="")
+    p.add_argument("--device", default="", help=TR("推理设备 (CPU/GPU/GPU.0/GPU.1/NPU)", "Device (CPU/GPU/GPU.0/GPU.1/NPU)"))
 
     # benchmark
     p = sub.add_parser("benchmark", help=TR("基准测试", "Benchmark"))
     p.add_argument("--model", "-m", required=True)
     p.add_argument("--reasoning", choices=["on","off"], default="on")
-    p.add_argument("--device", choices=["CPU","GPU","NPU"], default="")
+    p.add_argument("--device", default="", help=TR("推理设备 (CPU/GPU/GPU.0/GPU.1/NPU)", "Device (CPU/GPU/GPU.0/GPU.1/NPU)"))
 
     # server
     p = sub.add_parser("server", help=TR("API服务", "Server"))
     p.add_argument("--model", "-m", required=True)
-    p.add_argument("--device", choices=["CPU","GPU"], default="")
+    p.add_argument("--device", default="", help=TR("推理设备 (CPU/GPU/GPU.0/GPU.1/NPU)", "Device (CPU/GPU/GPU.0/GPU.1/NPU)"))
     p.add_argument("--host", default="0.0.0.0")
     p.add_argument("--port", type=int, default=8080)
 

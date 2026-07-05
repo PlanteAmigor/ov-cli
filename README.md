@@ -595,6 +595,22 @@ Xe 驱动下多图 VLM 推理不再触发 GPU fence timeout（[#36260](https://g
 | **Gemma-4 31B** | int4 | 1577ms | 261ms | 3.9 | 9949ms | 437ms | 3.3 |
 | **Qwen3.6/35B** (思考关) | int4 | 1415ms | 221ms | 13.7 | 4543ms | 224ms | 13.6 |
 
+### Arc Pro B60 (dGPU, Battlemage G21)
+
+测试环境: Intel Arc Pro B60 (Battlemage G21) dGPU | openvino-genai 2026.2.0.0 | 3 轮预热
+
+| 模型 | 量化 | 32 1st | 32 2nd | 32 tok/s | 1024 1st | 1024 2nd | 1024 tok/s |
+|:-----|:----:|:------:|:------:|:--------:|:---------:|:---------:|:----------:|
+| **Qwen3.5/0.8B** | int8 | 282ms | 6ms | 167.7 | 297ms | 6ms | 153.7 |
+| **Hy-MT2/1.8B** | int4 | 167ms | 8ms | 133.1 | 199ms | 9ms | 123.5 |
+| **Qwen3/2B** | int8 | 215ms | 6ms | 174.3 | 353ms | 6ms | 147.7 |
+| **Qwen3.5/4B** | int4 AWQ | 335ms | 10ms | 98.1 | 520ms | 10ms | 94.4 |
+| **DeepSeek-R1-7B** | int4 | 240ms | 11ms | 89.2 | 553ms | 14ms | 77.7 |
+| **Qwen3/8B** | int4 AWQ | 268ms | 16ms | 67.3 | 704ms | 16ms | 57.9 |
+| **Gemma-4 E2B** | int4 | 551ms | 13ms | 83.5 | 766ms | 19ms | 58.6 |
+| **Qwen3/14B** | int4 | 366ms | 49ms | 41.2 | 921ms | 29ms | 36.8 |
+| **Qwen3.6/35B** (思考开) | int4 | 778ms | 18ms | 62.5 | 1030ms | 17ms | 56.3 |
+
 ## 项目结构
 
 ```

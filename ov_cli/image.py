@@ -28,9 +28,10 @@ def _choose_device():
     return "GPU" if "GPU" in ov.Core().available_devices else "CPU"
 
 
-def load_model(ov_path):
+def load_model(ov_path, device=None):
     """加载 Text2ImagePipeline。"""
-    device = _choose_device()
+    if not device:
+        device = _choose_device()
     print(f"  {TR('加载 Text2ImagePipeline ({})...', 'Loading Text2ImagePipeline ({})...').format(device)}", end=" ", flush=True, file=sys.stderr)
     t0 = time.time()
     pipe = ov_genai.Text2ImagePipeline(ov_path, device)
