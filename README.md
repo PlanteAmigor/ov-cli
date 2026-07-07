@@ -609,9 +609,10 @@ Xe 驱动下多图 VLM 推理不再触发 GPU fence timeout（[#36260](https://g
 | **Qwen3/8B** | int4 AWQ | 268ms | 16ms | 67.3 | 704ms | 16ms | 57.9 |
 | **Gemma-4 E2B** | int4 | 551ms | 13ms | 83.5 | 766ms | 19ms | 58.6 |
 | **Qwen3/14B** | int4 | 366ms | 49ms | 41.2 | 921ms | 29ms | 36.8 |
-| **Qwen3.6/35B** (思考开) | int4 | 778ms | 18ms | 62.5 | 1030ms | 17ms | 56.3 |
+| **Qwen3.5/35B** (思考开) | int4 | 376ms | 16ms | 63.6 | 844ms | 18ms | 60.3 |
+| **Qwen3.6/35B** (思考开) | int4 | 778ms | 18ms | 62.5 | 1030ms | 17ms | 56.3 | 
 
-## 项目结构
+项目结构
 
 ```
 ov-cli/

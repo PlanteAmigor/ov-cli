@@ -291,18 +291,18 @@ def main():
     p.add_argument("--top-k", type=int, default=40, dest="top_k")
     p.add_argument("--max-tokens", type=int, default=1024, dest="max_tokens")
     p.add_argument("--image", "-i"), p.add_argument("--reasoning", choices=["on","off"], default="on")
-    p.add_argument("--device", default="", help=TR("推理设备 (CPU/GPU/GPU.0/GPU.1/NPU)", "Device (CPU/GPU/GPU.0/GPU.1/NPU)"))
+    p.add_argument("--device", default="", help=TR("推理设备 (CPU/GPU/GPU.N/NPU)", "Device (CPU/GPU/GPU.N/NPU)") + TR("，留空自动选择", ", leave empty for auto)"))
 
     # benchmark
     p = sub.add_parser("benchmark", help=TR("基准测试", "Benchmark"))
     p.add_argument("--model", "-m", required=True)
     p.add_argument("--reasoning", choices=["on","off"], default="on")
-    p.add_argument("--device", default="", help=TR("推理设备 (CPU/GPU/GPU.0/GPU.1/NPU)", "Device (CPU/GPU/GPU.0/GPU.1/NPU)"))
+    p.add_argument("--device", default="", help=TR("推理设备 (CPU/GPU/GPU.N/NPU)", "Device (CPU/GPU/GPU.N/NPU)") + TR("，留空自动选择", ", leave empty for auto)"))
 
     # server
     p = sub.add_parser("server", help=TR("API服务", "Server"))
     p.add_argument("--model", "-m", required=True)
-    p.add_argument("--device", default="", help=TR("推理设备 (CPU/GPU/GPU.0/GPU.1/NPU)", "Device (CPU/GPU/GPU.0/GPU.1/NPU)"))
+    p.add_argument("--device", default="", help=TR("推理设备 (CPU/GPU/GPU.N/NPU)", "Device (CPU/GPU/GPU.N/NPU)") + TR("，留空自动选择", ", leave empty for auto)"))
     p.add_argument("--host", default="0.0.0.0")
     p.add_argument("--port", type=int, default=8080)
 
