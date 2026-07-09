@@ -27,6 +27,14 @@ def _run_genai_bench_detailed(pipe, prompt, reasoning=True):
 
     rss_before = _measure_rss()
 
+    # 统计输入 token 数
+    tok = pipe.get_tokenizer()
+    try:
+        input_enc = tok.encode(prompt)
+        input_tokens = input_enc.input_ids.shape[-1]
+    except Exception:
+        input_tokens = len(prompt.replace("\n", "")) // 2  # 近似
+
     # 计时：首 token / 第二 token / 总时间
     first_token_time = None
     second_token_time = None
@@ -49,7 +57,6 @@ def _run_genai_bench_detailed(pipe, prompt, reasoning=True):
     cfg = ov_genai.GenerationConfig(max_new_tokens=128)
     if not reasoning:
         try:
-            tok = pipe.get_tokenizer()
             think_id = int(list(tok.encode("<think>", add_special_tokens=False).input_ids.data)[0][0])
             nothink_id = int(list(tok.encode("</think>", add_special_tokens=False).input_ids.data)[0][0])
             cfg.reasoning_budget_tokens = 0
@@ -68,12 +75,14 @@ def _run_genai_bench_detailed(pipe, prompt, reasoning=True):
     max_rss = max(rss_before, rss_after)
 
     total_time = t_end - t_start
-    first_latency = (first_token_time - t_start) * 1000 if first_token_time else 0
+    prefill_time = (first_token_time - t_start) if first_token_time else total_time
+    first_latency = prefill_time * 1000
     second_latency = (second_token_time - first_token_time) * 1000 if second_token_time else 0
+    prefill_tps = input_tokens / prefill_time if prefill_time > 0 else 0
 
     # 实际 token 数：用 tokenizer 编码输出文本
     full_text = "".join(all_text)
-    tok_out = pipe.get_tokenizer().encode(full_text)
+    tok_out = tok.encode(full_text)
     actual_tokens = tok_out.input_ids.shape[-1]
 
     # tok/s = 实际 token / (总时间 - 首 token 延迟)
@@ -87,6 +96,8 @@ def _run_genai_bench_detailed(pipe, prompt, reasoning=True):
         "second_tps": second_tps,
         "total_tokens": actual_tokens,
         "total_time": total_time,
+        "prefill_tps": prefill_tps,
+        "input_tokens": input_tokens,
     }
 
 
@@ -209,9 +220,10 @@ def run_benchmark(model_path, reasoning=True, device=""):
             res = _run_genai_bench_detailed(pipe, _make_prompt(size) + "请详细解释这段话的含义。", reasoning)
 
         results[size] = res
-        print(f"    1st latency:    {res['first_latency']:>8.1f} ms")
-        print(f"    2nd latency:    {res['second_latency']:>8.1f} ms")
-        print(f"    2nd token/s:    {res['second_tps']:>8.1f}")
+        print(f"    prefill:        {res['prefill_tps']:>8.1f} tok/s ({res['input_tokens']} tok in {res['first_latency']/1000:.2f}s)")
+        print(f"    decode:         {res['second_tps']:>8.1f} tok/s")
+        print(f"    1st lat (TTFT):{res['first_latency']:>8.1f} ms")
+        print(f"    2nd lat:        {res['second_latency']:>8.1f} ms")
         print(f"    total tokens:   {res['total_tokens']:>8}")
         print(f"    total time:     {res['total_time']:>8.3f}s")
         print()
@@ -220,9 +232,9 @@ def run_benchmark(model_path, reasoning=True, device=""):
     print(f"{'='*60}")
     print(f"  汇总")
     print(f"{'='*60}")
-    print(f"  {'Input':>8} | {'1st lat':>8} | {'2nd lat':>8} | {'tok/s':>8}")
-    print(f"  {'-'*8}-+-{'-'*8}-+-{'-'*8}-+-{'-'*8}")
+    print(f"  {'Input':>8} | {'TTFT':>8} | {'prefill':>8} | {'2nd lat':>8} | {'decode':>8}")
+    print(f"  {'-'*8}-+-{'-'*8}-+-{'-'*8}-+-{'-'*8}-+-{'-'*8}")
     for size in input_sizes:
         r = results[size]
-        print(f"  {size:>8} | {r['first_latency']:>7.0f}ms | {r['second_latency']:>7.0f}ms | {r['second_tps']:>7.1f}")
+        print(f"  {r['input_tokens']:>8} | {r['first_latency']:>7.0f}ms | {r['prefill_tps']:>7.1f} | {r['second_latency']:>7.0f}ms | {r['second_tps']:>7.1f}")
     print()

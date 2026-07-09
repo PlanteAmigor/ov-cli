@@ -590,6 +590,7 @@ Xe 驱动下多图 VLM 推理不再触发 GPU fence timeout（[#36260](https://g
 | **Qwen3.5/4B** | int4 AWQ | 459ms | 48ms | 20.5 | 1706ms | 50ms | 19.1 |
 | **DeepSeek-7B** | int4 | 370ms | 61ms | 16.7 | 1693ms | 64ms | 16.1 |
 | **Qwen3/8B** | — | 383ms | 68ms | 15.2 | 2089ms | 73ms | 13.9 |
+| **Qwen3.6/27B** | int4 | 1217ms | 215ms | 5.0 | 7158ms | 211ms | 4.7 |
 | **Gemma-4 E2B** | int4 | 439ms | 53ms | 19.1 | 1432ms | 71ms | 13.9 |
 | **Qwen3/14B** | int4 | 509ms | 386ms | 8.0 | 3113ms | 266ms | 7.5 |
 | **Gemma-4 31B** | int4 | 1577ms | 261ms | 3.9 | 9949ms | 437ms | 3.3 |
@@ -609,6 +610,7 @@ Xe 驱动下多图 VLM 推理不再触发 GPU fence timeout（[#36260](https://g
 | **Qwen3/8B** | int4 AWQ | 268ms | 16ms | 67.3 | 704ms | 16ms | 57.9 |
 | **Gemma-4 E2B** | int4 | 551ms | 13ms | 83.5 | 766ms | 19ms | 58.6 |
 | **Qwen3/14B** | int4 | 366ms | 49ms | 41.2 | 921ms | 29ms | 36.8 |
+| **Qwen3.6/27B** | int4 | 445ms | 41ms | 24.7 | 1806ms | 44ms | 23.5 |
 | **Qwen3.5/35B** (思考开) | int4 | 376ms | 16ms | 63.6 | 844ms | 18ms | 60.3 |
 | **Qwen3.6/35B** (思考开) | int4 | 778ms | 18ms | 62.5 | 1030ms | 17ms | 56.3 | 
 
