@@ -567,14 +567,43 @@ Xe driver resolves GPU fence timeout with multi-image VLM ([#36260](https://gith
 | **Qwen3.5/0.8B** | — | 259ms | 25ms | 38.8 | 615ms | 30ms | 37.4 |
 | **Hy-MT2/1.8B** | int8 | 250ms | 29ms | 36.1 | 636ms | 31ms | 32.8 |
 | **Qwen3/2B** | — | 258ms | 29ms | 33.1 | 766ms | 34ms | 29.9 |
+| **bloomz-3B** | int4 | 203ms | 29ms | 31.6 | 122ms | 32ms | 30.5 |
+| **LFM2-24B** (MoE) | int4 | 512ms | 36ms | 27.4 | 878ms | 40ms | 25.5 |
+| **Qwen3-30B-A3B** (MoE) | int4 | 1138ms | 115ms | 26.8 | 6665ms | 124ms | 23.7 |
 | **Qwen3.5/4B** | int4 AWQ | 459ms | 48ms | 20.5 | 1706ms | 50ms | 19.1 |
+| **GPT-OSS 20B** (MoE) | int4 | 1187ms | 90ms | 21.4 | 7225ms | 98ms | 20.5 |
 | **DeepSeek-7B** | int4 | 370ms | 61ms | 16.7 | 1693ms | 64ms | 16.1 |
+| **Gemma-4 26B** (reasoning on) | int4 | 1228ms | 65ms | 15.6 | 6595ms | 77ms | 13.7 |
 | **Qwen3/8B** | — | 383ms | 68ms | 15.2 | 2089ms | 73ms | 13.9 |
 | **Qwen3.6/27B** | int4 | 1217ms | 215ms | 5.0 | 7158ms | 211ms | 4.7 |
 | **Gemma-4 E2B** | int4 | 439ms | 53ms | 19.1 | 1432ms | 71ms | 13.9 |
 | **Qwen3/14B** | int4 | 509ms | 386ms | 8.0 | 3113ms | 266ms | 7.5 |
+| **Qwen3.5/35B** (reasoning on) | int4 | 1163ms | 72ms | 14.1 | 4684ms | 76ms | 13.5 |
 | **Gemma-4 31B** | int4 | 1577ms | 261ms | 3.9 | 9949ms | 437ms | 3.3 |
 | **Qwen3.6/35B** (reasoning off) | int4 | 1415ms | 221ms | 13.7 | 4543ms | 224ms | 13.6 |
+
+### Arc Pro B60 (dGPU, Battlemage G21)
+
+Tested on: Intel Arc Pro B60 (Battlemage G21) dGPU | openvino-genai 2026.2.0.0 | 3 warmup rounds
+
+| Model | Quant | 32 1st | 32 2nd | 32 tok/s | 1024 1st | 1024 2nd | 1024 tok/s |
+|:-----|:----:|:------:|:------:|:--------:|:---------:|:---------:|:----------:|
+| **Qwen3.5/0.8B** | int8 | 282ms | 6ms | 167.7 | 297ms | 6ms | 153.7 |
+| **Hy-MT2/1.8B** | int4 | 167ms | 8ms | 133.1 | 199ms | 9ms | 123.5 |
+| **Qwen3/2B** | int8 | 215ms | 6ms | 174.3 | 353ms | 6ms | 147.7 |
+| **bloomz-3B** | int4 | 62ms | 4ms | 142.0 | 86ms | 7ms | 138.2 |
+| **Qwen3.5/4B** | int4 AWQ | 335ms | 10ms | 98.1 | 520ms | 10ms | 94.4 |
+| **Qwen3-30B-A3B** (MoE) | int4 | 645ms | 30ms | 98.2 | 686ms | 38ms | 80.9 |
+| **GPT-OSS 20B** (MoE) | int4 | 256ms | 22ms | 93.7 | 674ms | 24ms | 82.6 |
+| **DeepSeek-R1-7B** | int4 | 240ms | 11ms | 89.2 | 553ms | 14ms | 77.7 |
+| **Qwen3/8B** | int4 AWQ | 268ms | 16ms | 67.3 | 704ms | 16ms | 57.9 |
+| **Gemma-4 E2B** | int4 | 551ms | 13ms | 83.5 | 766ms | 19ms | 58.6 |
+| **Gemma-4 26B** (reasoning on) | int4 | 792ms | 16ms | 66.0 | 1025ms | 18ms | 58.7 |
+| **Qwen3/14B** | int4 | 366ms | 49ms | 41.2 | 921ms | 29ms | 36.8 |
+| **Qwen3.6/27B** | int4 | 445ms | 41ms | 24.7 | 1806ms | 44ms | 23.5 |
+| **LFM2-24B** (MoE) | int4 | 799ms | 40ms | 25.1 | 878ms | 42ms | 24.7 |
+| **Qwen3.5/35B** (reasoning on) | int4 | 376ms | 16ms | 63.6 | 844ms | 18ms | 60.3 |
+| **Qwen3.6/35B** (reasoning on) | int4 | 778ms | 18ms | 62.5 | 1030ms | 17ms | 56.3 |
 
 ## Project Structure
 
