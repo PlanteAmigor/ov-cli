@@ -49,4 +49,5 @@ rknn-llm/
 rknn-toolkit2/
 openvino/
 optimum-intel-new/
-optimum-intel-2.0.0/
+optimum-intel-2.0.0/.hmcl/
+_repro.py
