@@ -43,46 +43,6 @@ def _pip_path(venv_path):
     return os.path.join(venv_path, "bin", "pip")
 
 
-def _ensure_vscode_settings(venv_path, workspace):
-    """创建 VS Code 工作区设置，使终端自动激活虚拟环境"""
-    vscode_dir = os.path.join(workspace, ".vscode")
-    settings_path = os.path.join(vscode_dir, "settings.json")
-    os.makedirs(vscode_dir, exist_ok=True)
-
-    settings = {}
-    if os.path.isfile(settings_path):
-        with open(settings_path) as f:
-            try:
-                settings = json.load(f)
-            except json.JSONDecodeError:
-                settings = {}
-
-    rel_venv = os.path.relpath(venv_path, workspace)
-    py_path = os.path.join("${workspaceFolder}", rel_venv, "bin", "python")
-
-    changed = False
-    if settings.get("python.defaultInterpreterPath") != py_path:
-        settings["python.defaultInterpreterPath"] = py_path
-        changed = True
-    if not settings.get("python.terminal.activateEnvironment"):
-        settings["python.terminal.activateEnvironment"] = True
-        changed = True
-    if not settings.get("python.terminal.activateEnvInCurrentTerminal"):
-        settings["python.terminal.activateEnvInCurrentTerminal"] = True
-        changed = True
-    if "files.exclude" not in settings:
-        settings["files.exclude"] = {"**/__pycache__": True, "**/*.egg-info": True, "**/.venv": True}
-        changed = True
-    if "search.exclude" not in settings:
-        settings["search.exclude"] = {"**/.venv": True}
-        changed = True
-
-    if changed:
-        with open(settings_path, "w") as f:
-            json.dump(settings, f, indent=4, ensure_ascii=False)
-            f.write("\n")
-        print(f"  ✓ VS Code 设置已更新: .vscode/settings.json")
-
 
 _APT_DEPS = {
     "sox": {
@@ -130,43 +90,6 @@ def _check_ld_lib(lib):
         except Exception:
             return True  # 无法检测时放行
 
-
-def _apply_gemma4_patch():
-    """自动修复 optimum-intel 中 Gemma-4 共享 KV 层的属性引用错误。"""
-    patcher_path = None
-    try:
-        import optimum.exporters.openvino.model_patcher as mp
-        patcher_path = mp.__file__
-    except (ImportError, AttributeError, ModuleNotFoundError):
-        pass
-
-    if not patcher_path or not os.path.isfile(patcher_path):
-        return
-
-    with open(patcher_path) as f:
-        content = f.read()
-
-    old_line = "    if self.is_kv_shared_layer and past_key_values is not None:"
-    new_lines = """    if self.is_kv_shared_layer and past_key_values is not None:
-        # kv_shared_layer_index 需要在运行时计算
-        if not hasattr(self, "kv_shared_layer_index"):
-            first_shared = self.config.num_hidden_layers - getattr(self.config, "num_kv_shared_layers", 0)
-            prev_types = self.config.layer_types[:first_shared]
-            self.kv_shared_layer_index = len(prev_types) - 1 - prev_types[::-1].index(self.layer_type)
-        key_states, value_states = past_key_values.shared_layers[self.kv_shared_layer_index]"""
-
-    old = old_line + "\n        key_states, value_states = past_key_values.shared_layers[self.kv_shared_layer_index]"
-    new = new_lines
-    if old in content:
-        content = content.replace(old, new)
-        with open(patcher_path, "w") as f:
-            f.write(content)
-        print(f"  ✓ {TR('Gemma-4 补丁已应用', 'Gemma-4 patch applied')}: {os.path.basename(patcher_path)}")
-    else:
-        if "hasattr(self, \"kv_shared_layer_index\")" in content:
-            print(f"  ✓ {TR('Gemma-4 补丁已存在', 'Gemma-4 patch already applied')}")
-        else:
-            print(f"  - {TR('Gemma-4 补丁不需要或已不适用', 'Gemma-4 patch not needed or N/A')}")
 
 
 def _build_genai_from_source(venv_path, genai_src):
@@ -381,7 +304,6 @@ def cmd_setup(args, workspace):
         print(f"  {TR('修复模式: 升级依赖 + 重打补丁', 'Fix mode: upgrade deps + repatch')}")
         # 只修复已装的功能
         _install_features(pip, installed, workspace, fix_mode=True)
-        _apply_gemma4_patch()
         print(f"  {TR('✅ 修复完成', '✅ Fix done')}")
         return
 
@@ -471,11 +393,6 @@ def cmd_setup(args, workspace):
         print(f"  {TR('安装已取消', 'Setup cancelled')}")
         sys.exit(1)
 
-    # 补丁
-    _apply_gemma4_patch()
-
-    _ensure_vscode_settings(venv_path, workspace)
-
     # 编译 GenAI（仅 mode 2 且包含 chat）
     if mode == 2 and "chat" in features:
         _thinking_whl = os.path.join(workspace, "openvino-genai-thinking", "dist", "openvino_genai_thinking-2026.2.0.0-cp313-cp313-manylinux_2_41_x86_64.whl")
@@ -506,8 +423,3 @@ def cmd_setup(args, workspace):
     print(f"  {TR('💡 激活虚拟环境:', '💡 Activate venv:')}")
     print(f"     source {_activate_path(venv_path)}")
     print(f"  {TR('💡 或在 VS Code 中重新打开终端即可自动激活', '💡 Or just reopen terminal in VS Code for auto-activation')}")
-
-
-def _write_version_stamp(venv_path, workspace):
-    """（已废弃）保留桩函数避免引用错误。"""
-    pass
