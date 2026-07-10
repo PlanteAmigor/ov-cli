@@ -12,6 +12,9 @@ import ov_cli
 from ov_cli import TR
 from ov_cli.features import get_packages, get_extra_pips, get_exclusive_packages, get_installed, save as _save_features
 
+# 项目根目录
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 
 _ALL_FEATURES = {"chat", "image", "asr", "tts", "ui", "mcp", "server"}
 
@@ -30,8 +33,7 @@ def _is_windows():
     return sys.platform == "win32"
 
 
-def _features_path(venv_path):
-    return os.path.join(venv_path, ".ov-cli-features")
+
 
 
 def _activate_path(venv_path):
@@ -283,7 +285,7 @@ def _install_features(pip, features: set[str], workspace, fix_mode=False):
 
 def _remove_features(pip, venv_path, removed: set[str]):
     """卸载指定功能独有（不被其他已装功能需要）的 pip 包。"""
-    installed = get_installed(venv_path)
+    installed = get_installed()
     remaining = installed - removed
 
     if not removed:
@@ -329,7 +331,7 @@ def _remove_features(pip, venv_path, removed: set[str]):
         except subprocess.CalledProcessError:
             print(f"  ⚠ {TR('部分包卸载失败（可能已被手动移除）', 'Some packages may already be removed')}")
 
-    _save_features(venv_path, remaining)
+    _save_features(remaining)
     print(f"  ✓ {TR('已更新安装记录', 'Features list updated')}: {', '.join(sorted(remaining))}")
     print(f"  {TR('基础依赖（openvino 等）始终保持不变', 'Base deps (openvino etc.) are kept')}")
     print(f"  {TR('如需彻底清理，可重建环境', 'For full cleanup, recreate with ./ov-cli setup')}")
@@ -353,21 +355,14 @@ def cmd_setup(args, workspace):
 
     # ── 修复模式 ──
     if args.fix:
-        venv_path = args.venv or os.path.join(workspace, ".venv")
+        venv_path = os.path.join(workspace, ".venv")
         if not os.path.isdir(venv_path):
             print(f"  {TR('错误: 未找到虚拟环境', 'Error: venv not found')}: {venv_path}")
             print(f"  {TR('请先运行', 'Run first')}: ./ov-cli setup")
             sys.exit(1)
         pip = _pip_path(venv_path)
 
-        # 读取已装功能
-        installed = set()
-        fp = _features_path(venv_path)
-        if os.path.isfile(fp):
-            with open(fp) as f:
-                installed = {s.strip() for s in f.read().strip().split(",") if s.strip()}
-        if not installed:
-            installed = _ALL_FEATURES
+        installed = get_installed()
 
         _mode_file = os.path.join(venv_path, ".ov-cli-mode")
         _prev_mode = None
@@ -401,7 +396,7 @@ def cmd_setup(args, workspace):
     if args.remove_features:
         raw = args.remove_features.strip()
         to_remove = {s.strip() for s in raw.split(",") if s.strip()}
-        venv_path = args.venv or os.path.join(workspace, ".venv")
+        venv_path = os.path.join(workspace, ".venv")
         if not os.path.isdir(venv_path):
             print(f"  {TR('错误: 未找到虚拟环境', 'Error: venv not found')}: {venv_path}")
             print(f"  {TR('请先运行', 'Run first')}: ./ov-cli setup")
@@ -470,7 +465,7 @@ def cmd_setup(args, workspace):
             sys.exit(1)
 
     try:
-        venv_path = args.venv or os.path.join(workspace, ".venv")
+        venv_path = os.path.join(workspace, ".venv")
         print(f"  {TR('创建虚拟环境', 'Creating venv')}: {venv_path}")
         subprocess.check_call([sys.executable, "-m", "venv", venv_path, "--clear"])
         pip = _pip_path(venv_path)
@@ -507,7 +502,7 @@ def cmd_setup(args, workspace):
             _build_genai_from_source(venv_path, genai_src)
 
     # ── 记录安装信息 ──
-    _save_features(venv_path, features)
+    _save_features(features)
 
     _mode_file = os.path.join(venv_path, ".ov-cli-mode")
     with open(_mode_file, "w") as f:

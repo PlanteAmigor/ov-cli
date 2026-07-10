@@ -14,29 +14,28 @@ ov-cli features: 按需安装的功能模块管理。
 
 import os
 
-_FEATURES_FILE = ".ov-cli-features"
+# 项目根目录（ov_cli/features.py → ov_cli/ → 项目根）
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_FEATURES_PATH = os.path.join(_PROJECT_ROOT, ".ov-cli-features")
 
 
-def get_installed(venv_path: str) -> set[str]:
+def get_installed() -> set[str]:
     """读取已安装的功能列表。"""
-    path = os.path.join(venv_path, _FEATURES_FILE)
-    if not os.path.isfile(path):
-        # 旧版本未记录 → 假设全装
+    if not os.path.isfile(_FEATURES_PATH):
         return {"chat", "image", "asr", "tts", "ui", "mcp", "server"}
-    with open(path) as f:
+    with open(_FEATURES_PATH) as f:
         return {s.strip() for s in f.read().strip().split(",") if s.strip()}
 
 
-def save(venv_path: str, features: set[str]):
+def save(features: set[str]):
     """写入已安装的功能列表。"""
-    path = os.path.join(venv_path, _FEATURES_FILE)
-    with open(path, "w") as f:
+    with open(_FEATURES_PATH, "w") as f:
         f.write(",".join(sorted(features)) + "\n")
 
 
-def has(venv_path: str, feature: str) -> bool:
+def has(feature: str) -> bool:
     """检查某功能是否已安装。"""
-    return feature in get_installed(venv_path)
+    return feature in get_installed()
 
 
 # ── 功能 → pip 包映射 ──
