@@ -29,10 +29,6 @@ _FEATURE_HINTS = {
 }
 
 
-
-
-
-
 def _activate_path(venv_path):
     """返回虚拟环境的 activate 脚本路径。"""
     return os.path.join(venv_path, "bin", "activate")
@@ -179,7 +175,7 @@ def _install_features(pip, features: set[str], workspace, fix_mode=False):
         print(f"  {TR('安装基础依赖...', 'Installing base deps...')}")
         subprocess.check_call([pip, "install", "-v"] + pkgs)
 
-    # 修复模式下：升级 huggingface-hub + 重打补丁，跳过 optimum-intel 重装
+    # 修复模式下：仅升级 huggingface-hub + transformers
     if fix_mode:
         subprocess.check_call([pip, "install", "--upgrade", "huggingface-hub", "transformers"])
         return
@@ -301,7 +297,7 @@ def cmd_setup(args, workspace):
                     print(f"  {TR('✅ 已升级到完整模式', '✅ Upgraded to full mode')}")
                     return
 
-        print(f"  {TR('修复模式: 升级依赖 + 重打补丁', 'Fix mode: upgrade deps + repatch')}")
+        print(f"  {TR('修复模式: 升级依赖', 'Fix mode: upgrade deps')}")
         # 只修复已装的功能
         _install_features(pip, installed, workspace, fix_mode=True)
         print(f"  {TR('✅ 修复完成', '✅ Fix done')}")
@@ -420,6 +416,3 @@ def cmd_setup(args, workspace):
 
     print()
     print(f"  {TR('✅ 完成!', '✅ Done!')}")
-    print(f"  {TR('💡 激活虚拟环境:', '💡 Activate venv:')}")
-    print(f"     source {_activate_path(venv_path)}")
-    print(f"  {TR('💡 或在 VS Code 中重新打开终端即可自动激活', '💡 Or just reopen terminal in VS Code for auto-activation')}")
