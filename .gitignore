@@ -51,4 +51,5 @@ openvino/
 optimum-intel-new/
 optimum-intel-2.0.0/.hmcl/
 _repro.py
-.hmcl/.ov-cli-features
+.hmcl/
+.ov-cli-features

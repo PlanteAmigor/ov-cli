@@ -29,24 +29,17 @@ _FEATURE_HINTS = {
 }
 
 
-def _is_windows():
-    return sys.platform == "win32"
-
 
 
 
 
 def _activate_path(venv_path):
     """返回虚拟环境的 activate 脚本路径。"""
-    if _is_windows():
-        return os.path.join(venv_path, "Scripts", "activate")
     return os.path.join(venv_path, "bin", "activate")
 
 
 def _pip_path(venv_path):
     """返回虚拟环境的 pip 路径。"""
-    if _is_windows():
-        return os.path.join(venv_path, "Scripts", "pip.exe")
     return os.path.join(venv_path, "bin", "pip")
 
 
