@@ -6,9 +6,9 @@ ov-cli chat: LLM 聊天/翻译终端。
 """
 
 import os, sys, time, json, re, signal, threading
+import readline  # 激活 input() 的 ←→↑↓ + 历史记录
 import openvino as ov
 import openvino_genai as ov_genai
-from wcwidth import wcwidth, wcswidth
 
 
 # 翻译语言映射：代码 → (中文名, 英文名)
@@ -252,46 +252,18 @@ def run_pipe(ctx, reasoning=True, max_tokens=1024, temperature=0.7):
         pass
 
 
-# ── 行编辑器 ────────────────────────────────────────────
-# 支持方向键、Home/End、退格、Delete、历史记录（仿 llama.cpp）
+# ── 行编辑器（简单版本） ──────────────────────────────
 
 
 def has_chinese(text):
     return any('\u4e00' <= c <= '\u9fff' for c in text[:30])
 
 
-def read_multiline(prompt=">>> "):
-    import sys as _sys
-    if _sys.platform == "win32":
-        try:
-            return input(prompt)
-        except EOFError:
-            return ""
+def readline():
     try:
-        line = input(prompt)
+        return input(">>> ")
     except EOFError:
         return ""
-    if not line:
-        return ""
-    import select
-    lines = [line.rstrip("\n")]
-    try:
-        while True:
-            try:
-                r, _, _ = select.select([sys.stdin], [], [], 0.1)
-            except (ValueError, TypeError):
-                from . import TR
-                print(f"  {TR('交互式输入不支持管道，请使用 --mode once', 'Interactive input does not support pipe, use --mode once')}")
-                break
-            if not r:
-                break
-            more = sys.stdin.readline()
-            if not more:
-                break
-            lines.append(more.rstrip("\n"))
-    except EOFError:
-        pass
-    return "\n".join(lines)
 
 
 def _count_tokens(ctx, text):
@@ -306,250 +278,6 @@ def _count_tokens(ctx, text):
     except Exception:
         return 0
 
-
-_hist = []
-_hist_idx = -1
-_in_readline = False
-
-
-
-def _char_width(ch):
-    if ch == "\n":
-        return 0
-    return max(wcwidth(ch), 1)
-
-
-def _total_width(chars, start=0, end=None):
-    if end is None:
-        end = len(chars)
-    if start >= end:
-        return 0
-    # 只计算当前行（最后一个 \n 之后）的宽度
-    s = "".join(chars[start:end])
-    if "\n" in s:
-        s = s.rsplit("\n", 1)[1]
-    return wcswidth(s)
-
-
-def _move_cursor(delta):
-    if delta < 0:
-        import sys as _sys
-        _sys.stdout.write("\b" * (-delta))
-    elif delta > 0:
-        import sys as _sys
-        _sys.stdout.write("\033[C" * delta)
-
-
-def _clear_line(_total_w):
-    import sys as _sys
-    _sys.stdout.write("\r\033[K")
-
-
-def _draw_prompt():
-    import sys as _sys
-    _sys.stdout.write(">>> ")
-
-
-def readline():
-    global _hist, _hist_idx, _in_readline
-    import os as _os
-    if _in_readline or _os.name == "nt":
-        try:
-            return input(">>> ")
-        except EOFError:
-            return ""
-    _in_readline = True
-
-    import sys as _sys, tty, termios
-    fd = _sys.stdin.fileno()
-    old = termios.tcgetattr(fd)
-    tty.setraw(fd)
-
-    buf, widths = [], []
-    char_pos = 0
-
-    try:
-        _draw_prompt()
-        _sys.stdout.flush()
-        while True:
-            raw = _os.read(fd, 1)
-            if not raw:
-                break
-            b = raw[0]
-            if b == 3:
-                raise KeyboardInterrupt
-            if b == 4:
-                break
-            if b in (13, 10):
-                # 取当前行（光标所在行，从上一个 \n 到光标）的内容
-                before = "".join(buf[:char_pos])
-                cur_line = before.rsplit("\n", 1)[1] if "\n" in before else before
-                if cur_line:  # 当前行有内容 → 换行继续输入
-                    buf.insert(char_pos, "\n")
-                    widths.insert(char_pos, 0)
-                    char_pos += 1
-                    _sys.stdout.write("\r\n")
-                    _sys.stdout.flush()
-                    continue
-                # 当前行无内容 → 提交
-                _sys.stdout.write("\r\n")
-                _sys.stdout.flush()
-                break
-            if b == 9:
-                continue
-
-            if b & 0xE0 == 0xC0:
-                raw += _os.read(fd, 1)
-            elif b & 0xF0 == 0xE0:
-                raw += _os.read(fd, 2)
-            elif b & 0xF8 == 0xF0:
-                raw += _os.read(fd, 3)
-            ch = raw.decode("utf-8", errors="replace")
-
-            if b == 27:
-                nxt = _os.read(fd, 1)
-                if nxt == b"[":
-                    params = b""
-                    while True:
-                        c = _os.read(fd, 1)
-                        if c in [b"A", b"B", b"C", b"D", b"H", b"F", b"~"] or (c.isalpha() and c.isupper()):
-                            code = c
-                            if code == b"3":
-                                _os.read(fd, 1)
-                            break
-                        params += c
-                    if code == b"D" and char_pos > 0:
-                        char_pos -= 1
-                        _move_cursor(-_char_width(buf[char_pos]))
-                    elif code == b"C" and char_pos < len(buf):
-                        _move_cursor(_char_width(buf[char_pos]))
-                        char_pos += 1
-                    elif code == b"H":
-                        _move_cursor(-_total_width(buf[:char_pos]))
-                        char_pos = 0
-                    elif code == b"F":
-                        _move_cursor(_total_width(buf[char_pos:]))
-                        char_pos = len(buf)
-                    elif code == b"A":
-                        char_pos = _hist_up(buf, widths, char_pos)
-                    elif code == b"B":
-                        char_pos = _hist_down(buf, widths, char_pos)
-                    elif code == b"~" and params == b"3":
-                        if char_pos < len(buf):
-                            dw = _char_width(buf[char_pos])
-                            del buf[char_pos]
-                            del widths[char_pos]
-                            tail = "".join(buf[char_pos:])
-                            _sys.stdout.write(tail + " ")
-                            _move_cursor(-_total_width(buf[char_pos:]) - dw - 1)
-                        _sys.stdout.flush()
-                _sys.stdout.flush()
-                continue
-
-            if b in (127, 8):
-                if char_pos > 0:
-                    dw = _char_width(buf[char_pos - 1])
-                    is_nl = buf[char_pos - 1] == "\n"
-                    del buf[char_pos - 1]
-                    del widths[char_pos - 1]
-                    char_pos -= 1
-                    if is_nl:
-                        _sys.stdout.write("\033[A")  # 光标上移一行
-                        # 清除当前行并重新绘制后续文本
-                        import shutil
-                        cols = shutil.get_terminal_size().columns
-                        _sys.stdout.write("\r\033[K")
-                        tail = "".join(buf[char_pos:])
-                        _sys.stdout.write(tail)
-                        _move_cursor(-_total_width(buf[char_pos:]))
-                    else:
-                        _move_cursor(-dw)
-                        tail = "".join(buf[char_pos:])
-                        _sys.stdout.write(tail + " ")
-                        _move_cursor(-_total_width(buf[char_pos:]) - 1)
-                _sys.stdout.flush()
-                continue
-
-            w = _char_width(ch)
-            if char_pos == len(buf):
-                _sys.stdout.write(ch)
-            else:
-                tail = "".join(buf[char_pos:])
-                _sys.stdout.write(ch + tail)
-                _move_cursor(-_total_width(buf[char_pos:]))
-            buf.insert(char_pos, ch)
-            widths.insert(char_pos, w)
-            char_pos += 1
-            _sys.stdout.flush()
-    finally:
-        termios.tcsetattr(fd, termios.TCSANOW, old)
-        _in_readline = False
-
-    line = "".join(buf)
-    if line:
-        _hist.append(line)
-    _hist_idx = -1
-    return line
-
-
-def _hist_up(buf, widths, char_pos):
-    global _hist_idx, _hist_buf
-    import sys as _sys
-    if not _hist:
-        return char_pos
-    if _hist_idx == -1:
-        _hist_buf = "".join(buf)
-    if _hist_idx + 1 < len(_hist):
-        _hist_idx += 1
-        s = _hist[-(_hist_idx + 1)]
-        _sys.stdout.write("\r")
-        _clear_line(_total_width(buf))
-        _draw_prompt()
-        for c in s:
-            _sys.stdout.write(c)
-        buf.clear()
-        buf.extend(s)
-        widths.clear()
-        widths.extend(_char_width(c) for c in s)
-        return len(s)
-    return char_pos
-
-
-def _hist_down(buf, widths, char_pos):
-    global _hist_idx, _hist_buf
-    import sys as _sys
-    if _hist_idx <= 0:
-        if _hist_idx == 0:
-            _sys.stdout.write("\r")
-            _clear_line(_total_width(buf))
-            _draw_prompt()
-            for c in _hist_buf:
-                _sys.stdout.write(c)
-            buf.clear()
-            buf.extend(_hist_buf)
-            widths.clear()
-            widths.extend(_char_width(c) for c in _hist_buf)
-            _hist_idx = -1
-            return len(_hist_buf)
-        return char_pos
-    _hist_idx -= 1
-    s = _hist[-(_hist_idx + 1)]
-    _move_cursor(-_total_width(buf[:char_pos]) - 4)
-    _clear_line(_total_width(buf))
-    _draw_prompt()
-    for c in s:
-        _sys.stdout.write(c)
-    buf.clear()
-    buf.extend(s)
-    widths.clear()
-    widths.extend(_char_width(c) for c in s)
-    return len(s)
-
-
-_hist = []
-_hist_idx = -1
-_in_readline = False
-_hist_buf = ""
 
 def run_once(ctx, prompt="", files=None, output=None,
              temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024,
@@ -911,8 +639,6 @@ def _pdf_to_images(path):
         os.close(old_stderr_fd)
         sys.stderr = old_sys_stderr
     print()
-    return images
-
     return images
 
 

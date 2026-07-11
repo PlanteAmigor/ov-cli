@@ -53,3 +53,8 @@ optimum-intel-2.0.0/.hmcl/
 _repro.py
 .hmcl/
 .ov-cli-features
+openvino.genai/
+openvino.genai-thinking-patched/
+test_thinking_all.py/
+backup/
+rk-ov/

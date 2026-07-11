@@ -41,7 +41,7 @@ def has(feature: str) -> bool:
 # ── 功能 → pip 包映射 ──
 
 _FEATURE_PACKAGES = {
-    "chat":     ["wcwidth", "PyMuPDF", "soxr"],
+    "chat":     ["PyMuPDF", "soxr"],
     "image":    [],
     "asr":      ["soundfile", "scipy"],
     "tts":      ["soundfile", "sox"],

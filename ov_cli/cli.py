@@ -11,16 +11,28 @@ from ov_cli.setup import cmd_setup
 _WORKSPACE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def _check_version_warning():
-    """每次运行都提示 --fix，确保用户及时升级依赖。"""
-    print(f"  \u26a0 {TR('建议运行 ./ov-cli setup --fix 更新依赖', 'Run ./ov-cli setup --fix to update deps')}")
+# ── 功能检查装饰器 ──────────────────────────────────────────
+
+def _require(feature, hint=None):
+    """装饰器：检查指定 feature 是否已安装，否则退出。"""
+    def deco(fn):
+        def wrapper(*a, **kw):
+            from .features import has
+            if not has(feature):
+                hint_text = hint or f"./ov-cli setup --with {feature}"
+                print(f"  ⚠ {TR(f'{feature} 模块未安装，请运行:', f'{feature} not installed, run:')} {hint_text}")
+                sys.exit(1)
+            return fn(*a, **kw)
+        return wrapper
+    return deco
 
 
 def _check_wsl2_gpu():
     """WSL2 下检查 Intel GPU runtime。"""
-    import subprocess
     try:
-        subprocess.run(["grep", "-qi", "microsoft", "/proc/version"], capture_output=True, check=True)
+        with open("/proc/version") as f:
+            if "microsoft" not in f.read().lower():
+                return
     except Exception:
         return
     try:
@@ -35,23 +47,17 @@ def _check_wsl2_gpu():
 
 
 
+@_require("chat", hint="./ov-cli setup --with chat")
 def cmd_benchmark(args):
     """ov-cli benchmark"""
-    from .features import has as _has_feature
-    if not _has_feature("chat"):
-        print(f"  ⚠ {TR('benchmark 需要 chat 模块，请运行:', 'benchmark needs chat, run:')} ./ov-cli setup --with chat")
-        sys.exit(1)
     from .benchmark import run_benchmark
     ov_path = os.path.abspath(args.model)
     run_benchmark(ov_path, args.reasoning == "on", device=args.device)
 
 
+@_require("server", hint="./ov-cli setup --with server")
 def cmd_server(args):
     """ov-cli server: 启动 API 服务"""
-    from .features import has as _has_feature
-    if not _has_feature("server"):
-        print(f"  ⚠ {TR('server 模块未安装，请运行:', 'server not installed, run:')} ./ov-cli setup --with server")
-        sys.exit(1)
     from .server import run_server
     model_path = os.path.abspath(args.model)
     if not os.path.isdir(model_path):
@@ -60,12 +66,9 @@ def cmd_server(args):
     run_server(model_path, args.device, args.host, args.port)
 
 
+@_require("image", hint="./ov-cli setup --with image")
 def cmd_image(args):
     """ov-cli image: 文生图"""
-    from .features import has as _has_feature
-    if not _has_feature("image"):
-        print(f"  ⚠ {TR('image 模块未安装，请运行:', 'image not installed, run:')} ./ov-cli setup --with image")
-        sys.exit(1)
     from .image import load_model, run_once, run_generate, run_pipe
     ov_path = os.path.abspath(args.model)
     if not os.path.isdir(ov_path):
@@ -88,12 +91,9 @@ def cmd_image(args):
                      steps=args.steps, guidance=args.guidance)
 
 
+@_require("tts", hint="./ov-cli setup --with tts")
 def cmd_tts(args):
     """ov-cli tts: 语音合成"""
-    from .features import has as _has_feature
-    if not _has_feature("tts"):
-        print(f"  ⚠ {TR('tts 模块未安装，请运行:', 'tts not installed, run:')} ./ov-cli setup --with tts")
-        sys.exit(1)
     from .tts import load_model, run_once, run_pipe, detect_model_type
     ov_path = os.path.abspath(args.model)
     if not os.path.isdir(ov_path):
@@ -124,21 +124,15 @@ def cmd_tts(args):
              instruct=args.instruct, ref_audio=args.ref_audio,
              warmup=not args.no_warmup, json_output=args.json)
 
+@_require("ui", hint="./ov-cli setup --with ui")
 def cmd_ui(args):
     """ov-cli ui: 网页界面"""
-    from .features import has as _has_feature
-    if not _has_feature("ui"):
-        print(f"  ⚠ {TR('ui 模块未安装，请运行:', 'ui not installed, run:')} ./ov-cli setup --with ui")
-        sys.exit(1)
     from .ui import launch_ui
     launch_ui(model_path=args.model, device=args.device, port=args.port, share=args.share, reasoning=args.reasoning == "on")
 
+@_require("chat", hint="./ov-cli setup --with chat")
 def cmd_chat(args):
     """ov-cli chat"""
-    from .features import has as _has_feature
-    if not _has_feature("chat"):
-        print(f"  ⚠ {TR('chat 模块未安装，请运行:', 'chat not installed, run:')} ./ov-cli setup --with chat")
-        sys.exit(1)
     from .chat import load_model, run_chat, run_translate
     if args.reasoning == "off" and args.mode != "translate":
         print(f"  {TR('💡 提示', '💡 Hint')}: "
@@ -175,12 +169,9 @@ def cmd_chat(args):
                  reasoning=args.reasoning == "on")
 
 
+@_require("asr", hint="./ov-cli setup --with asr")
 def cmd_asr(args):
     """ov-cli asr: 语音转文字"""
-    from .features import has as _has_feature
-    if not _has_feature("asr"):
-        print(f"  ⚠ {TR('asr 模块未安装，请运行:', 'asr not installed, run:')} ./ov-cli setup --with asr")
-        sys.exit(1)
     from .asr import load_model, run_once, run_whisper, run_pipe
     ov_path = os.path.abspath(args.model)
     if not os.path.isdir(ov_path):
@@ -198,12 +189,9 @@ def cmd_asr(args):
         run_whisper(ctx, lang=args.lang)
 
 
+@_require("mcp", hint="./ov-cli setup --with mcp")
 def cmd_mcp(args):
     """ov-cli mcp: MCP 协议服务器"""
-    from .features import has as _has_feature
-    if not _has_feature("mcp"):
-        print(f"  ⚠ {TR('mcp 模块未安装，请运行:', 'mcp not installed, run:')} ./ov-cli setup --with mcp")
-        sys.exit(1)
     from .mcp import run_mcp
     ov_path = os.path.abspath(args.model)
     run_mcp(ov_path)
@@ -211,36 +199,32 @@ def cmd_mcp(args):
 
 # ── 帮助文本 ──
 
-def _build_help():
-    zh = ov_cli._LANG == "zh"
-    if zh:
-        desc = "ov-cli — 基于 OpenVINO 的 LLM 本地推理工具箱\n轻量、离线、CPU/GPU 皆可运行。"
-        epilog = (
-            "📖 使用示例:\n\n"
-            "  ./ov-cli setup\n"
-            "  ./ov-cli chat --model ./gemma-4-E2B-it-ov-int4\n"
-            "  ./ov-cli asr --model ./whisper/ov-large\n"
-            "  ./ov-cli image --model ./FLUX/ov-int4\n"
-            "  ./ov-cli tts --model ./0.6B-CV-ov --prompt 你好 --speaker Vivian\n"
-            "  ./ov-cli ui --model ./model-ov\n"
-            "  ./ov-cli server --model ./model-ov --port 8080\n"
-            "  ./ov-cli setup --fix\n"
-        )
-    else:
-        desc = "ov-cli — OpenVINO-powered LLM local inference toolkit."
-        epilog = (
-            "📖 Examples:\n\n"
-            "  ./ov-cli setup\n"
-            "  ./ov-cli chat --model ./gemma-4-E2B-it-ov-int4\n"
-            "  ./ov-cli asr --model ./whisper/ov-large\n"
-            "  ./ov-cli image --model ./FLUX/ov-int4\n"
-            "  ./ov-cli tts --model ./0.6B-CV-ov --prompt hello --speaker vivian\n"
-            "  ./ov-cli ui --model ./model-ov\n"
-            "  ./ov-cli server --model ./model-ov --port 8080\n"
-            "  ./ov-cli mcp --model ./model-ov\n"
-            "  ./ov-cli setup --fix\n"
-        )
-    return desc, epilog
+_HELP_DESC_ZH = "ov-cli — 基于 OpenVINO 的 LLM 本地推理工具箱\n轻量、离线、CPU/GPU 皆可运行。"
+_HELP_DESC_EN = "ov-cli — OpenVINO-powered LLM local inference toolkit."
+
+_HELP_EPILOG_ZH = (
+    "📖 使用示例:\n\n"
+    "  ./ov-cli setup\n"
+    "  ./ov-cli chat --model ./gemma-4-E2B-it-ov-int4\n"
+    "  ./ov-cli asr --model ./whisper/ov-large\n"
+    "  ./ov-cli image --model ./FLUX/ov-int4\n"
+    "  ./ov-cli tts --model ./0.6B-CV-ov --prompt 你好 --speaker Vivian\n"
+    "  ./ov-cli ui --model ./model-ov\n"
+    "  ./ov-cli server --model ./model-ov --port 8080\n"
+    "  ./ov-cli setup --fix\n"
+)
+_HELP_EPILOG_EN = (
+    "📖 Examples:\n\n"
+    "  ./ov-cli setup\n"
+    "  ./ov-cli chat --model ./gemma-4-E2B-it-ov-int4\n"
+    "  ./ov-cli asr --model ./whisper/ov-large\n"
+    "  ./ov-cli image --model ./FLUX/ov-int4\n"
+    "  ./ov-cli tts --model ./0.6B-CV-ov --prompt hello --speaker vivian\n"
+    "  ./ov-cli ui --model ./model-ov\n"
+    "  ./ov-cli server --model ./model-ov --port 8080\n"
+    "  ./ov-cli mcp --model ./model-ov\n"
+    "  ./ov-cli setup --fix\n"
+)
 
 
 # ── 入口 ──
@@ -255,7 +239,9 @@ def main():
             ov_cli._LANG = a.split("=", 1)[1]
             break
 
-    desc, epilog = _build_help()
+    zh = ov_cli._LANG == "zh"
+    desc = _HELP_DESC_ZH if zh else _HELP_DESC_EN
+    epilog = _HELP_EPILOG_ZH if zh else _HELP_EPILOG_EN
     parser = argparse.ArgumentParser(prog="ov-cli", description=desc,
         formatter_class=argparse.RawDescriptionHelpFormatter, epilog=epilog)
     parser.add_argument("--lang", choices=["zh", "en"])
@@ -383,8 +369,6 @@ def main():
     args = parser.parse_args()
     if args.lang:
         ov_cli._LANG = args.lang
-    if args.cmd != "setup":
-        _check_version_warning()
     if args.cmd not in ("setup",):
         _check_wsl2_gpu()
 
