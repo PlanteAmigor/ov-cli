@@ -5,6 +5,7 @@ ov-cli setup: 虚拟环境创建与依赖安装。
   ./ov-cli setup --with chat,image
   ./ov-cli setup --with all
   ./ov-cli setup --fix
+  ./ov-cli setup --remove asr
 """
 
 import os, sys, json, shutil, subprocess, tempfile
@@ -85,87 +86,6 @@ def _check_ld_lib(lib):
             return r.returncode == 0
         except Exception:
             return True  # 无法检测时放行
-
-
-
-def _build_genai_from_source(venv_path, genai_src):
-    """从源码编译 openvino-genai 并安装到虚拟环境。"""
-    import sysconfig
-
-    build_dir = os.path.join(genai_src, "build")
-    if os.path.isdir(build_dir):
-        shutil.rmtree(build_dir)
-
-    site_packages = os.path.join(venv_path, "lib", f"python{sys.version_info.major}.{sys.version_info.minor}", "site-packages")
-    openvino_dir = os.path.join(site_packages, "openvino", "cmake")
-    if not os.path.isdir(openvino_dir):
-        print(f"  ⚠ {TR('找不到 OpenVINO cmake 配置', 'OpenVINO cmake not found')}")
-        print(f"    {TR('请确保已安装 openvino', 'Make sure openvino is installed')}")
-        return False
-
-    env = os.environ.copy()
-    env["OpenVINO_DIR"] = openvino_dir
-
-    print(f"  {TR('配置 GenAI 源码...', 'Configuring GenAI source...')}")
-    try:
-        subprocess.check_call([
-            "cmake", "-DCMAKE_BUILD_TYPE=Release",
-            "-DBUILD_TOKENIZERS=OFF",
-            "-DENABLE_TOOLS=OFF",
-            "-DENABLE_TESTS=OFF",
-            "-DENABLE_SAMPLES=OFF",
-            "-DENABLE_GGUF=OFF",
-            "-DENABLE_XGRAMMAR=OFF",
-            "-S", genai_src, "-B", build_dir,
-        ], env=env)
-    except Exception as e:
-        print(f"  ⚠ {TR('cmake 配置失败', 'cmake configuration failed')}: {e}")
-        return False
-
-    print(f"  {TR('编译 GenAI...', 'Building GenAI...')}")
-    try:
-        subprocess.check_call(["cmake", "--build", build_dir, "--config", "Release", "-j"], env=env)
-    except Exception as e:
-        print(f"  ⚠ {TR('编译失败', 'Build failed')}: {e}")
-        return False
-
-    genai_out = os.path.join(build_dir, "openvino_genai")
-    target = os.path.join(site_packages, "openvino_genai")
-    ext = sysconfig.get_config_var("EXT_SUFFIX") or ".so"
-    libsrc = os.path.join(genai_out, "libopenvino_genai.so")
-    pysrc = os.path.join(genai_out, f"py_openvino_genai{ext}")
-    if os.path.isfile(pysrc) and os.path.isfile(libsrc):
-        try:
-            subprocess.check_call(["patchelf", "--set-rpath", f"$ORIGIN:{target}", pysrc])
-        except Exception:
-            pass
-        shutil.copy2(libsrc, os.path.join(target, "libopenvino_genai.so"))
-        shutil.copy2(libsrc, os.path.join(target, "libopenvino_genai.so.2620"))
-        shutil.copy2(pysrc, target)
-        print(f"  ✓ {TR('已安装', 'Installed')}: libopenvino_genai.so + py_openvino_genai{ext}")
-
-    print(f"  ✓ {TR('GenAI 编译安装完成', 'GenAI build & install complete')}")
-    return True
-
-
-def _prompt_mode(has_genai_src):
-    """交互选择安装模式：1=简易 2=完整（编译 GenAI）"""
-    if not has_genai_src:
-        print(f"  - {TR('GenAI 源码目录不存在，使用简易模式', 'No GenAI source, using simple mode')}")
-        return 1
-    while True:
-        try:
-            r = input(f"  {TR('选择安装模式', 'Select mode')}:\n"
-                      f"    1. {TR('简易模式 - 仅 pip 安装', 'Simple - pip only')}\n"
-                      f"    2. {TR('完整模式 - 安装修改版 openvino-genai 启用 thinking budget', 'Full - install patched openvino-genai for thinking budget')}\n"
-                      f"  {TR('请输入 [1/2]', 'Enter [1/2]')} (1): ")
-            if r.strip() == "":
-                return 1
-            m = int(r.strip())
-            if m in (1, 2):
-                return m
-        except (ValueError, EOFError):
-            return 1
 
 
 def _install_features(pip, features: set[str], workspace, fix_mode=False):
@@ -276,27 +196,6 @@ def cmd_setup(args, workspace):
 
         installed = get_installed()
 
-        _mode_file = os.path.join(venv_path, ".ov-cli-mode")
-        _prev_mode = None
-        if os.path.isfile(_mode_file):
-            with open(_mode_file) as f:
-                _prev_mode = f.read().strip()
-        _genai_src = os.path.join(workspace, "openvino.genai-2026.2.0.0-optimization")
-
-        # 简易→完整升级路径
-        if _prev_mode != "2":
-            _thinking_whl = os.path.join(workspace, "openvino-genai-thinking", "dist",
-                                         "openvino_genai_thinking-2026.2.0.0-cp313-cp313-manylinux_2_41_x86_64.whl")
-            if os.path.isfile(_thinking_whl):
-                print(f"  {TR('检测到修改版 openvino-genai whl，可升级到完整模式', 'Patched openvino-genai whl found, can upgrade to full mode')}")
-                r = input(f"  {TR('升级到完整模式？(y/N)', 'Upgrade to full mode? (y/N)')}: ").strip().lower()
-                if r == "y":
-                    subprocess.check_call([pip, "install", _thinking_whl])
-                    with open(_mode_file, "w") as f:
-                        f.write("2")
-                    print(f"  {TR('✅ 已升级到完整模式', '✅ Upgraded to full mode')}")
-                    return
-
         print(f"  {TR('修复模式: 升级依赖', 'Fix mode: upgrade deps')}")
         # 只修复已装的功能
         _install_features(pip, installed, workspace, fix_mode=True)
@@ -316,19 +215,26 @@ def cmd_setup(args, workspace):
         _remove_features(pip, venv_path, to_remove)
         return
 
-    # ── 打印安装概要 ──
+    # ── 交互确认 ──
     print(f"  {TR('即将安装以下模块', 'Will install:')}")
+    selected = set()
     for f in sorted(features):
         hint = _FEATURE_HINTS.get(f, f)
         print(f"    • {f} — {hint}")
 
         try:
-            r = input(f"  {TR('是否继续?', 'Continue?')} [Y/n]: ")
+            r = input(f"  {TR('是否安装?', 'Install?')} [Y/n]: ")
             if r.strip().lower() == "n":
-                sys.exit(0)
+                continue  # 跳过该模块，不退出
         except (EOFError, KeyboardInterrupt):
             print()
             sys.exit(0)
+        selected.add(f)
+
+    features = selected
+    if not features:
+        print(f"  {TR('没有选择任何模块，退出', 'No features selected, exiting')}")
+        sys.exit(0)
 
     # 检查目录写入权限
     if not os.access(workspace, os.W_OK):
@@ -337,31 +243,6 @@ def cmd_setup(args, workspace):
         print(f"  {TR('请执行以下命令后重试:', 'Run the following command and retry:')}")
         print(f"    sudo chown -R {_user}:{_user} {workspace}")
         sys.exit(1)
-
-    genai_src = os.path.join(workspace, "openvino.genai-2026.2.0.0-optimization")
-
-    # ── 只有装了 chat 才问 mode ──
-    mode = 1
-    if "chat" in features:
-        print()
-        print(f"  {TR('chat 模块需要选择安装模式', 'chat module needs mode selection')}")
-        try:
-            mode = _prompt_mode(os.path.isdir(genai_src))
-        except KeyboardInterrupt:
-            print()
-            print(f"  {TR('安装已取消', 'Setup cancelled')}")
-            sys.exit(1)
-
-    if mode == 2:
-        print()
-        print("=" * 54)
-        print(f"  {TR('完整模式将执行以下操作', 'Full mode will:')}")
-        print(f"  {TR('1. 创建虚拟环境并 pip 安装依赖', '1. Create venv & pip install deps')}")
-        print(f"  {TR('2. 安装修改版 openvino-genai（预编译 whl，数秒完成）', '2. Install patched openvino-genai (prebuilt whl, seconds)')}")
-        print()
-        print(f"  {TR('前置条件', 'Prerequisites')}:")
-        print(f"  • {TR('Python 3.10+', 'Python 3.10+')}")
-        print(f"  • {TR('Intel GPU / CPU', 'Intel GPU / CPU')}")
 
     # ── venv 就绪检查 + 系统依赖 ──
     _check_apt_deps(features)
@@ -389,30 +270,8 @@ def cmd_setup(args, workspace):
         print(f"  {TR('安装已取消', 'Setup cancelled')}")
         sys.exit(1)
 
-    # 编译 GenAI（仅 mode 2 且包含 chat）
-    if mode == 2 and "chat" in features:
-        _thinking_whl = os.path.join(workspace, "openvino-genai-thinking", "dist", "openvino_genai_thinking-2026.2.0.0-cp313-cp313-manylinux_2_41_x86_64.whl")
-        if os.path.isfile(_thinking_whl):
-            print(f"  ⚡ {TR('安装修改版 openvino-genai（含 ThinkingBudgetTransform）...', 'Installing patched openvino-genai (with ThinkingBudgetTransform)...')}")
-            subprocess.check_call([pip, "install", _thinking_whl])
-        else:
-            print(f"  ⚠ {TR('未找到预编译 whl，回退到源码编译...', 'Prebuilt whl not found, falling back to source build...')}")
-            for dep, hint in [("cmake", "sudo apt install cmake"),
-                              ("gcc", "sudo apt install gcc"),
-                              ("g++", "sudo apt install g++"),
-                              ("make", "sudo apt install make"),
-                              ("patchelf", "sudo apt install patchelf")]:
-                if not shutil.which(dep):
-                    print(f"  ❌ {TR('未找到 {dep}，请先安装 ({hint})', '{dep} not found, install: {hint}').format(dep=dep, hint=hint)}")
-                    sys.exit(1)
-            _build_genai_from_source(venv_path, genai_src)
-
     # ── 记录安装信息 ──
     _save_features(features)
-
-    _mode_file = os.path.join(venv_path, ".ov-cli-mode")
-    with open(_mode_file, "w") as f:
-        f.write(str(mode))
 
     print()
     print(f"  {TR('✅ 完成!', '✅ Done!')}")

@@ -52,7 +52,7 @@ def cmd_benchmark(args):
     """ov-cli benchmark"""
     from .benchmark import run_benchmark
     ov_path = os.path.abspath(args.model)
-    run_benchmark(ov_path, args.reasoning == "on", device=args.device)
+    run_benchmark(ov_path, device=args.device)
 
 
 @_require("server", hint="./ov-cli setup --with server")
@@ -128,16 +128,12 @@ def cmd_tts(args):
 def cmd_ui(args):
     """ov-cli ui: 网页界面"""
     from .ui import launch_ui
-    launch_ui(model_path=args.model, device=args.device, port=args.port, share=args.share, reasoning=args.reasoning == "on")
+    launch_ui(model_path=args.model, device=args.device, port=args.port, share=args.share)
 
 @_require("chat", hint="./ov-cli setup --with chat")
 def cmd_chat(args):
     """ov-cli chat"""
     from .chat import load_model, run_chat, run_translate
-    if args.reasoning == "off" and args.mode != "translate":
-        print(f"  {TR('💡 提示', '💡 Hint')}: "
-              f"{TR('简易模式下 --reasoning off 无效（仅完整模式生效）。',
-                   'In simple mode --reasoning off has no effect (full mode only).')}")
     mode = args.mode
     if mode == "once" and not args.prompt and not args.file:
         print(f"  ⚠ {TR('once 模式需要 --prompt 和/或 --file', 'once mode requires --prompt and/or --file')}")
@@ -159,14 +155,13 @@ def cmd_chat(args):
         run_once(ctx, prompt=prompt, files=args.file or [],
                  output=args.output, temperature=args.temp, top_p=args.top_p,
                  top_k=args.top_k, max_tokens=args.max_tokens,
-                 reasoning=args.reasoning == "on", json_output=args.json)
+                 json_output=args.json)
     elif mode == "pipe":
         from .chat import run_pipe
-        run_pipe(ctx, reasoning=args.reasoning == "on", max_tokens=args.max_tokens, temperature=args.temp)
+        run_pipe(ctx, max_tokens=args.max_tokens, temperature=args.temp)
     else:
         run_chat(ctx, system=args.system, temperature=args.temp, top_p=args.top_p,
-                 top_k=args.top_k, max_tokens=args.max_tokens, image_path=args.image,
-                 reasoning=args.reasoning == "on")
+                 top_k=args.top_k, max_tokens=args.max_tokens, image_path=args.image)
 
 
 @_require("asr", hint="./ov-cli setup --with asr")
@@ -267,13 +262,13 @@ def main():
     p.add_argument("--top-p", type=float, default=0.9, dest="top_p")
     p.add_argument("--top-k", type=int, default=40, dest="top_k")
     p.add_argument("--max-tokens", type=int, default=1024, dest="max_tokens")
-    p.add_argument("--image", "-i"), p.add_argument("--reasoning", choices=["on","off"], default="on")
+    p.add_argument("--image", "-i")
     p.add_argument("--device", default="", help=TR("推理设备 (CPU/GPU/GPU.N/NPU)", "Device (CPU/GPU/GPU.N/NPU)") + TR("，留空自动选择", ", leave empty for auto)"))
 
     # benchmark
     p = sub.add_parser("benchmark", help=TR("基准测试", "Benchmark"))
     p.add_argument("--model", "-m", required=True)
-    p.add_argument("--reasoning", choices=["on","off"], default="on")
+
     p.add_argument("--device", default="", help=TR("推理设备 (CPU/GPU/GPU.N/NPU)", "Device (CPU/GPU/GPU.N/NPU)") + TR("，留空自动选择", ", leave empty for auto)"))
 
     # server
@@ -352,7 +347,7 @@ def main():
     p.add_argument("--device", default=None, help=TR("推理设备", "Device"))
     p.add_argument("--port", type=int, default=7860, help=TR("端口", "Port"))
     p.add_argument("--share", action="store_true", help=TR("生成公链", "Public link"))
-    p.add_argument("--reasoning", choices=["on","off"], default="on", help=TR("思考模式", "Reasoning"))
+
 
     # mcp
     p = sub.add_parser("mcp", help=TR("MCP 协议服务器", "MCP Server"),

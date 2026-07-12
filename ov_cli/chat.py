@@ -165,7 +165,7 @@ def load_model(ov_path, device=""):
 
 
 
-def _make_genai_config(temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024, presence_penalty=None, reasoning=True, tokenizer=None):
+def _make_genai_config(temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024, presence_penalty=None):
     """创建 GenAI GenerationConfig。"""
     cfg = ov_genai.GenerationConfig()
     cfg.max_new_tokens = max_tokens
@@ -175,24 +175,12 @@ def _make_genai_config(temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024, pr
     cfg.do_sample = temperature >= 0.01
     if presence_penalty is not None:
         cfg.presence_penalty = presence_penalty
-    # Reasoning budget: 不显示思考时用 budget=0 强制立即结束思考
-    if not reasoning and tokenizer is not None:
-        try:
-            think_enc = tokenizer.encode("<think>", add_special_tokens=False)
-            nothink_enc = tokenizer.encode("</think>", add_special_tokens=False)
-            think_id = int(list(think_enc.input_ids.data)[0][0])
-            nothink_id = int(list(nothink_enc.input_ids.data)[0][0])
-            cfg.reasoning_budget_tokens = 0
-            cfg.thinking_start_token_id = think_id
-            cfg.thinking_end_token_id = nothink_id
-        except Exception:
-            pass
     return cfg
 
 
 # ── 管道模式 ────────────────────────────────────────────
 
-def run_pipe(ctx, reasoning=True, max_tokens=1024, temperature=0.7):
+def run_pipe(ctx, max_tokens=1024, temperature=0.7):
     """管道模式：从 stdin 读提示词，向 stdout 写 JSON 结果。"""
     import json as _json
     pipe = ctx.get("pipe")
@@ -210,21 +198,10 @@ def run_pipe(ctx, reasoning=True, max_tokens=1024, temperature=0.7):
                 continue
 
             conv = [{"role": "user", "content": prompt}]
-            full = _build_prompt(conv, pipe.get_tokenizer(), enable_thinking=reasoning)
+            full = _build_prompt(conv, pipe.get_tokenizer(), enable_thinking=True)
 
             cfg = ov_genai.GenerationConfig(max_new_tokens=max_tokens, temperature=temperature)
             cfg.do_sample = temperature >= 0.01
-
-            if not reasoning:
-                try:
-                    tok = pipe.get_tokenizer()
-                    think_id = int(list(tok.encode("<think>", add_special_tokens=False).input_ids.data)[0][0])
-                    nothink_id = int(list(tok.encode("</think>", add_special_tokens=False).input_ids.data)[0][0])
-                    cfg.reasoning_budget_tokens = 0
-                    cfg.thinking_start_token_id = think_id
-                    cfg.thinking_end_token_id = nothink_id
-                except Exception:
-                    pass
 
             t0 = time.time()
             try:
@@ -238,8 +215,6 @@ def run_pipe(ctx, reasoning=True, max_tokens=1024, temperature=0.7):
 
             elapsed = time.time() - t0
             resp = str(result).strip()
-            if not reasoning:
-                resp = re.sub(r'</?think>', '', resp).strip()
             print(_json.dumps({"text": resp, "time": round(elapsed, 1)}, ensure_ascii=False), flush=True)
     except KeyboardInterrupt:
         pass
@@ -274,7 +249,7 @@ def _count_tokens(ctx, text):
 
 def run_once(ctx, prompt="", files=None, output=None,
              temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024,
-             reasoning=True, json_output=False):
+             json_output=False):
     """单次输出模式：读取文件 + 文字，一次生成，输出后退出。"""
     import numpy as np
     import json as _json
@@ -320,7 +295,7 @@ def run_once(ctx, prompt="", files=None, output=None,
         # Optimum 路径
         chat_prompt = processor.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True,
-            chat_template_kwargs={"enable_thinking": reasoning})
+            chat_template_kwargs={"enable_thinking": True})
         if all_pages and is_vlm:
             inputs = processor(text=[chat_prompt], images=all_pages, return_tensors="pt")
         else:
@@ -359,13 +334,11 @@ def run_once(ctx, prompt="", files=None, output=None,
         try:
             prompt_text = tokenizer.apply_chat_template(
                 messages, add_generation_prompt=True,
-                extra_context={"enable_thinking": reasoning})
+                extra_context={"enable_thinking": True})
         except Exception:
             prompt_text = f"<|im_start|>user\n{user_text}\n<|im_end|>\n<|im_start|>assistant\n"
 
-        gen_cfg = _make_genai_config(temperature, top_p, top_k, max_tokens,
-                                     presence_penalty=None, reasoning=reasoning,
-                                     tokenizer=tokenizer)
+        gen_cfg = _make_genai_config(temperature, top_p, top_k, max_tokens)
 
         # VLM 预编码进度
         n_vis = len(all_pages)
@@ -410,9 +383,6 @@ def run_once(ctx, prompt="", files=None, output=None,
 
         reply_text = "".join(reply_parts)
 
-    if not reasoning:
-        reply_text = re.sub(r'</?think>', '', reply_text).strip()
-
     # 输出统计
     elapsed = time.time() - t0
     char_count = len(reply_text.replace(" ", ""))
@@ -443,7 +413,7 @@ def run_once(ctx, prompt="", files=None, output=None,
 
 def run_chat(ctx, system="You are a helpful AI assistant.",
              temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024,
-             image_path=None, reasoning=True):
+             image_path=None):
     """通用聊天模式"""
     from . import TR
 
@@ -469,9 +439,9 @@ def run_chat(ctx, system="You are a helpful AI assistant.",
     print()
 
     if ctx.get("optimum"):
-        _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_path, reasoning)
+        _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_path)
     else:
-        _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_path, reasoning)
+        _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_path)
 
 
 def _build_prompt(messages, tokenizer=None, enable_thinking=True):
@@ -674,7 +644,7 @@ def _count_tokens(ctx, text):
 
 
 # 每批最多发送的图片/PDF 页数
-def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_path=None, reasoning=True):
+def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_path=None):
     """Optimum 格式聊天模式（OVModelForVisualCausalLM + AutoProcessor）。"""
     model = ctx["model"]
     processor = ctx["processor"]
@@ -798,7 +768,7 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
             messages.append({"role": "system", "content": system})
         messages.extend(conv)
 
-        prompt = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, chat_template_kwargs={"enable_thinking": reasoning})
+        prompt = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, chat_template_kwargs={"enable_thinking": True})
         # VLM prefill 进度指示器
         n_vlm_pages = len(all_pages)
         progress_stop = threading.Event()
@@ -844,7 +814,6 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
         thread = Thread(target=model.generate, kwargs=gen_kwargs)
         thread.start()
 
-        thinking_filter = not reasoning
         in_think = [False]  # 初始不在 think 块内，由 <think> 标签触发
         reply_parts = []
         _opt_first = [True]
@@ -914,7 +883,7 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
         print()
 
 
-def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_path=None, reasoning=True):
+def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_path=None):
     """GenAI 格式聊天模式。"""
     pipe = ctx["pipe"]
     is_vlm = ctx.get("is_vlm", False)
@@ -1034,8 +1003,7 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
         import numpy as np
         image_tensors = [ov.Tensor(np.array(img)[None]) for img in all_pages] if all_pages and is_vlm else None
 
-        pp = 1.5 if not reasoning else None
-        gen_cfg = _make_genai_config(temperature, top_p, top_k, max_tokens, presence_penalty=pp, reasoning=reasoning, tokenizer=pipe.get_tokenizer())
+        gen_cfg = _make_genai_config(temperature, top_p, top_k, max_tokens)
 
         # VLM prefill 进度指示器
         reply_parts = []
@@ -1063,7 +1031,7 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
 
         t0 = time.time()
         try:
-            prompt = _build_prompt(messages, pipe.get_tokenizer(), reasoning)
+            prompt = _build_prompt(messages, pipe.get_tokenizer(), True)
             kwargs = {"generation_config": gen_cfg, "streamer": streamer_callback}
             if is_vlm and image_tensors is not None:
                 kwargs["images"] = image_tensors
@@ -1075,9 +1043,6 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
             else:
                 print(f"\n  ⚠ {TR('生成失败', 'Generation failed')}: {err[:200]}")
         reply_text = "".join(reply_parts)
-
-        if not reasoning:
-            reply_text = re.sub(r'</?think>', '', reply_text).strip()
 
         elapsed = time.time() - t0
         conv.append({"role": "assistant", "content": reply_text})
@@ -1186,7 +1151,7 @@ def _run_translate_genai(ctx, max_tokens):
             target = TR(TRANSLATE_LANGS["zh"][0], TRANSLATE_LANGS["zh"][1])
 
         prompt = t_zh.format(target=target, text=text) if has_chinese(text) else t_en.format(target=target, text=text)
-        gen_cfg = _make_genai_config(temperature=0, max_tokens=max_tokens, reasoning=False, tokenizer=pipe.get_tokenizer())
+        gen_cfg = _make_genai_config(temperature=0, max_tokens=max_tokens)
 
         print(f"  → {target}", flush=True)
         t0 = time.time()
@@ -1216,6 +1181,6 @@ def run_translate(ctx, max_tokens=512):
     if ctx.get("optimum"):
         # Optimum 格式翻译（退化为聊天模式）
         print(f"  ⚠ {TR('翻译模式在 Optimum 格式下不可用，进入聊天模式', 'Translate mode not available, using chat mode')}")
-        _run_chat_optimum(ctx, None, 0, 0.9, 40, max_tokens, None, reasoning=False)
+        _run_chat_optimum(ctx, None, 0, 0.9, 40, max_tokens, None)
         return
     _run_translate_genai(ctx, max_tokens)

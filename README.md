@@ -48,15 +48,11 @@ printf '你好\n再见' | ./ov-cli chat --model ./model-ov --mode pipe
 # 拉取最新代码
 git pull
 
-# 运行任意命令时会自动检测版本变化并提示：
-# ⚠ 检测到版本变化 (0.0.0 → 0.1.0)，建议运行:
-#    ./ov-cli setup --fix
-
-# 使用修复模式快速升级（不重建 venv，数秒完成）
+# 修复模式：升级已安装模块的依赖版本（不重建 venv，数秒完成）
 ./ov-cli setup --fix
 ```
 
-升级模式 (`setup --fix`) 仅升级依赖版本和重打补丁，不下重复的包。
+修复模式 (`setup --fix`) 仅升级已安装模块的依赖版本，不下重复的包。
 
 **ZIP 用户**：下载最新源码解压后，覆盖旧目录，然后执行 `./ov-cli setup --fix` 即可。
 
@@ -99,10 +95,8 @@ git pull
 
 > `convert` 模块已移除。每个模型对 `optimum-intel` / `transformers` 的版本要求不同，统一入口反而制造兼容性问题。转换直接用 [`optimum-cli`](https://huggingface.co/docs/optimum/main/en/intel/export)。
 
-**模式选择**（仅装 `chat` 时提示）：
-1. **简易模式** — pip 安装，日常使用。`--reasoning off` 对思考型模型无效。
-2. **完整模式** — 从源码编译 OpenVINO GenAI 以启用 thinking budget 功能
-   （logit 级别的 `</think>` 强制结束思考）。
+> **`--reasoning off` 已移除**：该功能依赖自定义编译的 OpenVINO GenAI，现已弃用。
+> 等 [PR #4139](https://github.com/openvinotoolkit/openvino/pull/4139) 合并后，OpenVINO 将原生支持 reasoning budget。
 
 **修复模式** (`--fix`)：不重建虚拟环境，仅升级已安装的模块、重打补丁，
 数秒完成。
@@ -118,10 +112,6 @@ git pull
 ./ov-cli chat --model ./Qwen3/8B-ov-int4-v2                       # 8B VLM
 ./ov-cli chat --model ./gemma-4-E2B-it-ov                          # Optimum 格式
 ./ov-cli chat --model ./model-ov --temp 0.9 --max-tokens 2048
-
-# 推理控制（仅 GenAI 格式）
-./ov-cli chat --model ./Qwen3.5/0.8B-ov --reasoning off            # 关闭思考（过滤<think>块）
-./ov-cli chat --model ./Qwen3.6/35B-A3B-ov --reasoning off         # 关闭思考（需完整模式）
 
 # 翻译模式
 ./ov-cli chat --model ./Hy-MT2-1.8B-ov --mode translate
@@ -218,7 +208,7 @@ EOF
 
 ```bash
 ./ov-cli benchmark --model ./Qwen3.5/0.8B-ov-int4
-./ov-cli benchmark --model ./Qwen3.6/35B-A3B-ov-int4 --reasoning off
+./ov-cli benchmark --model ./Qwen3.6/35B-A3B-ov-int4
 ```
 
 ### `ui` — Web 界面
@@ -230,7 +220,7 @@ EOF
 ./ov-cli ui --model ./Qwen3/2B-ov-int4
 ./ov-cli ui --model ./Qwen3/8B-ov-int4-v2 --port 7861              # 指定端口
 ./ov-cli ui --model ./model-vlm-ov --share                          # 公开链接
-./ov-cli ui --model ./deepseek/7B-ov --reasoning off                # 关闭思考
+./ov-cli ui --model ./deepseek/7B-ov
 
 # TTS / ASR / 文生图界面
 ./ov-cli ui --model ./0.6B-CV-ov                                    # TTS
@@ -549,11 +539,10 @@ optimum-cli export openvino -m ./SD3.5-Medium --library diffusers --weight-forma
 ### 注意事项
 
 - **Gemma-4**：使用 `VLMPipeline` 直接加载，无需 `optimum-intel` 或额外补丁。
-- **Ctrl+C 中断**：生成期间按 Ctrl+C 可中断，但需等待当前 token 生成完毕（约 20-200ms）。
-- **`--reasoning off`**：Qwen3.6 等天生思考模型无法通过 prompt 技巧阻止推理。
-  解决方案：ov-cli 在 LogitProcessor 中插入 `ThinkingBudgetTransform`，
-  预算耗尽后强制输出 `</think>`。需 `setup` **完整模式**编译修改版 GenAI。
-  简易模式下 `--reasoning off` 仅过滤输出中的 `<think>` 块，但无法阻止推理。
+- **Ctrl+C**：生成期间按 Ctrl+C 会强制退出进程（上游 C++ 层不处理 Python 信号）。
+- **思考模型**：Qwen3.6 等天生思考模型无法通过 prompt 技巧阻止推理。
+  [PR #4139](https://github.com/openvinotoolkit/openvino/pull/4139) 合入后将原生支持。
+  目前输出中会包含 `<think>` 标签，可自行过滤。
 
 ## 性能参考
 
@@ -645,7 +634,7 @@ ov-cli/
 │   ├── mcp.py               # MCP 协议服务器
 │   └── benchmark.py         # 性能测试
 │
-└── openvino.genai-2026.2.0.0-optimization/  # 修改版 GenAI 源码（setup 完整模式用）
+└── openvino.genai-2026.2.0.0-optimization/  # 修改版 GenAI 源码（实验性）
 ```
 
 ## 依赖

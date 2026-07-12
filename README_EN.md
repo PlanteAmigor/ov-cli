@@ -45,15 +45,11 @@ eval "$(./ov-cli venv)"
 # Pull latest code
 git pull
 
-# Running any command will auto-detect version changes:
-# ⚠ Version changed (0.0.0 → 0.1.0), run:
-#    ./ov-cli setup --fix
-
-# Fix mode upgrades deps + reapplies patches in seconds
+# Fix mode: upgrade already-installed module deps (no rebuild, seconds)
 ./ov-cli setup --fix
 ```
 
-Fix mode (`setup --fix`) only upgrades package versions and reapplies patches — no redundant downloads.
+Fix mode (`setup --fix`) upgrades already-installed module deps only — no redundant downloads.
 
 **ZIP users**: Download the latest source, extract and overwrite your old directory, then run `./ov-cli setup --fix`.
 
@@ -94,10 +90,8 @@ Creates a Python venv and installs dependencies. Supports on-demand installation
 
 > `convert` module removed. Each model requires different `optimum-intel` / `transformers` versions — a unified entry point creates more compatibility issues than it solves. Use [`optimum-cli`](https://huggingface.co/docs/optimum/main/en/intel/export) directly for conversions.
 
-**Mode selection** (only when `chat` is included):
-1. **Simple mode** — pip install only. `--reasoning off` has no effect on thinking models.
-2. **Full mode** — compiles modified GenAI from source to enable thinking budget
-   (logit-level `</think>` forcing).
+> **`--reasoning off` removed**: This feature relied on a custom-compiled OpenVINO GenAI and is now deprecated.
+> Waiting for [PR #4139](https://github.com/openvinotoolkit/openvino/pull/4139) to land — after that, reasoning budget will be natively supported.
 
 **Fix mode** (`--fix`): Upgrades installed modules only, reapplies patches, no rebuild.
 
@@ -117,10 +111,6 @@ Interactive terminal. Auto-detects model format (GenAI / Optimum), supports stre
 ./ov-cli chat --model ./Qwen3/2B-ov                               # GenAI format
 ./ov-cli chat --model ./gemma-4-E2B-it-ov                          # Optimum format (Gemma-4)
 ./ov-cli chat --model ./model-ov --temp 0.9 --max-tokens 2048
-
-# Reasoning control (GenAI format only)
-./ov-cli chat --model ./Qwen3.5/0.8B-ov --reasoning off            # filter <think> blocks
-./ov-cli chat --model ./Qwen3.6/35B-A3B-ov --reasoning off         # force </think> (full mode)
 
 # Translate mode
 ./ov-cli chat --model ./Hy-MT2-1.8B-ov --mode translate
@@ -212,7 +202,7 @@ EOF
 
 ```bash
 ./ov-cli benchmark --model ./Qwen3.5/0.8B-ov
-./ov-cli benchmark --model ./Qwen3.6/35B-A3B-ov --reasoning off
+./ov-cli benchmark --model ./Qwen3.6/35B-A3B-ov
 ```
 
 ### `ui` — Web UI
@@ -224,7 +214,7 @@ Launch a Gradio Web UI that auto-detects the model type (chat/tts/asr/image) and
 ./ov-cli ui --model ./Qwen3/2B-ov
 ./ov-cli ui --model ./Qwen3/8B-ov --port 7861                      # Custom port
 ./ov-cli ui --model ./model-vlm-ov --share                          # Public link
-./ov-cli ui --model ./deepseek/7B-ov --reasoning off                # Disable thinking
+./ov-cli ui --model ./deepseek/7B-ov
 
 # TTS / ASR / Text-to-Image UI
 ./ov-cli ui --model ./0.6B-CV-ov                                    # TTS
@@ -529,11 +519,10 @@ Find all pre-converted models at:
 ### Notes
 
 - **Gemma-4**: Use `VLMPipeline` directly, no `optimum-intel` or patches needed.
-- **Ctrl+C**: Interrupt during generation may take 20-200ms (one token time).
-- **`--reasoning off`**: Inherent thinking models (Qwen3.6 etc.) cannot be stopped by prompt tricks.
-  ov-cli inserts a `ThinkingBudgetTransform` into the LogitProcessor chain to force `</think>`.
-  Requires `setup` **full mode** (compiled GenAI).
-  Simple mode `--reasoning off` only filters `<think>` blocks from output, but cannot prevent the model from reasoning.
+- **Ctrl+C**: Pressing Ctrl+C during generation will force-kill the process (C++ layer doesn't handle Python signals).
+- **Thinking models**: Qwen3.6 etc. cannot be stopped by prompt tricks.
+  [PR #4139](https://github.com/openvinotoolkit/openvino/pull/4139) will add native support.
+  Output may contain `<think>` tags — filter them as needed.
 
 ## Performance
 

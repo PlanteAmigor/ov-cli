@@ -21,7 +21,7 @@ def _measure_rss():
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024
 
 
-def _run_genai_bench_detailed(pipe, prompt, reasoning=True):
+def _run_genai_bench_detailed(pipe, prompt):
     """用 streamer 精确测量各指标。"""
     import openvino_genai as ov_genai
 
@@ -55,15 +55,6 @@ def _run_genai_bench_detailed(pipe, prompt, reasoning=True):
         return False
 
     cfg = ov_genai.GenerationConfig(max_new_tokens=128)
-    if not reasoning:
-        try:
-            think_id = int(list(tok.encode("<think>", add_special_tokens=False).input_ids.data)[0][0])
-            nothink_id = int(list(tok.encode("</think>", add_special_tokens=False).input_ids.data)[0][0])
-            cfg.reasoning_budget_tokens = 0
-            cfg.thinking_start_token_id = think_id
-            cfg.thinking_end_token_id = nothink_id
-        except Exception:
-            pass
     t_start = time.perf_counter()
     if isinstance(pipe, ov_genai.VLMPipeline):
         pipe.generate(prompt, images=[], generation_config=cfg, streamer=streamer)
@@ -169,7 +160,7 @@ def _run_optimum_bench(model, processor, input_size):
     }
 
 
-def run_benchmark(model_path, reasoning=True, device=""):
+def run_benchmark(model_path, device=""):
     """运行基准测试。"""
     from .chat import load_model
 
@@ -217,7 +208,7 @@ def run_benchmark(model_path, reasoning=True, device=""):
             res = _run_optimum_bench(ctx["model"], ctx["processor"], size)
         else:
             pipe = ctx["pipe"]
-            res = _run_genai_bench_detailed(pipe, _make_prompt(size) + "请详细解释这段话的含义。", reasoning)
+            res = _run_genai_bench_detailed(pipe, _make_prompt(size) + "请详细解释这段话的含义。")
 
         results[size] = res
         print(f"    prefill:        {res['prefill_tps']:>8.1f} tok/s ({res['input_tokens']} tok in {res['first_latency']/1000:.2f}s)")

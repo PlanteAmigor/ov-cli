@@ -52,7 +52,7 @@ def _detect_model_type(ov_path):
 
 # ── Chat 界面 ──
 
-def _build_chat_ui(model_path, device, reasoning=True):
+def _build_chat_ui(model_path, device):
     """LLM/VLM 聊天界面。"""
     from .chat import load_model as load_llm
 
@@ -102,17 +102,6 @@ def _build_chat_ui(model_path, device, reasoning=True):
 
         gen_cfg = GenerationConfig(max_new_tokens=1024)
         gen_cfg.temperature = config.get("temperature", 0.7)
-
-        if not reasoning:
-            try:
-                tok = pipe.get_tokenizer()
-                think_id = int(list(tok.encode("<think>", add_special_tokens=False).input_ids.data)[0][0])
-                nothink_id = int(list(tok.encode("</think>", add_special_tokens=False).input_ids.data)[0][0])
-                gen_cfg.reasoning_budget_tokens = 0
-                gen_cfg.thinking_start_token_id = think_id
-                gen_cfg.thinking_end_token_id = nothink_id
-            except Exception:
-                pass
 
         q = queue.Queue()
         stop = [False]
@@ -420,7 +409,7 @@ def _build_image_ui(model_path, device):
 
 # ── 入口 ──
 
-def launch_ui(model_path, device=None, port=7860, share=False, reasoning=True):
+def launch_ui(model_path, device=None, port=7860, share=False):
     """启动 Gradio 网页界面。"""
     import openvino as ov
     import signal as _signal
@@ -447,10 +436,7 @@ def launch_ui(model_path, device=None, port=7860, share=False, reasoning=True):
         print(f"  ❌ {TR('不支持的模型类型', 'Unsupported model type')}: {mtype}")
         sys.exit(1)
 
-    if mtype == "chat":
-        demo = builder(ov_path, device, reasoning=reasoning)
-    else:
-        demo = builder(ov_path, device)
+    demo = builder(ov_path, device)
     print(f"  🌐 {TR('启动 Gradio 界面', 'Launching Gradio UI')}: http://localhost:{port}", file=sys.stderr)
     try:
         demo.launch(server_port=port, share=share)
