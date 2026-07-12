@@ -157,6 +157,9 @@ if(ENABLE_XGRAMMAR)
         if(MSVC)
             # Suppress C4146 warning for MSVC compiler
             target_compile_options(xgrammar PRIVATE "/wd4146")
+        else()
+            # Fix: xgrammar v0.1.31 uses cstring/cstdio without _GNU_SOURCE on newer GCC
+            target_compile_options(xgrammar PRIVATE -D_GNU_SOURCE -D_DEFAULT_SOURCE)
         endif()
     endif()
 else()

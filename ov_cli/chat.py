@@ -1196,11 +1196,10 @@ def _run_translate_genai(ctx, max_tokens):
         stop_flag = [False]
         streamer_callback = _make_streamer(reply_parts, stop_flag, thinking_filter=True)
 
-        try:
-            if ctx.get("is_vlm"):
-                pipe.generate(prompt, generation_config=gen_cfg, streamer=streamer_callback)
-            else:
-                pipe.generate(prompt, gen_cfg, streamer_callback)
+        if ctx.get("is_vlm"):
+            pipe.generate(prompt, generation_config=gen_cfg, streamer=streamer_callback)
+        else:
+            pipe.generate(prompt, gen_cfg, streamer_callback)
         elapsed = time.time() - t0
         reply_text = "".join(reply_parts)
         char_count = len(reply_text.replace(" ", ""))

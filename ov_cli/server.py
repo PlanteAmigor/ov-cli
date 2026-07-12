@@ -40,6 +40,7 @@ import openvino_genai as ov_genai
 # ── 全局状态 ────────────────────────────────────────────────
 
 _model_lock = threading.Lock()
+_generate_lock = threading.Lock()  # 串行化 generate 调用
 _model_state: dict[str, Any] = {}  # pipe, model_type, is_vlm, model_path
 _running_tasks: dict[str, threading.Thread] = {}  # task_id -> thread
 _running_task_lock = threading.Lock()
@@ -237,7 +238,7 @@ class ChatCompletionRequest(BaseModel):
     model: str = "default"
     messages: list[ChatMessage]
     stream: bool = True
-    max_tokens: int = 1024
+    max_tokens: int = 16384
     temperature: float = 0.7
     top_p: float = 0.9
     top_k: int = 40
@@ -329,9 +330,12 @@ async def _stream_chat(request_id: str, model_path: str, device: str,
             kwargs = {"generation_config": gen_cfg, "streamer": streamer_cb}
             if is_vlm and has_image and images:
                 img_tag = "<|vision_start|><|image_pad|><|vision_end|>\n"
-                prompt = img_tag * len(images) + prompt
+                final_prompt = img_tag * len(images) + prompt
                 kwargs["images"] = images
-            pipe.generate(prompt, **kwargs)
+            else:
+                final_prompt = prompt
+            with _generate_lock:
+                pipe.generate(final_prompt, **kwargs)
         except RuntimeError as e:
             err = str(e)
             if "reshape" in err.lower():
@@ -377,7 +381,8 @@ async def _stream_chat(request_id: str, model_path: str, device: str,
 
 def create_app(model_path: str, device: str = "", host: str = "0.0.0.0", port: int = 8080) -> FastAPI:
     if not device:
-        device = "GPU" if "GPU" in ov.Core().available_devices else "CPU"
+        devices = ov.Core().available_devices
+        device = next((d for d in devices if "GPU" in d), "CPU")
     """创建 FastAPI 应用实例。"""
     # 预加载模型
     state = _load_model(model_path, device)
@@ -399,7 +404,7 @@ def create_app(model_path: str, device: str = "", host: str = "0.0.0.0", port: i
                 "temperature": 0.7,
                 "top_p": 0.9,
                 "top_k": 40,
-                "max_tokens": 1024,
+                "max_tokens": 16384,
             },
             "total_slots": 1,
             "model_alias": state.get("model_name", ""),
@@ -582,7 +587,10 @@ def create_app(model_path: str, device: str = "", host: str = "0.0.0.0", port: i
                 kwargs["images"] = images
             loop = asyncio.get_event_loop()
             try:
-                await loop.run_in_executor(None, lambda: pipe.generate(prompt, **kwargs))
+                def _gen():
+                    with _generate_lock:
+                        pipe.generate(prompt, **kwargs)
+                await loop.run_in_executor(None, _gen)
             except RuntimeError as e:
                 err = str(e)
                 if "reshape" in err.lower():
@@ -657,6 +665,10 @@ def run_server(model_path: str, device: str = "",
                host: str = "0.0.0.0", port: int = 8080):
     """启动 ov-cli server。"""
     import uvicorn
+
+    if not device:
+        devices = ov.Core().available_devices
+        device = next((d for d in devices if "GPU" in d), "CPU")
 
     model_name = os.path.basename(model_path.rstrip("/"))
     _log(f"  ╔══════════════════════════════════════════════╗")
