@@ -14,7 +14,7 @@ import openvino_genai as ov_genai
 # 翻译语言映射：代码 → (中文名, 英文名)
 TRANSLATE_LANGS = {
     "zh":   ("中文",     "Chinese"),
-    "en":   ("英语",     "English"),
+    "en":   ("英语",     "English"),       
     "ja":   ("日语",     "Japanese"),
     "ko":   ("韩语",     "Korean"),
     "fr":   ("法语",     "French"),
@@ -60,7 +60,6 @@ def _make_streamer(reply_parts, stop_flag, on_first_token=None, thinking_filter=
     on_first_token: 首个 token 到达时的回调（用于停止进度指示器）。
     thinking_filter: 是否过滤 <think> 标签及思考内容。
     """
-    import select as _sel
     _first = [True]
     # 启用 filter 时，初始假设在 think 块内（模型可能先输出思考才输出 </think>）
     in_think = [thinking_filter]
@@ -71,12 +70,6 @@ def _make_streamer(reply_parts, stop_flag, on_first_token=None, thinking_filter=
         if _first[0] and on_first_token:
             _first[0] = False
             on_first_token()
-        # 非阻塞检查 stdin 的 Ctrl+C
-        if _sel.select([sys.stdin], [], [], 0)[0]:
-            c = sys.stdin.read(1)
-            if c == '\x03':
-                stop_flag[0] = True
-                return True
 
         if thinking_filter:
             if in_think[0]:
@@ -399,7 +392,7 @@ def run_once(ctx, prompt="", files=None, output=None,
 
         reply_parts = []
         stop_flag = [False]
-        streamer_cb = _make_streamer(reply_parts, stop_flag, on_first, thinking_filter=not reasoning)
+        streamer_cb = _make_streamer(reply_parts, stop_flag, on_first, thinking_filter=False)
 
         kwargs = {"generation_config": gen_cfg, "streamer": streamer_cb}
         if image_tensors is not None:
@@ -848,7 +841,6 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
         )
 
         stop_flag = [False]
-        old_handler = signal.signal(signal.SIGINT, lambda s, f: stop_flag.__setitem__(0, True))
         thread = Thread(target=model.generate, kwargs=gen_kwargs)
         thread.start()
 
@@ -861,8 +853,6 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
                 if _opt_first[0] and n_vlm_pages > 0:
                     _opt_first[0] = False
                     _on_first()
-                if stop_flag[0]:
-                    break
                 if thinking_filter:
                     if in_think[0]:
                         if '</think>' in t:
@@ -910,15 +900,8 @@ def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_
                     sys.stdout.flush()
                     reply_parts.append(t)
         finally:
-            signal.signal(signal.SIGINT, old_handler)
             if not progress_stop.is_set():
                 progress_stop.set()
-
-        if stop_flag[0]:
-            print(f"\n  \u26a0 {TR('\u5df2\u4e2d\u65ad', 'Interrupted')}")
-            print()
-            thread.join(timeout=5)
-            continue
 
         thread.join()
         reply_text = "".join(reply_parts)
@@ -1076,10 +1059,9 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
                     progress_stop.wait(1.0)
             threading.Thread(target=_show_progress, daemon=True).start()
 
-        streamer_callback = _make_streamer(reply_parts, stop_flag, on_first_token, thinking_filter=not reasoning)
+        streamer_callback = _make_streamer(reply_parts, stop_flag, on_first_token, thinking_filter=False)
 
         t0 = time.time()
-        old_handler = signal.signal(signal.SIGINT, lambda s, f: stop_flag.__setitem__(0, True))
         try:
             prompt = _build_prompt(messages, pipe.get_tokenizer(), reasoning)
             kwargs = {"generation_config": gen_cfg, "streamer": streamer_callback}
@@ -1092,19 +1074,13 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
                 print(f"\n  ⚠ {TR('该模型不支持图像输入', 'This model does not support image input')}")
             else:
                 print(f"\n  ⚠ {TR('生成失败', 'Generation failed')}: {err[:200]}")
-        finally:
-            signal.signal(signal.SIGINT, old_handler)
         reply_text = "".join(reply_parts)
 
         if not reasoning:
             reply_text = re.sub(r'</?think>', '', reply_text).strip()
 
         elapsed = time.time() - t0
-        if stop_flag[0]:
-            print(f"\n  ⚠ {TR('已中断', 'Interrupted')}")
-            conv.append({"role": "assistant", "content": reply_text + TR(" [已中断]", " [Interrupted]")})
-        else:
-            conv.append({"role": "assistant", "content": reply_text})
+        conv.append({"role": "assistant", "content": reply_text})
         char_count = len(reply_text.replace(" ", ""))
         tok_count = _count_tokens(ctx, reply_text)
         print()
@@ -1220,14 +1196,11 @@ def _run_translate_genai(ctx, max_tokens):
         stop_flag = [False]
         streamer_callback = _make_streamer(reply_parts, stop_flag, thinking_filter=True)
 
-        old_handler = signal.signal(signal.SIGINT, lambda s, f: stop_flag.__setitem__(0, True))
         try:
             if ctx.get("is_vlm"):
                 pipe.generate(prompt, generation_config=gen_cfg, streamer=streamer_callback)
             else:
                 pipe.generate(prompt, gen_cfg, streamer_callback)
-        finally:
-            signal.signal(signal.SIGINT, old_handler)
         elapsed = time.time() - t0
         reply_text = "".join(reply_parts)
         char_count = len(reply_text.replace(" ", ""))

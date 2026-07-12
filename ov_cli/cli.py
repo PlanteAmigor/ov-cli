@@ -136,8 +136,8 @@ def cmd_chat(args):
     from .chat import load_model, run_chat, run_translate
     if args.reasoning == "off" and args.mode != "translate":
         print(f"  {TR('💡 提示', '💡 Hint')}: "
-              f"{TR('若当前是简易模式，--reasoning off 仅过滤 <think> 块显示...',
-                   'In simple mode, --reasoning off only filters <think> blocks...')}")
+              f"{TR('简易模式下 --reasoning off 无效（仅完整模式生效）。',
+                   'In simple mode --reasoning off has no effect (full mode only).')}")
     mode = args.mode
     if mode == "once" and not args.prompt and not args.file:
         print(f"  ⚠ {TR('once 模式需要 --prompt 和/或 --file', 'once mode requires --prompt and/or --file')}")
