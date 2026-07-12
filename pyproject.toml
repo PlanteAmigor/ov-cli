@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ov-cli"
-version = "1.4.4-dev"
+version = "2.0.0-dev"
 description = "OpenVINO LLM 命令行工具"
 requires-python = ">=3.10"
 dependencies = [

@@ -76,39 +76,6 @@ def _load_model(model_path: str, device: str = "CPU") -> dict:
             return _model_state
 
         is_vlm = os.path.isfile(os.path.join(model_path, "openvino_vision_embeddings_model.xml"))
-        is_optimum = (
-            os.path.isfile(os.path.join(model_path, "openvino_text_embeddings_per_layer_model.xml"))
-            or (is_vlm and not os.path.isfile(os.path.join(model_path, "openvino_vision_embeddings_merger_model.xml")))
-        )
-
-        if is_optimum:
-            _log(f"  📦 加载 Optimum: {os.path.basename(model_path)} ({device})", end=" ")
-            t0 = time.time()
-            import os as _os
-            _os.environ["TRUST_REMOTE_CODE"] = "1"
-            from optimum.intel import OVModelForVisualCausalLM
-            from transformers import AutoConfig, AutoProcessor
-            # 先加载 config（trust_remote_code 必须显式传）
-            cfg = AutoConfig.from_pretrained(model_path, trust_remote_code=True)
-            model = OVModelForVisualCausalLM.from_pretrained(model_path, device=device, config=cfg, trust_remote_code=True)
-            processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
-            _log(f"✓ {time.time()-t0:.1f}s")
-            pipe = None
-            model_type = None
-            cfg_path = os.path.join(model_path, "config.json")
-            if os.path.isfile(cfg_path):
-                with open(cfg_path) as f:
-                    cfg = json.load(f)
-                model_type = cfg.get("model_type")
-            model_name = cfg.get("_name_or_path", os.path.basename(model_path)) if os.path.isfile(cfg_path) else os.path.basename(model_path)
-            _log(f"  📋 模型: {model_name} | 类型: {model_type or 'Optimum VLM'}")
-            _model_state = {
-                "pipe": None, "model": model, "processor": processor,
-                "is_optimum": True, "is_vlm": is_vlm,
-                "model_path": model_path, "model_name": model_name, "device": device,
-            }
-            return _model_state
-
         tag = "VLM" if is_vlm else "LLM"
         _log(f"  📦 加载 {tag}: {os.path.basename(model_path)} ({device})", end=" ")
         t0 = time.time()
@@ -165,33 +132,6 @@ def _build_prompt(messages: list, tokenizer) -> str:
             else:
                 conv.append({"role": role, "content": content})
     return _bp(conv, tokenizer, enable_thinking=True)
-
-
-def _extract_images_pil(messages):
-    """从消息中提取所有图片，返回 list[PIL.Image]。"""
-    from PIL import Image as _PIL
-    import io as _io, base64 as _b64
-    result = []
-    try:
-        for m in messages:
-            for p in (m.get("content", []) if isinstance(m.get("content"), list) else []):
-                if isinstance(p, dict) and p.get("type") == "image_url":
-                    url = p["image_url"]["url"]
-                    if url.startswith("data:image"):
-                        raw = _b64.b64decode(url.split(",", 1)[1])
-                        img = _PIL.open(_io.BytesIO(raw)).convert("RGB")
-                        w, h = img.size
-                        cur = w * h
-                        max_px = 384 * 384
-                        if cur > max_px:
-                            ratio = (max_px / cur) ** 0.5
-                            w, h = int(w * ratio), int(h * ratio)
-                        w = max(32, (w // 32) * 32)
-                        h = max(32, (h // 32) * 32)
-                        result.append(img.resize((w, h)))
-    except Exception:
-        pass
-    return result
 
 
 def _extract_images(messages: list) -> list:
@@ -256,45 +196,6 @@ async def _stream_chat(request_id: str, model_path: str, device: str,
     """异步生成 SSE 事件流。"""
     state = _load_model(model_path, device)
     is_vlm = state["is_vlm"]
-
-    if state.get("is_optimum"):
-        # ── Optimum 格式流式 ──
-        model = state["model"]
-        processor = state["processor"]
-        from transformers import TextIteratorStreamer
-        from threading import Thread
-
-        # 图片 → processor
-        pil_images = _extract_images_pil(messages)
-
-        img_tag = "<|vision_start|><|image_pad|><|vision_end|>\n"
-        prompt = processor.apply_chat_template(messages, tokenize=False,
-            add_generation_prompt=True, chat_template_kwargs={"enable_thinking": True})
-
-        if pil_images:
-            prompt = img_tag * len(pil_images) + prompt
-            inputs = processor(text=[prompt], images=pil_images, return_tensors="pt")
-        else:
-            inputs = processor(text=[prompt], return_tensors="pt")
-
-        streamer = TextIteratorStreamer(processor.tokenizer, skip_prompt=True, skip_special_tokens=True)
-        gen_kwargs = dict(
-            **inputs, max_new_tokens=gen_cfg.max_new_tokens,
-            do_sample=gen_cfg.temperature >= 0.01,
-            temperature=gen_cfg.temperature if gen_cfg.temperature >= 0.01 else None,
-            top_p=gen_cfg.top_p, top_k=gen_cfg.top_k,
-            streamer=streamer,
-        )
-
-        thread = Thread(target=model.generate, kwargs=gen_kwargs)
-        thread.start()
-
-        yield f"data: {json.dumps({'id': f'chatcmpl-{request_id}', 'choices': [{'delta': {'role': 'assistant'}, 'index': 0}]})}\n\n"
-        for t in streamer:
-            yield f"data: {json.dumps({'id': f'chatcmpl-{request_id}', 'choices': [{'delta': {'content': t}, 'index': 0}]})}\n\n"
-        thread.join()
-        yield "data: [DONE]\n\n"
-        return
 
     # ── GenAI 格式流式 ──
     pipe = state["pipe"]
@@ -476,10 +377,7 @@ def create_app(model_path: str, device: str = "", host: str = "0.0.0.0", port: i
         state = _load_model(model_path, device)
         pipe = state.get("pipe")
 
-        if state.get("is_optimum"):
-            tokenizer = state["processor"].tokenizer
-        else:
-            tokenizer = pipe.get_tokenizer()
+        tokenizer = pipe.get_tokenizer()
 
         gen_cfg = ov_genai.GenerationConfig()
         gen_cfg.max_new_tokens = req.max_tokens
@@ -515,51 +413,6 @@ def create_app(model_path: str, device: str = "", host: str = "0.0.0.0", port: i
             # 非流式：收集所有 token
             _log_request("POST", "/v1/chat/completions",
                          f"non-stream{' 📷' if has_image else ''}")
-
-            if state.get("is_optimum"):
-                # ── Optimum 格式 ──
-                model = state["model"]
-                processor = state["processor"]
-                prompt = processor.apply_chat_template(
-                    [m.model_dump() for m in req.messages],
-                    tokenize=False, add_generation_prompt=True,
-                    chat_template_kwargs={"enable_thinking": True}
-                )
-                from transformers import TextIteratorStreamer
-                from threading import Thread
-
-                # 图片 → processor
-                pil_images = _extract_images_pil([m.model_dump() for m in req.messages]) if has_image else []
-
-                img_tag = "<|vision_start|><|image_pad|><|vision_end|>\n"
-                if pil_images:
-                    prompt = img_tag * len(pil_images) + prompt
-                    inputs = processor(text=[prompt], images=pil_images, return_tensors="pt")
-                else:
-                    inputs = processor(text=[prompt], return_tensors="pt")
-
-                streamer = TextIteratorStreamer(processor.tokenizer, skip_prompt=True, skip_special_tokens=True)
-                gen_kwargs = dict(
-                    **inputs, max_new_tokens=req.max_tokens,
-                    do_sample=req.temperature >= 0.01,
-                    temperature=req.temperature if req.temperature >= 0.01 else None,
-                    top_p=req.top_p, top_k=req.top_k,
-                    streamer=streamer,
-                )
-                t0 = time.time()
-                collected = []
-                thread = Thread(target=model.generate, kwargs=gen_kwargs)
-                thread.start()
-                for t in streamer:
-                    collected.append(t)
-                thread.join()
-                elapsed = time.time() - t0
-                content = "".join(collected)
-                return {
-                    "id": f"chatcmpl-{request_id}",
-                    "object": "chat.completion",
-                    "choices": [{"index": 0, "message": {"role": "assistant", "content": content}}],
-                }
 
             # ── GenAI 格式 ──
             collected = []
