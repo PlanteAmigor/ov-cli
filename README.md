@@ -11,7 +11,20 @@
 
 > 💡 **切换英文界面**：所有命令前加 `--lang en`，例如 `./ov-cli --lang en chat --model ./model-ov`
 
-基于 OpenVINO GenAI 推理引擎。支持交互式聊天（流式/翻译/图片）、OpenAI 兼容 API 服务。
+基于 OpenVINO GenAI 推理引擎。
+
+**功能矩阵：**
+
+| 功能 | 命令 | 说明 |
+|------|------|------|
+| 💬 聊天 | `ov-cli chat` | 交互式 LLM/VLM 聊天 |
+| 🌐 翻译 | `ov-cli translate` | 文本/图片翻译（独立命令） |
+| 🎨 文生图 | `ov-cli image` | Stable Diffusion / Flux |
+| 🎤 语音转文字 | `ov-cli asr` | Whisper / Qwen3-ASR |
+| 📢 语音合成 | `ov-cli tts` | Qwen3-TTS |
+| 🖥 API 服务 | `ov-cli server` | OpenAI 兼容 API |
+| 🔗 MCP 协议 | `ov-cli mcp` | LLM 工具调用 |
+| 🌐 Web 界面 | `ov-cli ui` | Gradio 可视化 |
 
 ## 快速开始
 
@@ -23,23 +36,23 @@ source .venv/bin/activate
 # 2. 聊天终端
 ./ov-cli chat --model ./Qwen3/2B-ov-int4
 
-# 3. 文生图
+# 3. 翻译
+./ov-cli translate --model ./Qwen3.5/4B-ov-int4
+
+# 4. 文生图
 ./ov-cli image --model ./FLUX/ov-int4
 
-# 4. TTS 语音合成
+# 5. TTS 语音合成
 ./ov-cli tts --model ./0.6B-CV-ov --prompt 你好 --speaker Vivian
 
-# 5. API 服务
+# 6. API 服务
 ./ov-cli server --model ./Qwen3/8B-ov-int4-v2
 
-# 6. Web 界面
+# 7. Web 界面
 ./ov-cli ui --model ./Qwen3/2B-ov-int4
 
-# 7. MCP 协议
+# 8. MCP 协议
 ./ov-cli mcp --model ./Qwen3/2B-ov-int4
-
-# 8. 管道模式（批量/外部调用）
-printf '你好\n再见' | ./ov-cli chat --model ./model-ov --mode pipe
 ```
 
 ## 如何升级
@@ -85,13 +98,15 @@ git pull
 
 | 模块 | 说明 | 额外依赖 |
 |------|------|---------|
-| `chat` | 聊天/翻译终端 | PyMuPDF, soxr |
+| `chat` | 聊天终端 | PyMuPDF, soxr |
 | `image` | 文生图 | — |
 | `asr` | 语音识别 | soundfile, scipy, qwen-asr |
 | `tts` | 语音合成 | soundfile, sox, qwen-tts |
 | `ui` | Gradio Web 界面 | gradio |
 | `mcp` | MCP 协议服务器 | — |
 | `server` | API 服务器 | fastapi, uvicorn |
+
+> **翻译功能**已从 `chat` 独立为 `translate` 子命令，支持交互式/once/pipe 三种模式。
 
 > `convert` 模块已移除。每个模型对 `optimum-intel` / `transformers` 的版本要求不同，统一入口反而制造兼容性问题。转换直接用 [`optimum-cli`](https://huggingface.co/docs/optimum/main/en/intel/export)。
 
@@ -100,6 +115,38 @@ git pull
 
 **修复模式** (`--fix`)：不重建虚拟环境，仅升级已安装的模块、重打补丁，
 数秒完成。
+
+### `translate` — 翻译终端
+
+交互式翻译终端，支持文本/图片翻译。与 `chat` 相同的文件加载功能。
+
+```bash
+# 交互式翻译
+./ov-cli translate --model ./Qwen3.5/4B-ov-int4
+./ov-cli translate --model ./Hy-MT2-1.8B-ov
+
+# 单次翻译
+./ov-cli translate --model ./model-ov --mode once --prompt '你好' --lang en
+./ov-cli translate --model ./model-ov --mode once --file ./doc.txt --lang en
+
+# 管道翻译
+echo 'hello world' | ./ov-cli translate --mode pipe --lang zh
+
+# VLM 图片翻译
+./ov-cli translate --model ./model-vlm-ov
+# 进入终端后: //img photo.jpg //en 描述图中的内容
+```
+
+**终端内命令：**
+
+| 命令 | 说明 |
+|------|------|
+| `//img PATH` | 加载图片（VLM） |
+| `//txt PATH` | 加载文本文件 |
+| `//zh` / `//en` / `//ja` ... | 指定目标语言 |
+| `/temp N` | 设置温度 (0-2) |
+| `/help` | 帮助 |
+| `/exit` | 退出 |
 
 ### `chat` — 聊天终端
 
@@ -112,9 +159,6 @@ git pull
 ./ov-cli chat --model ./Qwen3/8B-ov-int4-v2                       # 8B VLM
 ./ov-cli chat --model ./gemma-4-E2B-it-ov                          # Optimum 格式
 ./ov-cli chat --model ./model-ov --temp 0.9 --max-tokens 2048
-
-# 翻译模式
-./ov-cli chat --model ./Hy-MT2-1.8B-ov --mode translate
 
 # VLM 图片支持
 ./ov-cli chat --model ./model-vlm-ov --image ./photo.jpg
@@ -155,7 +199,7 @@ printf '问题1\n问题2\n' | ./ov-cli chat --model ./model-ov --mode pipe
 | `--file PATH` | 上传文件（可多次，支持 PDF/图片/文本） |
 | `--output PATH` | 保存结果为 .md 文件（自动命名或指定路径） |
 
-**翻译模式**：自动检测语言方向；`//en 文本` 强制译英，`//zh 文本` 强制译中。
+
 
 ### `server` — API 服务
 
@@ -173,10 +217,12 @@ printf '问题1\n问题2\n' | ./ov-cli chat --model ./model-ov --mode pipe
 |------|------|------|
 | `GET` | `/v1/models` | 模型列表 + 能力（视觉/文字） |
 | `POST` | `/v1/chat/completions` | 聊天补全（流式 + 非流式，支持多图） |
-| `POST` | `/v1/chat/completions/control` | 停止生成 |
 | `GET` | `/props` | 服务器属性 |
 | `GET` | `/health` | 健康检查 |
 | `POST` | `/token` | Token 计数 |
+
+> **纯文本生成**：server 为纯文本 API，不处理工具调用（观察派）。工具调用由 agent 框架（LangChain、opencode 等）自行管理。
+> 接受 `tools` 参数但忽略，保持 API 兼容。
 
 **curl 示例**：
 

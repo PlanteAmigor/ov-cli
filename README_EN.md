@@ -80,13 +80,15 @@ Creates a Python venv and installs dependencies. Supports on-demand installation
 
 | Module | Description | Extra deps |
 |--------|-------------|-----------|
-| `chat` | Chat / Translation terminal | PyMuPDF |
+| `chat` | Chat terminal | PyMuPDF |
 | `image` | Text-to-image | — |
 | `asr` | Speech-to-text | soundfile, qwen-asr |
 | `tts` | Text-to-speech | soundfile, qwen-tts |
 | `ui` | Gradio Web UI | gradio |
 | `mcp` | MCP protocol server | — |
 | `server` | API server | fastapi, uvicorn |
+
+> **Translate** is now a standalone `translate` command (was `chat --mode translate`). Supports interactive/once/pipe modes.
 
 > `convert` module removed. Each model requires different `optimum-intel` / `transformers` versions — a unified entry point creates more compatibility issues than it solves. Use [`optimum-cli`](https://huggingface.co/docs/optimum/main/en/intel/export) directly for conversions.
 
@@ -102,6 +104,35 @@ eval "$(./ov-cli venv)"
 eval "$(./ov-cli venv --venv ./my-venv)"
 ```
 
+### `translate` — Translation Terminal
+
+Interactive translation terminal. Supports text/image translation with the same file loading as `chat`.
+
+```bash
+# Interactive
+./ov-cli translate --model ./Qwen3.5/4B-ov-int4
+
+# Once mode
+./ov-cli translate --model ./model-ov --mode once --prompt 'Hello' --lang zh
+
+# Pipe mode
+echo '你好' | ./ov-cli translate --mode pipe --lang en
+
+# VLM image translation (inside terminal)
+//img photo.jpg //en describe the image
+```
+
+**In-terminal commands:**
+
+| Command | Description |
+|---------|-------------|
+| `//img PATH` | Load image (VLM) |
+| `//txt PATH` | Load text file |
+| `//zh` / `//en` / `//ja` ... | Set target language |
+| `/temp N` | Set temperature (0-2) |
+| `/help` | Help |
+| `/exit` | Exit |
+
 ### `chat` — Chat Terminal
 
 Interactive terminal. Auto-detects model format (GenAI / Optimum), supports streaming, multi-turn, images.
@@ -111,9 +142,6 @@ Interactive terminal. Auto-detects model format (GenAI / Optimum), supports stre
 ./ov-cli chat --model ./Qwen3/2B-ov                               # GenAI format
 ./ov-cli chat --model ./gemma-4-E2B-it-ov                          # Optimum format (Gemma-4)
 ./ov-cli chat --model ./model-ov --temp 0.9 --max-tokens 2048
-
-# Translate mode
-./ov-cli chat --model ./Hy-MT2-1.8B-ov --mode translate
 
 # VLM image support
 ./ov-cli chat --model ./model-vlm-ov --image ./photo.jpg
@@ -165,12 +193,14 @@ Starts an OpenAI-compatible HTTP API server.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/v1/models` | List models + capabilities |
+| `GET` | `/v1/models` | List models + capabilities (vision/text) |
 | `POST` | `/v1/chat/completions` | Chat completion (stream + non-stream, multi-image) |
-| `POST` | `/v1/chat/completions/control` | Stop generation |
 | `GET` | `/props` | Server properties |
 | `GET` | `/health` | Health check |
 | `POST` | `/token` | Count tokens |
+
+> **Pure text generation**: The server is a pure text API (observationist approach). Tool calling is handled by agent frameworks (LangChain, opencode, etc.) on the client side.
+> Accepts `tools` parameter for compatibility but ignores it.
 
 **curl examples**:
 

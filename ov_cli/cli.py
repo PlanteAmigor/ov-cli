@@ -131,9 +131,34 @@ def cmd_ui(args):
     launch_ui(model_path=args.model, device=args.device, port=args.port, share=args.share)
 
 @_require("chat", hint="./ov-cli setup --with chat")
+def cmd_translate(args):
+    """ov-cli translate"""
+    from .chat import load_model
+    from .translate import run_translate, run_once, run_pipe
+    ov_path = os.path.abspath(args.model)
+    if not os.path.isdir(ov_path):
+        print(f"{TR('错误: 找不到模型目录', 'Error: model directory not found')}: {ov_path}")
+        sys.exit(1)
+    ctx = load_model(ov_path, device=args.device)
+    mode = args.mode
+    if mode == "once":
+        if not args.prompt and not args.file:
+            print(f"  \u26a0 {TR('once 模式需要 --prompt 和/或 --file', 'once mode requires --prompt and/or --file')}")
+            sys.exit(1)
+        prompt = args.prompt.replace("\\n", "\n") if args.prompt else ""
+        run_once(ctx, prompt=prompt, files=args.file or [],
+                 lang=args.lang, output=args.output,
+                 max_tokens=args.max_tokens, json_output=args.json)
+    elif mode == "pipe":
+        run_pipe(ctx, lang=args.lang, max_tokens=args.max_tokens, temperature=args.temperature)
+    else:
+        run_translate(ctx, max_tokens=args.max_tokens)
+
+
+@_require("chat", hint="./ov-cli setup --with chat")
 def cmd_chat(args):
     """ov-cli chat"""
-    from .chat import load_model, run_chat, run_translate
+    from .chat import load_model, run_chat
     mode = args.mode
     if mode == "once" and not args.prompt and not args.file:
         print(f"  ⚠ {TR('once 模式需要 --prompt 和/或 --file', 'once mode requires --prompt and/or --file')}")
@@ -147,9 +172,7 @@ def cmd_chat(args):
         print(f"{TR('错误: 找不到模型文件', 'Error: model file not found')}: {ov_path}")
         sys.exit(1)
     ctx = load_model(ov_path, device=args.device)
-    if mode == "translate":
-        run_translate(ctx, max_tokens=args.max_tokens)
-    elif mode == "once":
+    if mode == "once":
         from .chat import run_once
         prompt = args.prompt.replace("\\n", "\n") if args.prompt else ""
         run_once(ctx, prompt=prompt, files=args.file or [],
@@ -207,7 +230,9 @@ _HELP_EPILOG_ZH = (
     "  ./ov-cli ui --model ./model-ov\n"
     "  ./ov-cli server --model ./model-ov --port 8080\n"
     "  ./ov-cli setup --fix\n"
-)
+    "  ./ov-cli translate --model ./model-ov\n"
+    "  ./ov-cli translate --model ./model-ov --mode once --prompt '你好' --lang en\n"
+)    
 _HELP_EPILOG_EN = (
     "📖 Examples:\n\n"
     "  ./ov-cli setup\n"
@@ -218,6 +243,9 @@ _HELP_EPILOG_EN = (
     "  ./ov-cli ui --model ./model-ov\n"
     "  ./ov-cli server --model ./model-ov --port 8080\n"
     "  ./ov-cli mcp --model ./model-ov\n"
+    "  ./ov-cli translate --model ./model-ov\n"
+    "  ./ov-cli translate --model ./model-ov --mode once --prompt '你好' --lang en\n"
+    "  echo 'hello' | ./ov-cli translate --mode pipe --lang zh\n"
     "  ./ov-cli setup --fix\n"
 )
 
@@ -251,10 +279,40 @@ def main():
         help=TR("移除模块 (chat,image,asr,tts,ui,mcp,server)", "Remove features (chat,image,asr,tts,ui,mcp,server)"))
     p.add_argument("--fix", action="store_true", help=TR("修复模式", "Fix mode"))
 
-    # chat
-    p = sub.add_parser("chat", help=TR("聊天/翻译", "Chat"))
+    # translate
+    p = sub.add_parser("translate", help=TR("翻译", "Translate"),
+        description=TR(
+            "使用 LLM/VLM 模型进行文本/图片翻译。\n\n"
+            "模式:\n"
+            "  interactive  交互式终端 (默认)，支持 //img //txt 等指令\n"
+            "  once         单次翻译 (需 --prompt 和 --lang)\n"
+            "  pipe         管道模式: echo text | ov-cli translate --mode pipe --lang zh\n\n"
+            "交互式终端指令:\n"
+            "  //img PATH  加载图片 (VLM)\n"
+            "  //txt PATH  加载文本文件\n"
+            "  //zh 文本  指定目标语言为中文\n"
+            "  //en 文本  指定目标语言为英文",
+            "Translate text/images using LLM/VLM."))
     p.add_argument("--model", "-m", required=True)
-    p.add_argument("--mode", choices=["chat","translate","once","pipe"], default="chat")
+    p.add_argument("--mode", choices=["interactive","once","pipe"], default="interactive")
+    p.add_argument("--prompt"), p.add_argument("--file", action="append", default=None)
+    p.add_argument("--output"), p.add_argument("--lang", help=TR("目标语言 (zh/en/ja...)", "Target language (zh/en/ja...)"))
+    p.add_argument("--json", action="store_true", help=TR("JSON 格式输出", "JSON output"))
+    p.add_argument("--temp", type=float, default=0.0, dest="temperature")
+    p.add_argument("--max-tokens", type=int, default=512, dest="max_tokens")
+    p.add_argument("--device", default="", help=TR("推理设备 (CPU/GPU/GPU.N/NPU)", "Device (CPU/GPU/GPU.N/NPU)") + TR("，留空自动选择", ", leave empty for auto)"))
+
+    # chat
+    p = sub.add_parser("chat", help=TR("聊天", "Chat"),
+        description=TR(
+            "交互式聊天终端。支持 VLM 图片/文件加载。\n\n"
+            "模式:\n"
+            "  chat    交互式聊天 (默认)\n"
+            "  once    单次生成 (需 --prompt)\n"
+            "  pipe    管道模式 (stdin/stdout)",
+            "Interactive chat terminal. Supports VLM image/file loading."))
+    p.add_argument("--model", "-m", required=True)
+    p.add_argument("--mode", choices=["chat","once","pipe"], default="chat")
     p.add_argument("--prompt"), p.add_argument("--file", action="append", default=None)
     p.add_argument("--output"), p.add_argument("--system", default="You are a helpful AI assistant.")
     p.add_argument("--json", action="store_true", help=TR("JSON 格式输出", "JSON output"))
@@ -368,7 +426,8 @@ def main():
         _check_wsl2_gpu()
 
     dispatch = {
-        "setup": lambda a: cmd_setup(a, _WORKSPACE), "chat": cmd_chat,
+        "setup": lambda a: cmd_setup(a, _WORKSPACE),
+        "translate": cmd_translate, "chat": cmd_chat,
         "benchmark": cmd_benchmark, "server": cmd_server,
         "image": cmd_image, "tts": cmd_tts, "asr": cmd_asr, "ui": cmd_ui, "mcp": cmd_mcp,
     }

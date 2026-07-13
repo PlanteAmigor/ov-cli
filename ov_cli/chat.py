@@ -11,47 +11,7 @@ import openvino as ov
 import openvino_genai as ov_genai
 
 
-# 翻译语言映射：代码 → (中文名, 英文名)
-TRANSLATE_LANGS = {
-    "zh":   ("中文",     "Chinese"),
-    "en":   ("英语",     "English"),       
-    "ja":   ("日语",     "Japanese"),
-    "ko":   ("韩语",     "Korean"),
-    "fr":   ("法语",     "French"),
-    "de":   ("德语",     "German"),
-    "es":   ("西班牙语", "Spanish"),
-    "pt":   ("葡萄牙语", "Portuguese"),
-    "ru":   ("俄语",     "Russian"),
-    "ar":   ("阿拉伯语", "Arabic"),
-    "it":   ("意大利语", "Italian"),
-    "tr":   ("土耳其语", "Turkish"),
-    "th":   ("泰语",     "Thai"),
-    "vi":   ("越南语",   "Vietnamese"),
-    "ms":   ("马来语",   "Malay"),
-    "id":   ("印尼语",   "Indonesian"),
-    "tl":   ("菲律宾语", "Filipino"),
-    "hi":   ("印地语",   "Hindi"),
-    "pl":   ("波兰语",   "Polish"),
-    "cs":   ("捷克语",   "Czech"),
-    "nl":   ("荷兰语",   "Dutch"),
-    "km":   ("高棉语",   "Khmer"),
-    "my":   ("缅甸语",   "Burmese"),
-    "fa":   ("波斯语",   "Persian"),
-    "gu":   ("古吉拉特语", "Gujarati"),
-    "ur":   ("乌尔都语", "Urdu"),
-    "te":   ("泰卢固语", "Telugu"),
-    "mr":   ("马拉地语", "Marathi"),
-    "he":   ("希伯来语", "Hebrew"),
-    "bn":   ("孟加拉语", "Bengali"),
-    "ta":   ("泰米尔语", "Tamil"),
-    "uk":   ("乌克兰语", "Ukrainian"),
-    "bo":   ("藏语",     "Tibetan"),
-    "kk":   ("哈萨克语", "Kazakh"),
-    "mn":   ("蒙古语",   "Mongolian"),
-    "ug":   ("维吾尔语", "Uyghur"),
-    "yue":  ("粤语",     "Cantonese"),
-    "zh-Hant": ("繁体中文", "Traditional Chinese"),
-}
+
 
 
 def _make_streamer(reply_parts, stop_flag, on_first_token=None, thinking_filter=False):
@@ -148,18 +108,12 @@ def load_model(ov_path, device=""):
                 cfg = json.load(f)
             model_type = cfg.get("model_type")
 
-        # 翻译 prompt 模板
-        t_zh = "将以下文本翻译为{target}，注意只需要输出翻译后的结果，不要额外解释：\n\n{text}"
-        t_en = "Translate the following text into {target}. Note that you should only output the translated result without any additional explanation:\n\n{text}"
-
         return {
             "pipe": pipe,
             "device": device,
             "model_type": model_type,
             "genai": True,
             "is_vlm": is_vlm,
-            "t_zh": t_zh,
-            "t_en": t_en,
         }
 
 
@@ -444,7 +398,7 @@ def run_chat(ctx, system="You are a helpful AI assistant.",
         _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_path)
 
 
-def _build_prompt(messages, tokenizer=None, enable_thinking=True):
+def _build_prompt(messages, tokenizer=None, enable_thinking=True, tools=None):
     """将消息列表转为纯文本 prompt。
 
     优先使用模型的 chat template（通过 tokenizer.apply_chat_template），
@@ -452,11 +406,13 @@ def _build_prompt(messages, tokenizer=None, enable_thinking=True):
     """
     if tokenizer is not None:
         try:
-            prompt = tokenizer.apply_chat_template(
-                messages,
-                add_generation_prompt=True,
-                extra_context={"enable_thinking": enable_thinking},
-            )
+            kwargs = {
+                "add_generation_prompt": True,
+                "extra_context": {"enable_thinking": enable_thinking},
+            }
+            if tools is not None:
+                kwargs["tools"] = tools
+            prompt = tokenizer.apply_chat_template(messages, **kwargs)
             # 去掉空的 <think>\n\n</think>\n\n（仅当 thinking 关闭时的空壳）
             prompt = prompt.replace("<think>\n\n</think>\n\n", "")
             prompt = prompt.replace("<think>\n</think>\n\n", "")
@@ -1053,134 +1009,4 @@ def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_pa
         print()
 
 
-def _run_translate_genai(ctx, max_tokens):
-    """GenAI 格式翻译模式。"""
-    pipe = ctx["pipe"]
-    t_zh = ctx["t_zh"]
-    t_en = ctx["t_en"]
-    import ov_cli as _ov
-    from ov_cli import TR
 
-    # 构建语言列表（按代码排序，常用语言排前）
-    lang_codes = sorted(TRANSLATE_LANGS.keys(), key=lambda c: (0, c) if c in ("zh","en","ja","ko","fr","de","es","pt","ru","ar","it","tr","th","vi") else (1, c))
-    lang_items = []
-    for c in lang_codes:
-        zh_name, en_name = TRANSLATE_LANGS[c]
-        name = TR(zh_name, en_name)
-        lang_items.append(f"{c}={name}")
-    # 每行 4 列
-    lang_lines = []
-    for i in range(0, len(lang_items), 4):
-        row = lang_items[i:i+4]
-        lang_lines.append("  " + "  ".join(f"{item:16s}" for item in row))
-    lang_display = "\n".join(lang_lines)
-
-    print()
-    print("        ██████╗ ██╗   ██╗     ██████╗██╗     ██╗")
-    print("       ██╔═══██╗██║   ██║    ██╔════╝██║     ██║")
-    print("       ██║   ██║██║   ██║    ██║     ██║     ██║")
-    print("       ██║   ██║╚██╗ ██╔╝    ██║     ██║     ██║")
-    print("       ╚██████╔╝ ╚████╔╝     ╚██████╗███████╗██║")
-    print("        ╚═════╝   ╚═══╝       ╚═════╝╚══════╝╚═╝")
-    print("=" * 50)
-    print("  ov-cli " + TR("翻译终端", "Translation Terminal"))
-    print(f"  {TR('设备', 'Device')}: {ctx['device']} | OpenVINO")
-    print("=" * 50)
-    print("  " + TR("直接输入文本 → 自动检测翻译方向", "Type text → auto detect language"))
-    print("  //" + TR("语言代码 文本 → 指定目标语言", "lang_code text → force target language"))
-    print(f"  " + TR("支持语言", "Supported codes") + f":\n{lang_display}")
-    print("  /help " + TR("→ 帮助", "→ help"))
-    print("  /exit " + TR("→ 退出", "→ quit"))
-    print("=" * 50)
-    print()
-
-    while True:
-        try:
-            text = readline()
-        except (EOFError, KeyboardInterrupt):
-            print()
-            break
-        if not text:
-            continue
-        if text in ("/exit", "exit", TR("退出", "exit")):
-            break
-        if text in ("/help", "help", TR("帮助", "help")):
-            print("  //" + TR("语言代码 文本 → 指定目标语言", "lang_code text → force target language"))
-            print("  " + TR("例如", "e.g.") + ": //ja おはよう, //fr Bonjour")
-            print("  /exit " + TR("退出", "quit"))
-            print()
-            continue
-
-        force_target = None
-        if text.startswith("//") and len(text) > 2:
-            # 尝试解析 //语言代码 文本
-            space_pos = text.find(" ", 2)
-            if space_pos > 2:
-                code = text[2:space_pos]
-                rest = text[space_pos+1:]
-            elif text[2:].isalpha() and text[2:].isascii():
-                code = text[2:]
-                rest = ""
-            else:
-                code = None
-                rest = text
-
-            if code and code in TRANSLATE_LANGS:
-                zh_name, en_name = TRANSLATE_LANGS[code]
-                force_target = TR(zh_name, en_name)
-                text = rest
-            elif code and code.isalpha() and code.isascii():
-                # 未知但看起来像语言代码，直接作为目标语言名
-                force_target = code
-                text = rest
-            else:
-                print("  ⚠ " + TR("未知语言代码。可用 /help 查看支持的语言", "Unknown language code. Use /help for supported codes"))
-                continue
-        elif text.startswith("//"):
-            print("  ⚠ " + TR("未知指令", "Unknown command"))
-            continue
-
-        if force_target:
-            target = force_target
-        elif _ov._LANG == "en":
-            # 英文界面：默认目标语言为英语
-            _, en_name = TRANSLATE_LANGS["en"]
-            target = TR(TRANSLATE_LANGS["en"][0], en_name)
-        else:
-            # 中文界面：默认目标语言为中文
-            target = TR(TRANSLATE_LANGS["zh"][0], TRANSLATE_LANGS["zh"][1])
-
-        prompt = t_zh.format(target=target, text=text) if has_chinese(text) else t_en.format(target=target, text=text)
-        gen_cfg = _make_genai_config(temperature=0, max_tokens=max_tokens)
-
-        print(f"  → {target}", flush=True)
-        t0 = time.time()
-        sys.stdout.write("  ")
-        sys.stdout.flush()
-        reply_parts = []
-        stop_flag = [False]
-        streamer_callback = _make_streamer(reply_parts, stop_flag, thinking_filter=True)
-
-        if ctx.get("is_vlm"):
-            pipe.generate(prompt, generation_config=gen_cfg, streamer=streamer_callback)
-        else:
-            pipe.generate(prompt, gen_cfg, streamer_callback)
-        elapsed = time.time() - t0
-        reply_text = "".join(reply_parts)
-        char_count = len(reply_text.replace(" ", ""))
-        tok_count = _count_tokens(ctx, reply_text)
-        print()
-        print(f"  [{elapsed:.1f}s | {char_count} chars | {char_count/elapsed:.1f} ch/s | {tok_count/elapsed:.1f} tok/s]")
-        print()
-
-
-def run_translate(ctx, max_tokens=512):
-    """翻译模式（用于 Hy-MT2 等翻译模型）。"""
-    from ov_cli import TR
-
-    if ctx.get("optimum"):
-        # Optimum 格式翻译（退化为聊天模式）
-        print(f"  ⚠ {TR('翻译模式在 Optimum 格式下不可用，进入聊天模式', 'Translate mode not available, using chat mode')}")
-        _run_chat_optimum(ctx, None, 0, 0.9, 40, max_tokens, None)
-        return
-    _run_translate_genai(ctx, max_tokens)

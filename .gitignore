@@ -44,6 +44,7 @@ scripts/
 convert/
 .con-venv/
 .xpu-venv/
+.ov-venv/
 rk3588-ov/
 rknn-llm/
 rknn-toolkit2/
@@ -58,3 +59,9 @@ openvino.genai-thinking-patched/
 test_thinking_all.py/
 backup/
 rk-ov/
+venv-aider/
+test_opencode_compat.py
+test_opencode_real.py
+test_tool_calls.py
+test_tool_calls.pyvenv-aider/
+.aider*
