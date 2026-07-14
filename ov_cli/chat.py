@@ -1,8 +1,7 @@
 """
 ov-cli chat: LLM 聊天/翻译终端。
 
-支持两种官方格式:
-  GenAI 格式 (optimum-cli 导出): 使用 openvino_genai LLMPipeline/VLMPipeline
+使用 OpenVINO GenAI LLMPipeline/VLMPipeline。
 """
 
 import os, sys, time, json, re, signal, threading
@@ -84,9 +83,7 @@ def load_model(ov_path, device=""):
         devices = ov.Core().available_devices
         device = next((d for d in devices if "GPU" in d), "CPU")
 
-    if _is_genai_format(ov_path):  
-
-        # === GenAI 格式（optimum-cli 导出，openvino-genai 推理） ===
+    if _is_genai_format(ov_path):
         is_vlm = _is_multimodal(ov_path)
         tag = "VLM" if is_vlm else "LLM"
         print(f"  加载 {tag}Pipeline ({device})...", end=" ", flush=True, file=sys.stderr)
@@ -193,11 +190,8 @@ def _count_tokens(ctx, text):
     if not text:
         return 0
     try:
-        if ctx.get("optimum"):
-            return len(ctx["processor"].tokenizer.encode(text))
-        else:
-            r = ctx["pipe"].get_tokenizer().encode(text)
-            return r.input_ids.shape[-1]
+        r = ctx["pipe"].get_tokenizer().encode(text)
+        return r.input_ids.shape[-1]
     except Exception:
         return 0
 
@@ -245,98 +239,64 @@ def run_once(ctx, prompt="", files=None, output=None,
 
     messages = [{"role": "user", "content": user_text}]
 
-    # 构建 prompt
-    if ctx.get("optimum"):
-        # Optimum 路径
-        chat_prompt = processor.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True,
-            chat_template_kwargs={"enable_thinking": True})
-        if all_pages and is_vlm:
-            inputs = processor(text=[chat_prompt], images=all_pages, return_tensors="pt")
-        else:
-            inputs = processor(text=[chat_prompt], return_tensors="pt")
+    # GenAI 路径
+    img_tag = "<|vision_start|><|image_pad|><|vision_end|>\n"
+    if all_pages:
+        user_text = img_tag * len(all_pages) + user_text
+        messages[0]["content"] = user_text
 
-        from transformers import TextIteratorStreamer
-        from threading import Thread
+    tokenizer = pipe.get_tokenizer()
+    try:
+        prompt_text = tokenizer.apply_chat_template(
+            messages, add_generation_prompt=True,
+            extra_context={"enable_thinking": True})
+    except Exception:
+        prompt_text = f"<|im_start|>user\n{user_text}\n<|im_end|>\n<|im_start|>assistant\n"
 
-        streamer = TextIteratorStreamer(processor.tokenizer, skip_prompt=True, skip_special_tokens=True)
-        gen_kwargs = dict(
-            **inputs, max_new_tokens=max_tokens,
-            do_sample=temperature >= 0.01,
-            temperature=temperature if temperature >= 0.01 else None,
-            top_p=top_p, top_k=top_k,
-            streamer=streamer,
-        )
+    gen_cfg = _make_genai_config(temperature, top_p, top_k, max_tokens)
 
-        reply_parts = []
-        thread = Thread(target=ctx["model"].generate, kwargs=gen_kwargs)
-        t0 = time.time()
-        thread.start()
-        for t in streamer:
-            sys.stdout.write(t)
-            sys.stdout.flush()
-            reply_parts.append(t)
-        thread.join()
-        reply_text = "".join(reply_parts)
+    # VLM 预编码进度
+    n_vis = len(all_pages)
+    progress_stop = threading.Event()
+    if is_vlm and all_pages:
+        _t_prefill = time.time()
+        def _on_first():
+            progress_stop.set()
+            pt = time.time() - _t_prefill
+            print(f"\r  ✓ {TR('视觉编码 + prefill 完成', 'Vision + prefill done')} ({pt:.1f}s, ~{n_vis})  ")
+            print(f"  {TR('回复', 'Reply')}:", end=" ", flush=True)
+        on_first = _on_first
+        def _prog():
+            while not progress_stop.is_set():
+                el = time.time() - _t_prefill
+                print(f"\r  ⏳ {TR('正在处理', 'Processing')} {n_vis} {TR('张图', 'images')}... ({el:.0f}s)", end="", flush=True)
+                progress_stop.wait(1.0)
+        threading.Thread(target=_prog, daemon=True).start()
     else:
-        # GenAI 路径
-        img_tag = "<|vision_start|><|image_pad|><|vision_end|>\n"
-        if all_pages:
-            user_text = img_tag * len(all_pages) + user_text
-            messages[0]["content"] = user_text
+        on_first = None
 
-        tokenizer = pipe.get_tokenizer()
-        try:
-            prompt_text = tokenizer.apply_chat_template(
-                messages, add_generation_prompt=True,
-                extra_context={"enable_thinking": True})
-        except Exception:
-            prompt_text = f"<|im_start|>user\n{user_text}\n<|im_end|>\n<|im_start|>assistant\n"
+    # 构建 tensors
+    image_tensors = [ov.Tensor(np.array(img)[None]) for img in all_pages] if is_vlm and all_pages else None
 
-        gen_cfg = _make_genai_config(temperature, top_p, top_k, max_tokens)
+    reply_parts = []
+    stop_flag = [False]
+    streamer_cb = _make_streamer(reply_parts, stop_flag, on_first, thinking_filter=False)
 
-        # VLM 预编码进度
-        n_vis = len(all_pages)
-        progress_stop = threading.Event()
-        if is_vlm and all_pages:
-            _t_prefill = time.time()
-            def _on_first():
-                progress_stop.set()
-                pt = time.time() - _t_prefill
-                print(f"\r  ✓ {TR('视觉编码 + prefill 完成', 'Vision + prefill done')} ({pt:.1f}s, ~{n_vis})  ")
-                print(f"  {TR('回复', 'Reply')}:", end=" ", flush=True)
-            on_first = _on_first
-            def _prog():
-                while not progress_stop.is_set():
-                    el = time.time() - _t_prefill
-                    print(f"\r  ⏳ {TR('正在处理', 'Processing')} {n_vis} {TR('张图', 'images')}... ({el:.0f}s)", end="", flush=True)
-                    progress_stop.wait(1.0)
-            threading.Thread(target=_prog, daemon=True).start()
-        else:
-            on_first = None
+    kwargs = {"generation_config": gen_cfg, "streamer": streamer_cb}
+    if image_tensors is not None:
+        kwargs["images"] = image_tensors
 
-        # 构建 tensors
-        image_tensors = [ov.Tensor(np.array(img)[None]) for img in all_pages] if is_vlm and all_pages else None
+    t0 = time.time()
+    try:
+        pipe.generate(prompt_text, **kwargs)
+    except RuntimeError as e:
+        print(f"\n  ⚠ {TR('生成失败', 'Generation failed')}: {str(e)[:200]}")
+        sys.exit(1)
+    finally:
+        if not progress_stop.is_set():
+            progress_stop.set()
 
-        reply_parts = []
-        stop_flag = [False]
-        streamer_cb = _make_streamer(reply_parts, stop_flag, on_first, thinking_filter=False)
-
-        kwargs = {"generation_config": gen_cfg, "streamer": streamer_cb}
-        if image_tensors is not None:
-            kwargs["images"] = image_tensors
-
-        t0 = time.time()
-        try:
-            pipe.generate(prompt_text, **kwargs)
-        except RuntimeError as e:
-            print(f"\n  ⚠ {TR('生成失败', 'Generation failed')}: {str(e)[:200]}")
-            sys.exit(1)
-        finally:
-            if not progress_stop.is_set():
-                progress_stop.set()
-
-        reply_text = "".join(reply_parts)
+    reply_text = "".join(reply_parts)
 
     # 输出统计
     elapsed = time.time() - t0
@@ -393,10 +353,7 @@ def run_chat(ctx, system="You are a helpful AI assistant.",
     print("=" * 50)
     print()
 
-    if ctx.get("optimum"):
-        _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_path)
-    else:
-        _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_path)
+    _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_path)
 
 
 def _build_prompt(messages, tokenizer=None, enable_thinking=True, tools=None):
@@ -499,6 +456,7 @@ def _pdf_to_images(path):
     i915 驱动下 PDF 超 20 页会触发 GPU fence timeout，返回 None 并提示切换到 Xe。
     Xe 驱动或 CPU 下无限制，使用 300 DPI 高清晰度渲染。
     """
+    from . import TR
     try:
         import fitz
     except ImportError:
@@ -586,259 +544,7 @@ def _images_to_ov_tensor(images):
     return ov.Tensor(canvas[None])
 
 
-def _count_tokens(ctx, text):
-    """统计文本的 token 数。"""
-    if not text:
-        return 0
-    try:
-        if ctx.get("optimum"):
-            return len(ctx["processor"].tokenizer.encode(text))
-        else:
-            r = ctx["pipe"].get_tokenizer().encode(text)
-            return r.input_ids.shape[-1]
-    except Exception:
-        return 0
-
-
-# 每批最多发送的图片/PDF 页数
-def _run_chat_optimum(ctx, system, temperature, top_p, top_k, max_tokens, image_path=None):
-    """Optimum 格式聊天模式（OVModelForVisualCausalLM + AutoProcessor）。"""
-    model = ctx["model"]
-    processor = ctx["processor"]
-    is_vlm = ctx.get("is_vlm", False)
-    from . import TR
-
-    # 文件管理: {id, path, type, pages:[PIL]}
-    loaded_files = []
-    _next_id = 1
-
-    # 预加载初始图片
-    if image_path and is_vlm:
-        if os.path.isfile(image_path):
-            from PIL import Image
-            loaded_files.append({"id": _next_id, "path": image_path, "type": "image", "pages": [Image.open(image_path).convert("RGB")]})
-            print(f"  \u2713 {TR('\u5df2\u52a0\u8f7d\u56fe\u7247', 'Image loaded')}: {image_path}")
-            _next_id += 1
-        else:
-            print(f"  \u26a0 {TR('\u627e\u4e0d\u5230\u56fe\u7247', 'Image not found')}: {image_path}")
-
-    conv = []
-    while True:
-        try:
-            text = readline()
-        except (EOFError, KeyboardInterrupt):
-            print()
-            break
-        if not text:
-            continue
-
-        if text in ("/exit", "exit"):
-            break
-        if text == "/help":
-            if is_vlm:
-                print("  //img PATH   " + TR("\u52a0\u8f7d\u56fe\u7247", "load image"))
-            print("  //txt PATH   " + TR("\u52a0\u8f7d\u6587\u672c\u6587\u4ef6", "load text file"))
-            print("  /temp N      " + TR("\u6e29\u5ea6 (0-2)", "temperature"))
-            print("  /system T    " + TR("\u7cfb\u7edf\u63d0\u793a\u8bcd", "system prompt"))
-            print("  /help        " + TR("\u5e2e\u52a9", "help"))
-            print("  /exit        " + TR("\u9000\u51fa", "quit"))
-            print()
-            continue
-        if text.startswith("/temp "):
-            try:
-                temperature = max(0, min(2, float(text[6:])))
-                print(f"  temperature = {temperature}")
-            except:
-                print("  \u26a0 /temp 0.7")
-            print()
-            continue
-        if text.startswith("/system "):
-            system = text[8:]
-            print(f"  {TR('\u7cfb\u7edf\u63d0\u793a\u8bcd\u5df2\u66f4\u65b0', 'System prompt updated')}")
-            print()
-            continue
-        if text.startswith("//img ") and is_vlm:
-            import shlex
-            paths = shlex.split(text[6:])
-            if not paths:
-                print(f"  \u26a0 {TR('\u7528\u6cd5', 'Usage')}: //img PATH1 [PATH2 ...]")
-                print()
-                continue
-            loaded_any = 0
-            for img_path in paths:
-                if os.path.isfile(img_path):
-                    loaded_files.append({"id": _next_id, "path": img_path, "type": "image", "pages": [_load_image(img_path)]})
-                    print(f"  #{_next_id} \u2713 {TR('\u5df2\u52a0\u8f7d\u56fe\u7247', 'Image loaded')}: {img_path}")
-                    _next_id += 1
-                    loaded_any += 1
-                else:
-                    print(f"  \u26a0 {TR('\u627e\u4e0d\u5230\u56fe\u7247', 'Image not found')}: {img_path}")
-            print()
-            continue
-
-        if text.startswith("//pdf ") and is_vlm:
-            print(f"  \u26a0 {TR('PDF \u6682\u65f6\u7981\u7528—\u89c1 #36386', 'PDF temporarily disabled—see #36386')} (https://github.com/openvinotoolkit/openvino/issues/36386)")
-            print()
-            continue
-
-        if text.startswith("//txt "):
-            import shlex
-            paths = shlex.split(text[6:])
-            if not paths:
-                print(f"  \u26a0 {TR('\u7528\u6cd5', 'Usage')}: //txt PATH1 [PATH2 ...]")
-                print()
-                continue
-            loaded_any = 0
-            for txt_path in paths:
-                if os.path.isfile(txt_path):
-                    file_content = _load_text_file(txt_path)
-                    loaded_files.append({"id": _next_id, "path": txt_path, "type": "text", "content": file_content})
-                    print(f"  #{_next_id} \u2713 {TR('\u5df2\u52a0\u8f7d\u6587\u4ef6', 'File loaded')}: {txt_path}")
-                    _next_id += 1
-                    loaded_any += 1
-                else:
-                    print(f"  \u26a0 {TR('\u627e\u4e0d\u5230\u6587\u4ef6', 'File not found')}: {txt_path}")
-            print()
-            continue
-
-        # \u6784\u5efa\u6d88\u606f\uff1a\u6240\u6709\u5df2\u52a0\u8f7d\u6587\u4ef6\u7684\u56fe\u7247 + \u6587\u672c
-        all_pages = []
-        txt_prefix = ""
-        for f in loaded_files:
-            if f["type"] == "text":
-                fname = os.path.basename(f["path"])
-                txt_prefix += f"[\u6587\u4ef6 {fname}]\n```\n{f['content']}\n```\n\n"
-            else:
-                all_pages.extend(f["pages"])
-        if txt_prefix:
-            text = txt_prefix + text
-        loaded_files.clear()
-        if all_pages and is_vlm:
-            content = [{"type": "image", "image": img} for img in all_pages]
-            content.append({"type": "text", "text": text})
-            conv.append({"role": "user", "content": content})
-        else:
-            conv.append({"role": "user", "content": text})
-
-        messages = []
-        if system:
-            messages.append({"role": "system", "content": system})
-        messages.extend(conv)
-
-        prompt = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, chat_template_kwargs={"enable_thinking": True})
-        # VLM prefill 进度指示器
-        n_vlm_pages = len(all_pages)
-        progress_stop = threading.Event()
-        if is_vlm and n_vlm_pages > 0:
-            n_vis_tokens = n_vlm_pages * (max(img.width * img.height for img in all_pages) // (32 * 32))
-            _t_prefill_start = time.time()
-            def _on_first():
-                progress_stop.set()
-                pt = time.time() - _t_prefill_start
-                print(f"\r  \u2713 {TR('\u89c6\u89c9\u7f16\u7801 + prefill \u5b8c\u6210', 'Vision + prefill done')} ({pt:.1f}s, ~{n_vis_tokens} tok)  ")
-                print(f"  {TR('\u56de\u590d', 'Reply')}:", end=" ", flush=True)
-            def _show_progress():
-                while not progress_stop.is_set():
-                    elapsed = time.time() - _t_prefill_start
-                    print(f"\r  \u23f3 {TR('\u6b63\u5728\u5904\u7406', 'Processing')} {n_vlm_pages} {TR('\u9875', 'pages')}... ({elapsed:.0f}s)", end="", flush=True)
-                    progress_stop.wait(1.0)
-            threading.Thread(target=_show_progress, daemon=True).start()
-
-        if all_pages and is_vlm:
-            inputs = processor(text=[prompt], images=all_pages, return_tensors="pt")
-        else:
-            inputs = processor(text=[prompt], return_tensors="pt")
-
-        t0 = time.time()
-        if not (is_vlm and n_vlm_pages > 0):
-            print(f"  {TR('\u56de\u590d', 'Reply')}:", end=" ", flush=True)
-
-        from transformers import TextIteratorStreamer
-        from threading import Thread
-
-        streamer = TextIteratorStreamer(processor.tokenizer, skip_prompt=True, skip_special_tokens=True)
-        gen_kwargs = dict(
-            **inputs,
-            max_new_tokens=max_tokens,
-            do_sample=temperature >= 0.01,
-            temperature=temperature if temperature >= 0.01 else None,
-            top_p=top_p,
-            top_k=top_k,
-            streamer=streamer,
-        )
-
-        stop_flag = [False]
-        thread = Thread(target=model.generate, kwargs=gen_kwargs)
-        thread.start()
-
-        in_think = [False]  # 初始不在 think 块内，由 <think> 标签触发
-        reply_parts = []
-        _opt_first = [True]
-        try:
-            for t in streamer:
-                if _opt_first[0] and n_vlm_pages > 0:
-                    _opt_first[0] = False
-                    _on_first()
-                if thinking_filter:
-                    if in_think[0]:
-                        if '</think>' in t:
-                            idx = t.index('</think>')
-                            after = t[idx + 8:]
-                            if after:
-                                reply_parts.append(after)
-                                sys.stdout.write(after)
-                                sys.stdout.flush()
-                            in_think[0] = False
-                        continue
-                    if '<think>' in t:
-                        idx = t.index('<think>')
-                        before = t[:idx]
-                        after = t[idx + 7:]
-                        if before:
-                            reply_parts.append(before)
-                            sys.stdout.write(before)
-                            sys.stdout.flush()
-                        if after:
-                            if '</think>' in after:
-                                idx2 = after.index('</think>')
-                                after_think = after[idx2 + 8:]
-                                if after_think:
-                                    reply_parts.append(after_think)
-                                    sys.stdout.write(after_think)
-                                    sys.stdout.flush()
-                            else:
-                                in_think[0] = True
-                        continue
-                    # 过滤孤立的 </think>（没有配对的 <think>）
-                    if '</think>' in t:
-                        idx = t.index('</think>')
-                        after = t[idx + 8:]
-                        if after:
-                            reply_parts.append(after)
-                            sys.stdout.write(after)
-                            sys.stdout.flush()
-                        continue
-                    sys.stdout.write(t)
-                    sys.stdout.flush()
-                    reply_parts.append(t)
-                else:
-                    sys.stdout.write(t)
-                    sys.stdout.flush()
-                    reply_parts.append(t)
-        finally:
-            if not progress_stop.is_set():
-                progress_stop.set()
-
-        thread.join()
-        reply_text = "".join(reply_parts)
-        elapsed = time.time() - t0
-        conv.append({"role": "assistant", "content": reply_text})
-        char_count = len(reply_text.replace(" ", ""))
-        tok_count = _count_tokens(ctx, reply_text)
-        print()
-        print(f"  [{elapsed:.1f}s | {char_count} chars | {char_count/elapsed:.1f} ch/s | {tok_count/elapsed:.1f} tok/s]")
-        print()
-
+# ── GenAI 聊天模式 ──────────────────────────────────────
 
 def _run_chat_genai(ctx, system, temperature, top_p, top_k, max_tokens, image_path=None):
     """GenAI 格式聊天模式。"""

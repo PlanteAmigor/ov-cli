@@ -6,8 +6,6 @@ ov-cli features: 按需安装的功能模块管理。
   image     — 文生图
   asr       — 语音识别 (+qwen-asr, soundfile, scipy)
   tts       — 语音合成 (+qwen-tts, soundfile)
-  mcp       — MCP 协议服务器
-  server    — API 服务器 (+fastapi, uvicorn)
   yolo      — 目标检测 (+ultralytics)
 
 """
@@ -22,7 +20,7 @@ _FEATURES_PATH = os.path.join(_PROJECT_ROOT, ".ov-cli-features")
 def get_installed() -> set[str]:
     """读取已安装的功能列表。"""
     if not os.path.isfile(_FEATURES_PATH):
-        return {"chat", "image", "asr", "tts", "mcp", "server", "yolo"}
+        return {"chat", "image", "asr", "tts", "yolo"}
     with open(_FEATURES_PATH) as f:
         return {s.strip() for s in f.read().strip().split(",") if s.strip()}
 
@@ -45,8 +43,6 @@ _FEATURE_PACKAGES = {
     "image":    [],
     "asr":      ["soundfile", "scipy"],
     "tts":      ["soundfile", "sox"],
-    "mcp":      [],
-    "server":   ["fastapi>=0.100", "uvicorn[standard]>=0.20"],
     "yolo":     ["ultralytics"],
 }
 

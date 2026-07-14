@@ -55,15 +55,6 @@ def cmd_benchmark(args):
     run_benchmark(ov_path, device=args.device)
 
 
-@_require("server", hint="./ov-cli setup --with server")
-def cmd_server(args):
-    """ov-cli server: 启动 API 服务"""
-    from .server import run_server
-    model_path = os.path.abspath(args.model)
-    if not os.path.isdir(model_path):
-        print(f"  ⚠ {TR('模型路径不存在', 'Model path not found')}: {model_path}")
-        sys.exit(1)
-    run_server(model_path, args.device, args.host, args.port)
 
 
 @_require("image", hint="./ov-cli setup --with image")
@@ -206,13 +197,6 @@ def cmd_asr(args):
     else:
         run_whisper(ctx, lang=args.lang)
 
-
-@_require("mcp", hint="./ov-cli setup --with mcp")
-def cmd_mcp(args):
-    """ov-cli mcp: MCP 协议服务器"""
-    from .mcp import run_mcp
-    ov_path = os.path.abspath(args.model)
-    run_mcp(ov_path)
 
 
 @_require("yolo", hint="./ov-cli setup --with yolo")
@@ -367,13 +351,6 @@ def main():
 
     p.add_argument("--device", default="", help=TR("推理设备 (CPU/GPU/GPU.N/NPU)", "Device (CPU/GPU/GPU.N/NPU)") + TR("，留空自动选择", ", leave empty for auto)"))
 
-    # server
-    p = sub.add_parser("server", help=TR("API服务", "Server"))
-    p.add_argument("--model", "-m", required=True)
-    p.add_argument("--device", default="", help=TR("推理设备 (CPU/GPU/GPU.N/NPU)", "Device (CPU/GPU/GPU.N/NPU)") + TR("，留空自动选择", ", leave empty for auto)"))
-    p.add_argument("--host", default="0.0.0.0")
-    p.add_argument("--port", type=int, default=8080)
-
     # image
     p = sub.add_parser("image", help=TR("文生图", "Image"),
         description=TR(
@@ -445,18 +422,6 @@ def main():
     p.add_argument("--share", action="store_true", help=TR("生成公链", "Public link"))
 
 
-    # mcp
-    p = sub.add_parser("mcp", help=TR("MCP 协议服务器", "MCP Server"),
-        description=TR(
-            "启动 MCP (Model Context Protocol) 服务器。\n"
-            "通过 stdin/stdout JSON-RPC 暴露 LLM 工具。\n\n"
-            "示例:\n"
-            "  ov-cli mcp --model ./Qwen3-ov\n"
-            "  ov-cli mcp --model ./deepseek/7B-ov",
-            "MCP (Model Context Protocol) server.\n"
-            "Exposes LLM tools via stdin/stdout JSON-RPC."))
-    p.add_argument("--model", "-m", required=True)
-
     # yolo
     p = sub.add_parser("yolo", help=TR("目标检测", "YOLO Detect"),
         description=TR(
@@ -493,9 +458,9 @@ def main():
     dispatch = {
         "setup": lambda a: cmd_setup(a, _WORKSPACE),
         "translate": cmd_translate, "chat": cmd_chat,
-        "benchmark": cmd_benchmark, "server": cmd_server,
+        "benchmark": cmd_benchmark,
         "image": cmd_image, "tts": cmd_tts, "asr": cmd_asr,
-        "mcp": cmd_mcp, "yolo": cmd_yolo,
+        "yolo": cmd_yolo,
     }
     dispatch[args.cmd](args)
 

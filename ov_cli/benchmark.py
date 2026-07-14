@@ -92,74 +92,6 @@ def _run_genai_bench_detailed(pipe, prompt):
     }
 
 
-def _run_optimum_bench(model, processor, input_size):
-    """Optimum 格式基准测试。"""
-    from transformers import TextIteratorStreamer
-    from threading import Thread
-    import torch
-
-    prompt = _make_prompt(input_size)
-    test_prompt = prompt + "请详细解释这段话的含义。"
-
-    # 预热
-    msgs = [{"role": "user", "content": [{"type": "text", "text": "你好"}]}]
-    text = processor.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
-    inputs = processor(text=[text], return_tensors="pt")
-    model.generate(**inputs, max_new_tokens=10)
-
-    rss_before = _measure_rss()
-
-    # 正式测试
-    msgs = [{"role": "user", "content": [{"type": "text", "text": test_prompt}]}]
-    text = processor.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
-    inputs = processor(text=[text], return_tensors="pt")
-
-    first_token_time = None
-    second_token_time = None
-    all_text = []
-
-    streamer = TextIteratorStreamer(processor.tokenizer, skip_prompt=True, skip_special_tokens=True)
-    gen_kwargs = dict(**inputs, max_new_tokens=128, do_sample=False, streamer=streamer)
-
-    t_start = time.perf_counter()
-    thread = Thread(target=model.generate, kwargs=gen_kwargs)
-    thread.start()
-
-    for t in streamer:
-        now = time.perf_counter()
-        if t:
-            all_text.append(t)
-            if first_token_time is None:
-                first_token_time = now
-            elif second_token_time is None:
-                second_token_time = now
-    thread.join()
-    t_end = time.perf_counter()
-
-    rss_after = _measure_rss()
-    max_rss = max(rss_before, rss_after)
-
-    total_time = t_end - t_start
-    first_latency = (first_token_time - t_start) * 1000 if first_token_time else 0
-    second_latency = (second_token_time - first_token_time) * 1000 if second_token_time else 0
-
-    # 实际 token 数
-    full_text = "".join(all_text)
-    actual_tokens = len(processor.tokenizer.encode(full_text))
-
-    gen_time = t_end - (first_token_time or t_end)
-    second_tps = actual_tokens / gen_time if gen_time > 0 else 0
-
-    return {
-        "first_latency": first_latency,
-        "second_latency": second_latency,
-        "max_rss": max_rss,
-        "second_tps": second_tps,
-        "total_tokens": actual_tokens,
-        "total_time": total_time,
-    }
-
-
 def run_benchmark(model_path, device=""):
     """运行基准测试。"""
     from .chat import load_model
@@ -184,12 +116,7 @@ def run_benchmark(model_path, device=""):
     import time as _time
     print(f"  {'预热中 (3 轮)...':40s}")
     for _ in range(3):
-        if ctx.get("optimum"):
-            msgs = [{"role": "user", "content": [{"type": "text", "text": "你好"}]}]
-            text = ctx["processor"].apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
-            inputs = ctx["processor"](text=[text], return_tensors="pt")
-            ctx["model"].generate(**inputs, max_new_tokens=10)
-        elif ctx.get("is_vlm"):
+        if ctx.get("is_vlm"):
             ctx["pipe"].generate("你好", images=[], max_new_tokens=10)
         else:
             ctx["pipe"].generate("你好", max_new_tokens=10)
@@ -204,11 +131,8 @@ def run_benchmark(model_path, device=""):
         print(f"  输入大小: {size} tokens")
         print(f"  {'-'*40}")
 
-        if ctx.get("optimum"):
-            res = _run_optimum_bench(ctx["model"], ctx["processor"], size)
-        else:
-            pipe = ctx["pipe"]
-            res = _run_genai_bench_detailed(pipe, _make_prompt(size) + "请详细解释这段话的含义。")
+        if ctx.get("is_vlm"):
+            res = _run_genai_bench_detailed(ctx["pipe"], _make_prompt(size) + "请详细解释这段话的含义。")
 
         results[size] = res
         print(f"    prefill:        {res['prefill_tps']:>8.1f} tok/s ({res['input_tokens']} tok in {res['first_latency']/1000:.2f}s)")
