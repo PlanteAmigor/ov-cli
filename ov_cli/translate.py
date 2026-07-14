@@ -76,7 +76,7 @@ _T_ZH = "将以下文本翻译为{target}，注意只需要输出翻译后的结
 _T_EN = "Translate the following text into {target}. Note that you should only output the translated result without any additional explanation:\n\n{text}"
 
 
-def run_translate(ctx, max_tokens=512):
+def run_translate(ctx, max_tokens=0):
     """翻译模式入口。"""
     pipe = ctx.get("pipe")
     is_vlm = ctx.get("is_vlm", False)
@@ -321,7 +321,7 @@ def _resolve_target_lang(lang_code):
 # ── Once 模式（单次翻译） ──────────────────────────────────
 
 def run_once(ctx, prompt="", files=None, lang=None, output=None,
-             max_tokens=512, json_output=False):
+             max_tokens=0, json_output=False):
     """单次翻译。"""
     import json as _json
     pipe = ctx.get("pipe")
@@ -402,7 +402,7 @@ def run_once(ctx, prompt="", files=None, lang=None, output=None,
 
 # ── Pipe 模式（管道翻译） ─────────────────────────────────
 
-def run_pipe(ctx, lang=None, max_tokens=512, temperature=0):
+def run_pipe(ctx, lang=None, max_tokens=0, temperature=0):
     """管道翻译：从 stdin 读文本，向 stdout 写 JSON 结果。"""
     import json as _json
     pipe = ctx.get("pipe")

@@ -11,9 +11,6 @@ import openvino as ov
 import openvino_genai as ov_genai
 
 
-
-
-
 def _make_streamer(reply_parts, stop_flag, on_first_token=None, thinking_filter=False):
     """创建 streamer callback。
 
@@ -119,10 +116,14 @@ def load_model(ov_path, device=""):
 
 
 
-def _make_genai_config(temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024, presence_penalty=None):
-    """创建 GenAI GenerationConfig。"""
+def _make_genai_config(temperature=0.7, top_p=0.9, top_k=40, max_tokens=0, presence_penalty=None):
+    """创建 GenAI GenerationConfig。
+    
+    max_tokens=0 表示不限制，由模型自行决定何时输出 EOS 结束。
+    """
     cfg = ov_genai.GenerationConfig()
-    cfg.max_new_tokens = max_tokens
+    if max_tokens > 0:
+        cfg.max_new_tokens = max_tokens
     cfg.temperature = temperature
     cfg.top_p = top_p
     cfg.top_k = top_k
@@ -134,7 +135,7 @@ def _make_genai_config(temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024, pr
 
 # ── 管道模式 ────────────────────────────────────────────
 
-def run_pipe(ctx, max_tokens=1024, temperature=0.7):
+def run_pipe(ctx, max_tokens=0, temperature=0.7):
     """管道模式：从 stdin 读提示词，向 stdout 写 JSON 结果。"""
     import json as _json
     pipe = ctx.get("pipe")
@@ -202,7 +203,7 @@ def _count_tokens(ctx, text):
 
 
 def run_once(ctx, prompt="", files=None, output=None,
-             temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024,
+             temperature=0.7, top_p=0.9, top_k=40, max_tokens=0,
              json_output=False):
     """单次输出模式：读取文件 + 文字，一次生成，输出后退出。"""
     import numpy as np
@@ -366,7 +367,7 @@ def run_once(ctx, prompt="", files=None, output=None,
 
 
 def run_chat(ctx, system="You are a helpful AI assistant.",
-             temperature=0.7, top_p=0.9, top_k=40, max_tokens=1024,
+             temperature=0.7, top_p=0.9, top_k=40, max_tokens=0,
              image_path=None):
     """通用聊天模式"""
     from . import TR
