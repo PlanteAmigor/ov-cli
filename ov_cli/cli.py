@@ -309,11 +309,10 @@ def main():
 
     # setup
     p = sub.add_parser("setup", help=TR("创建环境", "Setup"))
-    p.add_argument("--optimum-dir", help=TR("optimum-intel 源码目录", "optimum-intel source"))
     p.add_argument("--with", dest="with_features", default="all",
-        help=TR("按需安装 (chat,image,asr,tts,ui,mcp,server,yolo)", "Features (chat,image,asr,tts,ui,mcp,server,yolo)"))
+        help=TR("按需安装 (chat,image,asr,tts,mcp,server,yolo)", "Features (chat,image,asr,tts,mcp,server,yolo)"))
     p.add_argument("--remove", dest="remove_features", default="",
-        help=TR("移除模块 (chat,image,asr,tts,ui,mcp,server,yolo)", "Remove features (chat,image,asr,tts,ui,mcp,server,yolo)"))
+        help=TR("移除模块 (chat,image,asr,tts,mcp,server,yolo)", "Remove features (chat,image,asr,tts,mcp,server,yolo)"))
     p.add_argument("--fix", action="store_true", help=TR("修复模式", "Fix mode"))
 
     # translate
@@ -496,7 +495,7 @@ def main():
         "translate": cmd_translate, "chat": cmd_chat,
         "benchmark": cmd_benchmark, "server": cmd_server,
         "image": cmd_image, "tts": cmd_tts, "asr": cmd_asr,
-        "ui": cmd_ui, "mcp": cmd_mcp, "yolo": cmd_yolo,
+        "mcp": cmd_mcp, "yolo": cmd_yolo,
     }
     dispatch[args.cmd](args)
 
