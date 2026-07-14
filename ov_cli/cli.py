@@ -215,6 +215,43 @@ def cmd_mcp(args):
     run_mcp(ov_path)
 
 
+@_require("yolo", hint="./ov-cli setup --with yolo")
+def cmd_yolo(args):
+    """ov-cli yolo: 目标检测"""
+    from .yolo import run_once, run_batch
+    if args.dir:
+        # 批量模式
+        run_batch(
+            model_path=args.model,
+            input_dir=args.dir,
+            device=args.device,
+            output_dir=args.output,
+            json_output=args.json,
+            imgsz=args.imgsz,
+            conf=args.conf,
+            iou=args.iou,
+            classes_str=args.classes,
+        )
+        return
+    if not args.image and not args.camera:
+        print(f"  ⚠ {TR('需要 --image / --dir 或 --camera', 'Need --image / --dir or --camera')}")
+        sys.exit(1)
+    if args.camera is not None:
+        print(f"  ⚠ {TR('摄像头模式尚未实现', 'Camera mode not yet implemented')}")
+        sys.exit(1)
+    run_once(
+        model_path=args.model,
+        image_path=args.image,
+        device=args.device,
+        output=args.output,
+        json_output=args.json,
+        imgsz=args.imgsz,
+        conf=args.conf,
+        iou=args.iou,
+        classes_str=args.classes,
+    )
+
+
 # ── 帮助文本 ──
 
 _HELP_DESC_ZH = "ov-cli — 基于 OpenVINO 的 LLM 本地推理工具箱\n轻量、离线、CPU/GPU 皆可运行。"
@@ -274,9 +311,9 @@ def main():
     p = sub.add_parser("setup", help=TR("创建环境", "Setup"))
     p.add_argument("--optimum-dir", help=TR("optimum-intel 源码目录", "optimum-intel source"))
     p.add_argument("--with", dest="with_features", default="all",
-        help=TR("按需安装 (chat,image,asr,tts,ui,mcp,server)", "Features (chat,image,asr,tts,ui,mcp,server)"))
+        help=TR("按需安装 (chat,image,asr,tts,ui,mcp,server,yolo)", "Features (chat,image,asr,tts,ui,mcp,server,yolo)"))
     p.add_argument("--remove", dest="remove_features", default="",
-        help=TR("移除模块 (chat,image,asr,tts,ui,mcp,server)", "Remove features (chat,image,asr,tts,ui,mcp,server)"))
+        help=TR("移除模块 (chat,image,asr,tts,ui,mcp,server,yolo)", "Remove features (chat,image,asr,tts,ui,mcp,server,yolo)"))
     p.add_argument("--fix", action="store_true", help=TR("修复模式", "Fix mode"))
 
     # translate
@@ -299,7 +336,8 @@ def main():
     p.add_argument("--output"), p.add_argument("--lang", help=TR("目标语言 (zh/en/ja...)", "Target language (zh/en/ja...)"))
     p.add_argument("--json", action="store_true", help=TR("JSON 格式输出", "JSON output"))
     p.add_argument("--temp", type=float, default=0.0, dest="temperature")
-    p.add_argument("--max-tokens", type=int, default=512, dest="max_tokens")
+    p.add_argument("--max-tokens", type=int, default=0, dest="max_tokens",
+        help=TR("最大生成 token 数 (0=不限)", "Max tokens (0=unlimited)"))
     p.add_argument("--device", default="", help=TR("推理设备 (CPU/GPU/GPU.N/NPU)", "Device (CPU/GPU/GPU.N/NPU)") + TR("，留空自动选择", ", leave empty for auto)"))
 
     # chat
@@ -319,7 +357,8 @@ def main():
     p.add_argument("--temp", type=float, default=0.7)
     p.add_argument("--top-p", type=float, default=0.9, dest="top_p")
     p.add_argument("--top-k", type=int, default=40, dest="top_k")
-    p.add_argument("--max-tokens", type=int, default=1024, dest="max_tokens")
+    p.add_argument("--max-tokens", type=int, default=0, dest="max_tokens",
+        help=TR("最大生成 token 数 (0=不限)", "Max tokens (0=unlimited)"))
     p.add_argument("--image", "-i")
     p.add_argument("--device", default="", help=TR("推理设备 (CPU/GPU/GPU.N/NPU)", "Device (CPU/GPU/GPU.N/NPU)") + TR("，留空自动选择", ", leave empty for auto)"))
 
@@ -419,6 +458,33 @@ def main():
             "Exposes LLM tools via stdin/stdout JSON-RPC."))
     p.add_argument("--model", "-m", required=True)
 
+    # yolo
+    p = sub.add_parser("yolo", help=TR("目标检测", "YOLO Detect"),
+        description=TR(
+            "使用 Ultralytics YOLO + OpenVINO 进行目标检测。\n\n"
+            "支持 .pt 自动导出和 OpenVINO IR 直接推理。\n\n"
+            "单图模式:\n"
+            "  ov-cli yolo --model yolo11n.pt --image input.jpg\n"
+            "  ov-cli yolo --model yolo11n.pt --image input.jpg --output result.jpg\n"
+            "  ov-cli yolo --model yolo11n.pt --image input.jpg --json --classes person,car\n"
+            "  ov-cli yolo --model yolo11n.pt --image input.jpg --device GPU --conf 0.5\n\n"
+            "批量模式:\n"
+            "  ov-cli yolo --model yolo11n.pt --dir ./images/ --output ./results/\n"
+            "  ov-cli yolo --model yolo11n.pt --dir ./images/ --json --classes 0,5",
+            "Object detection using Ultralytics YOLO + OpenVINO."))
+    p.add_argument("--model", "-m", required=True)
+    p.add_argument("--image", "-i", help=TR("输入图片路径 / URL", "Input image path / URL"))
+    p.add_argument("--dir", help=TR("批量处理目录下所有图片", "Batch process all images in directory"))
+    p.add_argument("--output", "-o", help=TR("保存结果图片/目录", "Save annotated image/dir"))
+    p.add_argument("--json", action="store_true", help=TR("JSON 格式输出", "JSON output"))
+    p.add_argument("--device", default="", help=TR("推理设备 (CPU/GPU/NPU)", "Device (CPU/GPU/NPU)"))
+    p.add_argument("--camera", type=int, default=None, const=0, nargs="?",
+        help=TR("摄像头 ID。例: --camera 0", "Camera device ID. e.g. --camera 0"))
+    p.add_argument("--imgsz", type=int, default=640, help=TR("输入图片尺寸", "Input image size"))
+    p.add_argument("--conf", type=float, default=0.25, help=TR("置信度阈值", "Confidence threshold"))
+    p.add_argument("--iou", type=float, default=0.45, help=TR("NMS IoU 阈值", "NMS IoU threshold"))
+    p.add_argument("--classes", help=TR("只检测指定类别 (数字ID或名称,逗号分隔)", "Filter classes (IDs or names, comma-separated)"))
+
     args = parser.parse_args()
     if args.lang:
         ov_cli._LANG = args.lang
@@ -429,7 +495,8 @@ def main():
         "setup": lambda a: cmd_setup(a, _WORKSPACE),
         "translate": cmd_translate, "chat": cmd_chat,
         "benchmark": cmd_benchmark, "server": cmd_server,
-        "image": cmd_image, "tts": cmd_tts, "asr": cmd_asr, "ui": cmd_ui, "mcp": cmd_mcp,
+        "image": cmd_image, "tts": cmd_tts, "asr": cmd_asr,
+        "ui": cmd_ui, "mcp": cmd_mcp, "yolo": cmd_yolo,
     }
     dispatch[args.cmd](args)
 

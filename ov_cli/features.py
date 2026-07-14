@@ -9,6 +9,7 @@ ov-cli features: 按需安装的功能模块管理。
   ui        — Gradio Web 界面 (+gradio)
   mcp       — MCP 协议服务器
   server    — API 服务器 (+fastapi, uvicorn)
+  yolo      — 目标检测 (+ultralytics)
 
 """
 
@@ -22,7 +23,7 @@ _FEATURES_PATH = os.path.join(_PROJECT_ROOT, ".ov-cli-features")
 def get_installed() -> set[str]:
     """读取已安装的功能列表。"""
     if not os.path.isfile(_FEATURES_PATH):
-        return {"chat", "image", "asr", "tts", "ui", "mcp", "server"}
+        return {"chat", "image", "asr", "tts", "ui", "mcp", "server", "yolo"}
     with open(_FEATURES_PATH) as f:
         return {s.strip() for s in f.read().strip().split(",") if s.strip()}
 
@@ -48,6 +49,7 @@ _FEATURE_PACKAGES = {
     "ui":       ["gradio"],
     "mcp":      [],
     "server":   ["fastapi>=0.100", "uvicorn[standard]>=0.20"],
+    "yolo":     ["ultralytics"],
 }
 
 _FEATURE_EXTRA_PIPS = {
