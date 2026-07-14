@@ -11,7 +11,7 @@
 
 > 💡 **Switch to Chinese UI**: Prefix any command with `--lang zh`, e.g. `./ov-cli --lang zh chat --model ./model-ov`
 
-Built on OpenVINO GenAI. Features: interactive chat (streaming, translation, VLM), OpenAI-compatible API server.
+Built on OpenVINO GenAI. Features: interactive chat (streaming, translation, VLM), object detection, image generation, speech recognition, text-to-speech.
 
 ## Quick Start
 
@@ -29,14 +29,11 @@ eval "$(./ov-cli venv)"
 # 4. TTS
 ./ov-cli tts --model ./0.6B-CV-ov --prompt Hello --speaker vivian
 
-# 5. API server
-./ov-cli server --model ./Qwen3/2B-ov
+# 5. Object Detection
+./ov-cli yolo --model ./yolo11n.pt --image input.jpg
 
-# 6. Web UI
-./ov-cli ui --model ./Qwen3/2B-ov
-
-# 7. MCP Protocol
-./ov-cli mcp --model ./Qwen3/2B-ov
+# 6. Speech-to-Text
+./ov-cli asr --model ./Qwen3-ASR-0.6B-ov --mode once --file speech.mp3
 ```
 
 ## How to Upgrade
@@ -84,16 +81,13 @@ Creates a Python venv and installs dependencies. Supports on-demand installation
 | `image` | Text-to-image | — |
 | `asr` | Speech-to-text | soundfile, qwen-asr |
 | `tts` | Text-to-speech | soundfile, qwen-tts |
-| `ui` | Gradio Web UI | gradio |
-| `mcp` | MCP protocol server | — |
-| `server` | API server | fastapi, uvicorn |
+| `yolo` | Object detection | ultralytics |
 
-> **Translate** is now a standalone `translate` command (was `chat --mode translate`). Supports interactive/once/pipe modes.
-
-> `convert` module removed. Each model requires different `optimum-intel` / `transformers` versions — a unified entry point creates more compatibility issues than it solves. Use [`optimum-cli`](https://huggingface.co/docs/optimum/main/en/intel/export) directly for conversions.
-
-> **`--reasoning off` removed**: This feature relied on a custom-compiled OpenVINO GenAI and is now deprecated.
-> Waiting for [PR #4139](https://github.com/openvinotoolkit/openvino/pull/4139) to land — after that, reasoning budget will be natively supported.
+> **Optimum format and Optimum chat mode removed**: Gemma-4 and other models can be loaded directly via VLMPipeline, no longer requiring optimum-intel. All code paths unified to OpenVINO GenAI.
+>
+> **server, mcp, ui removed**: The Gradio Web UI (`ov-cli ui`), OpenAI-compatible HTTP API server (`ov-cli server`), and MCP protocol server (`ov-cli mcp`) have been removed. These network interfaces primarily served as a local LLM backend for AI coding assistants (opencode/VS Code Copilot), but small local models (<35B) offer limited utility for coding tasks — effective coding assistants require 150B+ models. These may return when running large models locally becomes feasible.
+>
+> **`build_info` no longer references optimum-intel**: Optimum is no longer in the codebase.
 
 **Fix mode** (`--fix`): Upgrades installed modules only, reapplies patches, no rebuild.
 
@@ -179,14 +173,11 @@ Interactive terminal. Auto-detects model format (GenAI / Optimum), supports stre
 | `--file PATH` | Upload file(s), auto-detect type (PDF/image/text) |
 | `--output PATH` | Save result as .md file (auto-name or explicit path) |
 
-### `server` — API Server
-
-Starts an OpenAI-compatible HTTP API server.
+### `benchmark` — Benchmark
 
 ```bash
-./ov-cli server --model ./Qwen3/8B-ov                              # default port 8080
-./ov-cli server --model ./model-ov --port 8081 --host 0.0.0.0
-./ov-cli server --model ./model-ov --device CPU                     # force CPU
+./ov-cli benchmark --model ./Qwen3.5/0.8B-ov
+./ov-cli benchmark --model ./Qwen3.6/35B-A3B-ov
 ```
 
 **API Endpoints**:
@@ -235,89 +226,41 @@ EOF
 ./ov-cli benchmark --model ./Qwen3.6/35B-A3B-ov
 ```
 
-### `ui` — Web UI
+### `yolo` — Object Detection
 
-Launch a Gradio Web UI that auto-detects the model type (chat/tts/asr/image) and provides a visual interface.
-
-```bash
-# Chat UI
-./ov-cli ui --model ./Qwen3/2B-ov
-./ov-cli ui --model ./Qwen3/8B-ov --port 7861                      # Custom port
-./ov-cli ui --model ./model-vlm-ov --share                          # Public link
-./ov-cli ui --model ./deepseek/7B-ov
-
-# TTS / ASR / Text-to-Image UI
-./ov-cli ui --model ./0.6B-CV-ov                                    # TTS
-./ov-cli ui --model ./Qwen3-ASR-0.6B-ov                             # ASR
-./ov-cli ui --model ./FLUX/ov-int4                                  # Text-to-Image
-```
-
-**Chat UI features**:
-- Streaming output, multi-turn conversation
-- Image upload (VLM models)
-- Chat history save / load / delete
-- `Ctrl+C` safe exit
-
-### `image` — Text-to-Image
-
-Text-to-image via OpenVINO GenAI Text2ImagePipeline. Supports interactive and single modes.
+Powered by Ultralytics YOLO + OpenVINO. Supports automatic .pt export and direct OpenVINO IR inference.
 
 ```bash
-# Interactive (multi-turn)
-./ov-cli image --model ./FLUX/ov-int4
+# Single image
+./ov-cli yolo --model ./yolo11n.pt --image input.jpg
+./ov-cli yolo --model ./yolo11n_openvino_model/ --image input.jpg   # Direct IR
+./ov-cli yolo --model ./yolo11n.pt --image input.jpg --output result.jpg
+./ov-cli yolo --model ./yolo11n.pt --image input.jpg --json          # JSON output
+./ov-cli yolo --model ./yolo11n.pt --image input.jpg --device GPU    # GPU inference
+./ov-cli yolo --model ./yolo11n.pt --image input.jpg --classes person,car
 
-# Single mode (auto-exit)
-./ov-cli image --model ./FLUX/ov-int4 --mode once --prompt "cat" -o cat.png
-./ov-cli image --model ./FLUX/ov-int4 --mode once --prompt "cat" --json
+# Batch processing
+./ov-cli yolo --model ./yolo11n.pt --dir ./images/ --output ./results/
+./ov-cli yolo --model ./yolo11n.pt --dir ./images/ --json
 ```
 
-**In-chat commands** (interactive mode only, Text2Image):
+**Options:**
 
-| Command | Description |
-|---------|-------------|
-| `/size W H` | Set resolution (default 512x512) |
-| `/steps N` | Inference steps (default 4) |
-| `/guidance F` | Guidance scale (default 0.0) |
-| `/seed [N]` | Set/reset random seed |
-| `/save DIR` | Set output directory |
-| `/history` | View generated images |
-| `/help` | Help |
-| `/exit` | Exit |
+| Option | Description |
+|--------|-------------|
+| `--image` / `-i` | Input image path or URL |
+| `--dir` | Batch process all images in directory |
+| `--output` / `-o` | Save annotated image/directory |
+| `--json` | JSON format output |
+| `--device` | Inference device (CPU/GPU/GPU.N/NPU) |
+| `--classes` | Filter classes (IDs or names) |
+| `--conf` | Confidence threshold (default 0.25) |
+| `--iou` | NMS IoU threshold (default 0.45) |
+| `--camera` | Camera device ID (experimental) |
 
-### `mcp` — MCP Protocol Server
+> Automatically detects detect/segment/pose/classify tasks.
 
-MCP (Model Context Protocol) server that exposes LLM tools via stdin/stdout JSON-RPC.
-Can be used by VS Code Copilot (agent mode), Cursor, Claude Desktop, and other MCP-compatible AI tools.
 
-```bash
-./ov-cli mcp --model ./Qwen3/2B-ov
-./ov-cli mcp --model ./deepseek/7B-ov
-```
-
-**Exposed tools:**
-
-| Tool | Description |
-|------|-------------|
-| `chat` | Send a prompt to the local LLM and get a response |
-| `chat_stream` | Streaming chat, returns text chunks |
-
-**VS Code config** (`.vscode/mcp.json`) for example (replace paths with yours):
-```json
-{
-  "servers": {
-    "ov-cli": {
-      "command": "/run/media/amigor/Project/ov-cli/.venv/bin/ov-cli",
-      "args": ["mcp", "--model", "/run/media/amigor/Project/ov-cli/model/deepseek/7B-ov"],
-      "type": "stdio",
-      "description": "Local LLM inference (chat, translation, Q&A)"
-    }
-  }
-}
-```
-
-**Other platforms** (Cursor → `.cursor/mcp.json`, Claude Desktop → `claude_desktop_config.json`), format is similar.
-
-### `tts` — TTS
 
 Text-to-speech via OpenVINO Qwen3-TTS. Once mode only.
 
@@ -636,22 +579,15 @@ ov-cli/
 │   ├── __init__.py          # Package info + i18n
 │   ├── __main__.py          # python -m ov_cli entry
 │   ├── cli.py               # CLI parser + dispatcher + setup
-│   ├── chat.py              # Chat/translate terminal (GenAI + Optimum)
+│   ├── chat.py              # Chat/translate terminal (GenAI)
+│   ├── translate.py         # Translate command
 │   ├── image.py             # Text-to-image terminal
 │   ├── tts.py               # TTS terminal
 │   ├── asr.py               # Speech-to-text terminal
-│   ├── ui.py                # Gradio web UI
-│   ├── server.py            # FastAPI OpenAI-compatible server│   ├── mcp.py               # MCP protocol server│   └── benchmark.py         # Performance benchmark
-│
-└── openvino.genai-2026.2.0.0-optimization/  # Modified GenAI source (full mode)
-```
-
-## Dependencies
-
-- Python >= 3.10
-- OpenVINO >= 2026.2, openvino-genai
-- Optimum Intel >= 1.27.0 (GitHub source)
-- transformers >= 5.9, torch, torchvision
+│   ├── yolo.py              # YOLO object detection
+│   ├── benchmark.py         # Performance benchmark
+│   ├── features.py          # Feature-based dependency management
+│   └── setup.py             # Venv creation + dependency installation
 - GPU: Intel integrated / Arc (auto-detected)
 - CPU: Any x86-64
 

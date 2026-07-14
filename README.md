@@ -22,9 +22,7 @@
 | 🎨 文生图 | `ov-cli image` | Stable Diffusion / Flux |
 | 🎤 语音转文字 | `ov-cli asr` | Whisper / Qwen3-ASR |
 | 📢 语音合成 | `ov-cli tts` | Qwen3-TTS |
-| 🖥 API 服务 | `ov-cli server` | OpenAI 兼容 API |
-| 🔗 MCP 协议 | `ov-cli mcp` | LLM 工具调用 |
-| 🌐 Web 界面 | `ov-cli ui` | Gradio 可视化 |
+| 🎯 目标检测 | `ov-cli yolo` | YOLO11 (Ultralytics + OpenVINO) |
 
 ## 快速开始
 
@@ -39,20 +37,14 @@ source .venv/bin/activate
 # 3. 翻译
 ./ov-cli translate --model ./Qwen3.5/4B-ov-int4
 
-# 4. 文生图
+# 6. 目标检测
+./ov-cli yolo --model ./yolo11n.pt --image input.jpg
+
+# 7. 文生图
 ./ov-cli image --model ./FLUX/ov-int4
 
-# 5. TTS 语音合成
+# 8. TTS 语音合成
 ./ov-cli tts --model ./0.6B-CV-ov --prompt 你好 --speaker Vivian
-
-# 6. API 服务
-./ov-cli server --model ./Qwen3/8B-ov-int4-v2
-
-# 7. Web 界面
-./ov-cli ui --model ./Qwen3/2B-ov-int4
-
-# 8. MCP 协议
-./ov-cli mcp --model ./Qwen3/2B-ov-int4
 ```
 
 ## 如何升级
@@ -102,14 +94,16 @@ git pull
 | `image` | 文生图 | — |
 | `asr` | 语音识别 | soundfile, scipy, qwen-asr |
 | `tts` | 语音合成 | soundfile, sox, qwen-tts |
-| `ui` | Gradio Web 界面 | gradio |
-| `mcp` | MCP 协议服务器 | — |
-| `server` | API 服务器 | fastapi, uvicorn |
+| `yolo` | 目标检测 | ultralytics |
 
 > **翻译功能**已从 `chat` 独立为 `translate` 子命令，支持交互式/once/pipe 三种模式。
 
 > `convert` 模块已移除。每个模型对 `optimum-intel` / `transformers` 的版本要求不同，统一入口反而制造兼容性问题。转换直接用 [`optimum-cli`](https://huggingface.co/docs/optimum/main/en/intel/export)。
 
+> **Optimum 格式支持和 Optimum 聊天模式已移除**：Gemma-4 等模型可直接用 VLMPipeline 加载，不再需要 optimum-intel。所有代码路径统一为 OpenVINO GenAI。
+>
+> **server、mcp、ui 已移除**：基于 Gradio 的 Web 界面（`ov-cli ui`）、OpenAI 兼容 HTTP API 服务器（`ov-cli server`）、和 MCP 协议服务器（`ov-cli mcp`）已移除。这些网络接口主要为 AI 编程助手（opencode/VS Code Copilot）提供 LLM 后端，而本地小模型（<35B）在编码场景下实用性有限——真正有效的 coding assistant 需要 150B+ 级别模型。当本地能运行超大模型时再考虑恢复。
+>
 > **`--reasoning off` 已移除**：该功能依赖自定义编译的 OpenVINO GenAI，现已弃用。
 > 等 [PR #4139](https://github.com/openvinotoolkit/openvino/pull/4139) 合并后，OpenVINO 将原生支持 reasoning budget。
 
@@ -250,70 +244,41 @@ EOF
 )" | python3 -m json.tool
 ```
 
-### `benchmark` — 性能测试
+### `yolo` — 目标检测
+
+基于 Ultralytics YOLO + OpenVINO 后端。支持 `.pt` 自动导出和 OpenVINO IR 直接推理。
 
 ```bash
-./ov-cli benchmark --model ./Qwen3.5/0.8B-ov-int4
-./ov-cli benchmark --model ./Qwen3.6/35B-A3B-ov-int4
+# 单张图片检测
+./ov-cli yolo --model ./yolo11n.pt --image input.jpg
+./ov-cli yolo --model ./yolo11n_openvino_model/ --image input.jpg   # 直接 IR
+./ov-cli yolo --model ./yolo11n.pt --image input.jpg --output result.jpg
+./ov-cli yolo --model ./yolo11n.pt --image input.jpg --json          # JSON 输出
+./ov-cli yolo --model ./yolo11n.pt --image input.jpg --device GPU    # GPU 推理
+./ov-cli yolo --model ./yolo11n.pt --image input.jpg --classes person,car  # 类别过滤
+
+# 批量处理目录
+./ov-cli yolo --model ./yolo11n.pt --dir ./images/ --output ./results/
+./ov-cli yolo --model ./yolo11n.pt --dir ./images/ --json
 ```
 
-### `ui` — Web 界面
+**参数：**
 
-启动 Gradio Web UI，自动检测模型类型（chat/tts/asr/image），提供对应的可视化界面。
-
-```bash
-# 聊天界面
-./ov-cli ui --model ./Qwen3/2B-ov-int4
-./ov-cli ui --model ./Qwen3/8B-ov-int4-v2 --port 7861              # 指定端口
-./ov-cli ui --model ./model-vlm-ov --share                          # 公开链接
-./ov-cli ui --model ./deepseek/7B-ov
-
-# TTS / ASR / 文生图界面
-./ov-cli ui --model ./0.6B-CV-ov                                    # TTS
-./ov-cli ui --model ./Qwen3-ASR-0.6B-ov                             # ASR
-./ov-cli ui --model ./FLUX/ov-int4                                  # 文生图
-```
-
-**聊天界面功能**：
-- 流式输出、多轮对话
-- 图片上传（VLM 模型）
-- 对话历史保存 / 加载 / 删除
-- `Ctrl+C` 安全退出
-
-### `mcp` — MCP 协议服务器
-
-启动 MCP (Model Context Protocol) 服务器，通过 stdin/stdout JSON-RPC 暴露 LLM 工具。
-可被 VS Code Copilot (agent 模式)、Cursor、Claude Desktop 等支持 MCP 的 AI 编程工具调用。
-
-```bash
-./ov-cli mcp --model ./Qwen3/2B-ov
-./ov-cli mcp --model ./deepseek/7B-ov
-```
-
-**暴露的工具：**
-
-| 工具 | 说明 |
+| 参数 | 说明 |
 |------|------|
-| `chat` | 向本地 LLM 发送提示并获取回复 |
-| `chat_stream` | 流式聊天，逐块返回文本 |
+| `--image` / `-i` | 输入图片路径或 URL |
+| `--dir` | 批量处理目录下所有图片 |
+| `--output` / `-o` | 保存结果图片/目录 |
+| `--json` | JSON 格式输出 |
+| `--device` | 推理设备 (CPU/GPU/GPU.N/NPU) |
+| `--classes` | 只检测指定类别（数字ID或名称） |
+| `--conf` | 置信度阈值（默认 0.25） |
+| `--iou` | NMS IoU 阈值（默认 0.45） |
+| `--camera` | 摄像头 ID（实验性） |
 
-**VS Code 配置**（`.vscode/mcp.json`）例如（将路径替换为你的实际路径）：
-```json
-{
-  "servers": {
-    "ov-cli": {
-      "command": "/run/media/amigor/Project/ov-cli/.venv/bin/ov-cli",
-      "args": ["mcp", "--model", "/run/media/amigor/Project/ov-cli/model/deepseek/7B-ov"],
-      "type": "stdio",
-      "description": "本地 LLM 推理（聊天、翻译、问答）"
-    }
-  }
-}
-```
+> 支持 detect/segment/pose/classify 等任务类型，模型自动识别。
 
-**其他平台**（Cursor → `.cursor/mcp.json`，Claude Desktop → `claude_desktop_config.json`），格式基本一致。
 
-### `tts` — 语音合成
 
 使用 OpenVINO Qwen3-TTS 生成语音，仅支持单次。
 
@@ -672,16 +637,15 @@ ov-cli/
 │   ├── __init__.py          # 包信息 + i18n
 │   ├── __main__.py          # python -m ov_cli 入口
 │   ├── cli.py               # CLI 参数解析 + 命令分发 + setup
-│   ├── chat.py              # 聊天/翻译终端（GenAI + Optimum）
+│   ├── chat.py              # 聊天/翻译终端（GenAI）
+│   ├── translate.py         # 翻译独立命令
 │   ├── image.py             # 文生图终端
 │   ├── tts.py               # TTS 语音合成终端
 │   ├── asr.py               # 语音转文字终端
-│   ├── server.py            # FastAPI OpenAI 兼容服务
-│   ├── mcp.py               # MCP 协议服务器
-│   └── benchmark.py         # 性能测试
-│
-└── openvino.genai-2026.2.0.0-optimization/  # 修改版 GenAI 源码（实验性）
-```
+│   ├── yolo.py              # YOLO 目标检测
+│   ├── benchmark.py         # 性能测试
+│   ├── features.py          # 按需安装模块管理
+│   └── setup.py             # venv 创建 + 依赖安装
 
 ## 依赖
 
