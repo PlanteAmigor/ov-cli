@@ -92,7 +92,7 @@ git pull
 |------|------|---------|
 | `chat` | 聊天终端 | PyMuPDF, soxr |
 | `image` | 文生图 | — |
-| `asr` | 语音识别 | soundfile, scipy, qwen-asr |
+| `asr` | 语音识别 | soundfile, scipy |
 | `tts` | 语音合成 | soundfile, sox, qwen-tts |
 | `yolo` | 目标检测 | ultralytics |
 
@@ -526,7 +526,7 @@ optimum-cli export openvino -m ./Qwen3-TTS-0.6B-CV --output ./0.6B-CV-ov
 # Qwen3-TTS Base（声音克隆）
 optimum-cli export openvino -m ./Qwen3-TTS-0.6B --output ./0.6B-ov
 
-# Qwen3-ASR（需安装 qwen-asr）
+# Qwen3-ASR（转 IR 后用 ov-cli asr 加载，无需额外 pip 包）
 optimum-cli export openvino -m ./Qwen3-ASR-0.6B --output ./Qwen3-ASR-0.6B-ov
 ```
 

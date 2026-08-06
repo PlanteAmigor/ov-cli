@@ -4,7 +4,7 @@ ov-cli features: 按需安装的功能模块管理。
 支持的功能:
   chat      — 聊天终端 (+PyMuPDF)
   image     — 文生图
-  asr       — 语音识别 (+qwen-asr, soundfile, scipy)
+  asr       — 语音识别 (+soundfile, scipy)
   tts       — 语音合成 (+qwen-tts, soundfile)
   yolo      — 目标检测 (+ultralytics)
 
@@ -47,7 +47,6 @@ _FEATURE_PACKAGES = {
 }
 
 _FEATURE_EXTRA_PIPS = {
-    "asr":  ["qwen-asr"],
     "tts":  ["qwen-tts"],
 }
 
@@ -66,7 +65,7 @@ def get_packages(features: set[str]) -> list[str]:
 
 
 def get_extra_pips(features: set[str]) -> list[str]:
-    """获取额外 pip 包（qwen-tts/asr 等外部包）。"""
+    """获取额外 pip 包（qwen-tts 等外部包）。"""
     pkgs = []
     for f in features:
         pkgs.extend(_FEATURE_EXTRA_PIPS.get(f, []))

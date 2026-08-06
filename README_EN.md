@@ -79,7 +79,7 @@ Creates a Python venv and installs dependencies. Supports on-demand installation
 |--------|-------------|-----------|
 | `chat` | Chat terminal | PyMuPDF |
 | `image` | Text-to-image | — |
-| `asr` | Speech-to-text | soundfile, qwen-asr |
+| `asr` | Speech-to-text | soundfile, scipy |
 | `tts` | Text-to-speech | soundfile, qwen-tts |
 | `yolo` | Object detection | ultralytics |
 
@@ -466,7 +466,7 @@ optimum-cli export openvino -m ./Qwen3-TTS-0.6B-CV --output ./0.6B-CV-ov
 # Qwen3-TTS Base (voice clone)
 optimum-cli export openvino -m ./Qwen3-TTS-0.6B --output ./0.6B-ov
 
-# Qwen3-ASR (requires qwen-asr)
+# Qwen3-ASR (load via ov-cli asr after conversion, no extra pip package)
 optimum-cli export openvino -m ./Qwen3-ASR-0.6B --output ./Qwen3-ASR-0.6B-ov
 ```
 

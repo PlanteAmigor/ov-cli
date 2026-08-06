@@ -22,7 +22,7 @@ _ALL_FEATURES = {"chat", "image", "asr", "tts", "yolo"}
 _FEATURE_HINTS = {
     "chat":    "聊天终端（PyMuPDF ~15MB）",
     "image":   "文生图（无额外依赖）",
-    "asr":     "语音识别（soundfile + qwen-asr ~50MB）",
+    "asr":     "语音识别（soundfile + scipy）",
     "tts":     "语音合成（soundfile + qwen-tts ~50MB）",
     "yolo":    "目标检测（ultralytics ~30MB）",
 }
@@ -104,8 +104,8 @@ def _install_features(pip, features: set[str], workspace, fix_mode=False):
         print(f"  ⚡ {TR('安装 {}...', 'Installing {}...').format(pkg)}")
         subprocess.check_call([pip, "install", "--quiet", pkg], timeout=180)
 
-    # qwen 包可能拉入 CUDA torch，强制换回 CPU 版
-    if "asr" in features or "tts" in features:
+    # qwen-tts 包可能拉入 CUDA torch，强制换回 CPU 版
+    if "tts" in features:
         print(f"  ⚡ {TR('修复 torch 为 CPU 版...', 'Fixing torch to CPU version...')}")
         subprocess.check_call([pip, "install", "--force-reinstall", "--no-deps",
                                "torch", "--index-url", "https://download.pytorch.org/whl/cpu"])
