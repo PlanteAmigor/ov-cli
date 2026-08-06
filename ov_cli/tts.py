@@ -6,7 +6,7 @@ ov-cli tts: 语音合成终端。
 
 import os, sys, time, json, subprocess
 from pathlib import Path
-from ov_cli import TR
+from ov_cli import TR, has_gpu
 
 
 def _pip_version(pkg):
@@ -46,8 +46,7 @@ def _restore_tf(need_restore=True):
 
 def _choose_device():
     """自动选择设备: GPU 优先。"""
-    import openvino as ov
-    return "GPU" if "GPU" in ov.Core().available_devices else "CPU"
+    return "GPU" if has_gpu() else "CPU"
 
 
 # ── 加载模型 ──

@@ -4,7 +4,7 @@ ov-cli: OpenVINO LLM 命令行工具
 
 import os, sys, argparse
 import ov_cli
-from ov_cli import TR
+from ov_cli import TR, has_gpu
 from ov_cli.setup import cmd_setup
 
 # 工作区根目录
@@ -36,8 +36,7 @@ def _check_wsl2_gpu():
     except Exception:
         return
     try:
-        import openvino as ov
-        if "GPU" not in ov.Core().available_devices:
+        if not has_gpu():
             print(f"  {TR('⚠ WSL2 检测到 Intel GPU 但缺少 runtime，请安装:', '⚠ WSL2: Intel GPU detected but runtime missing, install:')}")
             print(f"    sudo apt install intel-level-zero-gpu libze1")
     except Exception:
