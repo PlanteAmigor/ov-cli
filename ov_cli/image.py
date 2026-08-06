@@ -7,7 +7,7 @@ ov-cli image: 文生图终端。
 import os, sys, time, json
 import openvino_genai as ov_genai
 from PIL import Image
-from ov_cli import TR, has_gpu
+from ov_cli import TR, pick_device
 from ov_cli.chat import readline
 
 
@@ -23,8 +23,8 @@ _DEFAULT_SAVE_DIR = "outputs"
 # ── 加载模型 ──
 
 def _choose_device():
-    """自动选择设备: GPU 优先。"""
-    return "GPU" if has_gpu() else "CPU"
+    """自动选择设备: GPU 优先（编译探测，排除不可用 GPU）。"""
+    return pick_device()
 
 
 def load_model(ov_path, device=None):

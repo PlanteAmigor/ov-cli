@@ -8,7 +8,7 @@ ov-cli asr: 语音转文字终端。
 import os, sys, time, json
 import openvino as ov
 import openvino_genai as ov_genai
-from ov_cli import TR, has_gpu
+from ov_cli import TR, pick_device
 from ov_cli.chat import readline
 
 # ── 支持的音频格式 ──
@@ -92,7 +92,7 @@ def load_model(ov_path, device=None):
 def _load_whisper(ov_path, device=None):
     """加载 WhisperPipeline。"""
     if not device:
-        device = "GPU" if has_gpu() else "CPU"
+        device = pick_device()
     print(f"  {TR('加载 WhisperPipeline ({})...', 'Loading WhisperPipeline ({})...').format(device)}", end=" ", flush=True, file=sys.stderr)
     t0 = time.time()
     pipe = ov_genai.WhisperPipeline(ov_path, device)
@@ -103,7 +103,7 @@ def _load_whisper(ov_path, device=None):
 def _load_qwen3_asr(ov_path, device=None):
     """加载 Qwen3-ASR 官方 ASRPipeline。"""
     if not device:
-        device = "GPU" if has_gpu() else "CPU"
+        device = pick_device()
     print(f"  {TR('加载 Qwen3-ASR ASRPipeline ({})...', 'Loading Qwen3-ASR ASRPipeline ({})...').format(device)}", end=" ", flush=True, file=sys.stderr)
     t0 = time.time()
     pipe = ov_genai.ASRPipeline(ov_path, device)

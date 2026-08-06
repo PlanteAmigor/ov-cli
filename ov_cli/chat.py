@@ -8,6 +8,7 @@ import os, sys, time, json, re, signal, threading
 import readline  # 激活 input() 的 ←→↑↓ + 历史记录
 import openvino as ov
 import openvino_genai as ov_genai
+from . import pick_device
 
 
 def _make_streamer(reply_parts, stop_flag, on_first_token=None, thinking_filter=False):
@@ -80,8 +81,7 @@ def _is_multimodal(model_path):
 def load_model(ov_path, device=""):
     """加载 OpenVINO 模型。自动检测 GenAI/传统格式。"""
     if not device:
-        devices = ov.Core().available_devices
-        device = next((d for d in devices if "GPU" in d), "CPU")
+        device = pick_device()
 
     if _is_genai_format(ov_path):
         is_vlm = _is_multimodal(ov_path)
