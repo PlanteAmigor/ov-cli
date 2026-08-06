@@ -17,16 +17,14 @@ from ov_cli.features import get_packages, get_extra_pips, get_exclusive_packages
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-_ALL_FEATURES = {"chat", "image", "asr", "tts", "ui", "mcp", "server"}
+_ALL_FEATURES = {"chat", "image", "asr", "tts", "yolo"}
 
 _FEATURE_HINTS = {
     "chat":    "聊天终端（PyMuPDF ~15MB）",
     "image":   "文生图（无额外依赖）",
     "asr":     "语音识别（soundfile + qwen-asr ~50MB）",
     "tts":     "语音合成（soundfile + qwen-tts ~50MB）",
-    "ui":      "Web 界面（gradio ~30MB）",
-    "mcp":     "MCP 协议服务器（无额外依赖）",
-    "server":  "API 服务（fastapi + uvicorn ~15MB）",
+    "yolo":    "目标检测（ultralytics ~30MB）",
 }
 
 

@@ -115,12 +115,6 @@ def cmd_tts(args):
              instruct=args.instruct, ref_audio=args.ref_audio,
              warmup=not args.no_warmup, json_output=args.json)
 
-@_require("ui", hint="./ov-cli setup --with ui")
-def cmd_ui(args):
-    """ov-cli ui: 网页界面"""
-    from .ui import launch_ui
-    launch_ui(model_path=args.model, device=args.device, port=args.port, share=args.share)
-
 @_require("chat", hint="./ov-cli setup --with chat")
 def cmd_translate(args):
     """ov-cli translate"""
@@ -248,8 +242,6 @@ _HELP_EPILOG_ZH = (
     "  ./ov-cli asr --model ./whisper/ov-large\n"
     "  ./ov-cli image --model ./FLUX/ov-int4\n"
     "  ./ov-cli tts --model ./0.6B-CV-ov --prompt 你好 --speaker Vivian\n"
-    "  ./ov-cli ui --model ./model-ov\n"
-    "  ./ov-cli server --model ./model-ov --port 8080\n"
     "  ./ov-cli setup --fix\n"
     "  ./ov-cli translate --model ./model-ov\n"
     "  ./ov-cli translate --model ./model-ov --mode once --prompt '你好' --lang en\n"
@@ -261,9 +253,6 @@ _HELP_EPILOG_EN = (
     "  ./ov-cli asr --model ./whisper/ov-large\n"
     "  ./ov-cli image --model ./FLUX/ov-int4\n"
     "  ./ov-cli tts --model ./0.6B-CV-ov --prompt hello --speaker vivian\n"
-    "  ./ov-cli ui --model ./model-ov\n"
-    "  ./ov-cli server --model ./model-ov --port 8080\n"
-    "  ./ov-cli mcp --model ./model-ov\n"
     "  ./ov-cli translate --model ./model-ov\n"
     "  ./ov-cli translate --model ./model-ov --mode once --prompt '你好' --lang en\n"
     "  echo 'hello' | ./ov-cli translate --mode pipe --lang zh\n"
@@ -294,9 +283,9 @@ def main():
     # setup
     p = sub.add_parser("setup", help=TR("创建环境", "Setup"))
     p.add_argument("--with", dest="with_features", default="all",
-        help=TR("按需安装 (chat,image,asr,tts,mcp,server,yolo)", "Features (chat,image,asr,tts,mcp,server,yolo)"))
+        help=TR("按需安装 (chat,image,asr,tts,yolo)", "Features (chat,image,asr,tts,yolo)"))
     p.add_argument("--remove", dest="remove_features", default="",
-        help=TR("移除模块 (chat,image,asr,tts,mcp,server,yolo)", "Remove features (chat,image,asr,tts,mcp,server,yolo)"))
+        help=TR("移除模块 (chat,image,asr,tts,yolo)", "Remove features (chat,image,asr,tts,yolo)"))
     p.add_argument("--fix", action="store_true", help=TR("修复模式", "Fix mode"))
 
     # translate
@@ -405,22 +394,8 @@ def main():
     p.add_argument("--mode", choices=["interactive","once","pipe"], default="interactive")
     p.add_argument("--file"), p.add_argument("--output", "-o")
     p.add_argument("--lang")
+    p.add_argument("--device", default="", help=TR("推理设备 (CPU/GPU/GPU.N/NPU)", "Device (CPU/GPU/GPU.N/NPU)") + TR("，留空自动选择", ", leave empty for auto)"))
     p.add_argument("--json", action="store_true", help=TR("JSON 格式输出", "JSON output"))
-
-    # ui
-    p = sub.add_parser("ui", help=TR("网页界面", "Web UI"),
-        description=TR(
-            "启动 Gradio 网页界面。自动检测模型类型。\n\n"
-            "示例:\n"
-            "  ov-cli ui --model ./Qwen3-ov\n"
-            "  ov-cli ui --model ./0.6B-CV-ov --port 7860\n"
-            "  ov-cli ui --model ./FLUX-ov --share",
-            "Launch Gradio web UI. Auto-detects model type."))
-    p.add_argument("--model", "-m", required=True)
-    p.add_argument("--device", default=None, help=TR("推理设备", "Device"))
-    p.add_argument("--port", type=int, default=7860, help=TR("端口", "Port"))
-    p.add_argument("--share", action="store_true", help=TR("生成公链", "Public link"))
-
 
     # yolo
     p = sub.add_parser("yolo", help=TR("目标检测", "YOLO Detect"),

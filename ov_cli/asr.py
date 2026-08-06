@@ -1,12 +1,11 @@
 """
 ov-cli asr: 语音转文字终端。
 
-支持 Whisper (GenAI Pipeline) 和 Qwen3-ASR (自定义 OV)。
+支持 Whisper (WhisperPipeline) 和 Qwen3-ASR (ASRPipeline)。
 自动识别模型类型，无需手动指定。
 """
 
-import os, sys, time, json, subprocess
-from pathlib import Path
+import os, sys, time, json
 import openvino as ov
 import openvino_genai as ov_genai
 from ov_cli import TR
@@ -43,65 +42,30 @@ def _print_help():
 
 # ── 加载模型 ──
 
-_ASR_TF_VERSION = "4.57.6"  # Qwen3-ASR 需要 transformers 4.x
+# Qwen3-ASR (ASRPipeline) 的 language 使用语言名，CLI 侧是短码，做映射
+_LANG_MAP = {
+    "zh": "Chinese",
+    "zh-cn": "Chinese",
+    "en": "English",
+    "en-us": "English",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "fr": "French",
+    "de": "German",
+    "es": "Spanish",
+    "ru": "Russian",
+    "it": "Italian",
+    "pt": "Portuguese",
+    "ar": "Arabic",
+    "hi": "Hindi",
+}
 
 
-def _pip_version(pkg):
-    """用 pip list 查版本，不触发 import。"""
-    try:
-        out = subprocess.check_output(
-            [sys.executable, "-m", "pip", "list", "--format=columns"],
-            timeout=10, text=True,
-        )
-        for line in out.splitlines():
-            parts = line.split()
-            if len(parts) >= 2 and parts[0].lower().replace("-", "_") == pkg.lower().replace("-", "_"):
-                return parts[1]
+def _map_lang(lang):
+    """将 CLI 语言短码映射为 Qwen3-ASR 使用的语言名；未知则原样返回。"""
+    if not lang:
         return None
-    except Exception:
-        return None
-
-
-def _ensure_qwen_asr_tf():
-    """Qwen3-ASR 推理前确保 transformers 版本兼容，返回是否需恢复。"""
-    cur = _pip_version("transformers")
-    if cur and cur.startswith("4."):
-        # 已经在 4.x，检查 qwen-asr / qwen-tts 是否兼容
-        return False
-    old_hf = _pip_version("huggingface_hub")
-    print(f"  ⚡ Qwen3-ASR 需要 transformers 4.x（当前 {cur}），临时切换...")
-    subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "--no-deps", "--force-reinstall",
-         f"transformers=={_ASR_TF_VERSION}"],
-        timeout=120,
-    )
-    # huggingface_hub 也要切到 0.x 以兼容 4.x transformers
-    if old_hf and old_hf.startswith("1."):
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "--no-deps", "--force-reinstall",
-             "huggingface_hub==0.36.2"],
-            timeout=60,
-        )
-    print(f"  ✓ 已切换至 transformers {_ASR_TF_VERSION}")
-    return True
-
-
-def _restore_tf(need_restore):
-    """恢复 transformers 到最新版。"""
-    if not need_restore:
-        return
-    print(f"  ⚡ 恢复 transformers...")
-    subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "--no-deps", "--force-reinstall",
-         "transformers"],
-        timeout=120,
-    )
-    subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "--no-deps", "--force-reinstall",
-         "huggingface_hub"],
-        timeout=60,
-    )
-    print(f"  ✓ 已恢复至 transformers {_pip_version('transformers')}")
+    return _LANG_MAP.get(lang.lower(), lang)
 
 
 def _detect_asr_type(ov_path):
@@ -137,24 +101,14 @@ def _load_whisper(ov_path, device=None):
 
 
 def _load_qwen3_asr(ov_path, device=None):
-    """加载 Qwen3-ASR OpenVINO 模型（自动切 transformers 版本）。"""
-    _ensure_qwen_asr_tf()  # 只管切换，不管返回值
-    need_restore = True    # 只要加载了 Qwen3-ASR，退出就得恢复
-    import sys as _sys
-    _sys.path.insert(0, str(Path(__file__).parent.parent / "dlc"))
-    from qwen_3_asr_helper import OVQwen3ASRModel
-
+    """加载 Qwen3-ASR 官方 ASRPipeline。"""
     if not device:
         device = "GPU" if "GPU" in ov.Core().available_devices else "CPU"
-    print(f"  {TR('加载 Qwen3-ASR ({})...', 'Loading Qwen3-ASR ({})...').format(device)}", end=" ", flush=True, file=sys.stderr)
+    print(f"  {TR('加载 Qwen3-ASR ASRPipeline ({})...', 'Loading Qwen3-ASR ASRPipeline ({})...').format(device)}", end=" ", flush=True, file=sys.stderr)
     t0 = time.time()
-    try:
-        model = OVQwen3ASRModel.from_pretrained(ov_path, device=device)
-        print(f"✓ ({time.time()-t0:.1f}s)", file=sys.stderr)
-        return {"model": model, "device": device, "asr_type": "qwen3_asr", "_need_restore": need_restore}
-    except Exception:
-        _restore_tf(need_restore)
-        raise
+    pipe = ov_genai.ASRPipeline(ov_path, device)
+    print(f"✓ ({time.time()-t0:.1f}s)", file=sys.stderr)
+    return {"pipe": pipe, "device": device, "asr_type": "qwen3_asr"}
 
 
 # ── 单次转录 ──
@@ -171,22 +125,27 @@ def _transcribe_whisper(ctx, file_path, lang):
 
 
 def _transcribe_qwen_asr(ctx, file_path, lang):
-    """Qwen3-ASR 单次转录。"""
-    model = ctx["model"]
-    results = model.transcribe(audio=file_path, language=lang)
-    return results[0].text if results else ""
+    """Qwen3-ASR 单次转录（ASRPipeline，输入 16k 归一化 float 列表）。"""
+    pipe = ctx["pipe"]
+    data = _load_audio(file_path)
+    if data.ndim > 1:  # 立体声转单声道
+        data = data.mean(axis=1)
+    kwargs = {}
+    mapped = _map_lang(lang)
+    if mapped:
+        kwargs["language"] = mapped
+    result = pipe.generate(data.tolist(), **kwargs)
+    return result.texts[0] if result.texts else ""
 
 
 def run_once(ctx, file_path, lang=None, output=None, json_output=False):
     """单次转录，输出完自动退出。"""
     import json as _json
-    need_restore = ctx.get("_need_restore", False)
 
     ok, ext = _is_audio_file(file_path)
     if not ok:
         print(f"  ❌ {TR('不支持的文件格式: {}', 'Unsupported format: {}').format(ext)}", file=sys.stderr)
         print(f"     {TR('支持的格式:', 'Supported formats:')} {FORMAT_HINT}", file=sys.stderr)
-        _restore_tf(need_restore)
         return
 
     print(f"  {TR('⏳ 转录中...', '⏳ Transcribing...')}", end=" ", flush=True, file=sys.stderr)
@@ -200,7 +159,6 @@ def run_once(ctx, file_path, lang=None, output=None, json_output=False):
     except Exception as e:
         print(f"✗", file=sys.stderr)
         print(f"  {TR('转录失败', 'Transcription failed')}: {str(e)[:200]}", file=sys.stderr)
-        _restore_tf(need_restore)
         sys.exit(1)
 
     elapsed = time.time() - t0
@@ -225,8 +183,6 @@ def run_once(ctx, file_path, lang=None, output=None, json_output=False):
             f.write(f"\n\n<!-- ov-cli asr | {time.strftime('%Y-%m-%d %H:%M:%S')} | {file_path} -->\n")
         print(f"  {TR('已保存', 'Saved')}: {output}", file=sys.stderr)
 
-    _restore_tf(need_restore)
-
 
 # ── 管道模式 ──
 
@@ -239,11 +195,9 @@ def run_pipe(ctx, lang=None):
     """
     import json as _json
     asr_type = ctx.get("asr_type", "whisper")
-    need_restore = ctx.get("_need_restore", False)
 
     print(f"  🧪 {TR('管道模式已启动 (stdin/stdout)', 'Pipe mode started (stdin/stdout)')}", file=sys.stderr)
-    try:
-        while True:
+    while True:
             line = sys.stdin.readline()
             if not line:
                 break
@@ -271,16 +225,13 @@ def run_pipe(ctx, lang=None):
 
             elapsed = time.time() - t0
             print(_json.dumps({"text": text, "time": round(elapsed, 1)}, ensure_ascii=False), flush=True)
-    finally:
-        _restore_tf(need_restore)
 
 
 # ── 交互模式 ──
 
 def run_whisper(ctx, lang=None):
     """交互式转录终端。"""
-    pipe = ctx.get("pipe")  # Whisper only
-    model = ctx.get("model")  # Qwen3-ASR only
+    pipe = ctx.get("pipe")  # Whisper / Qwen3-ASR 共用
     asr_type = ctx.get("asr_type", "whisper")
     current_lang = lang
 
@@ -301,9 +252,7 @@ def run_whisper(ctx, lang=None):
     print("=" * 50)
     print()
 
-    need_restore = ctx.get("_need_restore", False)
-    try:
-        while True:
+    while True:
             try:
                 line = readline().strip()
             except (EOFError, KeyboardInterrupt):
@@ -348,8 +297,7 @@ def run_whisper(ctx, lang=None):
 
             try:
                 if asr_type == "qwen3_asr":
-                    results = model.transcribe(audio=file_path, language=current_lang)
-                    text = results[0].text if results else ""
+                    text = _transcribe_qwen_asr(ctx, file_path, current_lang)
                     elapsed = time.time() - t0
                     print(f"✓ ({elapsed:.1f}s)")
                 else:
@@ -370,5 +318,3 @@ def run_whisper(ctx, lang=None):
                 print("─" * 50)
             except Exception as e:
                 print(f"  ❌ {TR('转录失败', 'Transcription failed')}: {e}")
-    finally:
-        _restore_tf(need_restore)
